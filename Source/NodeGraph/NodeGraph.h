@@ -8,10 +8,7 @@ class NodeGraph
 {
 public:
     static NodeGraph* CreateDefaultNodeGraph();
-
 public:
-    void SetFirstID(UniqueID firstID) { m_FirstID = firstID; }
-    UniqueID GetFirstID() const { return m_FirstID; }
 
     void AddNode(EditorNode* node);
     void AddLink(const EditorNodeLink& link);
@@ -67,8 +64,6 @@ public:
     unsigned GetLinkCount() const { return m_Links.size(); }
 
 private:
-    UniqueID m_FirstID = 1;
-
     std::unordered_map<NodeID, Ptr<EditorNode>> m_Nodes;
     std::unordered_map<LinkID, EditorNodeLink> m_Links;
 };

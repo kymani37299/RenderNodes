@@ -75,6 +75,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>Default</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -133,6 +134,8 @@
     <ClInclude Include="Source\Execution\RenderPipelineExecutor.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraphCompiler.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h" />
+    <ClInclude Include="Source\IDGen.h" />
+    <ClInclude Include="Source\Util\Hash.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="External\ImGUI-Nodes\imgui_bezier_math.inl" />

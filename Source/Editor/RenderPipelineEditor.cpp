@@ -3,22 +3,7 @@
 #include <atomic>
 
 #include "../Common.h"
-
-std::atomic_int s_NextID = 1;
-
-namespace EditorPrivate
-{
-    void InitIDGenerator(UniqueID firstID)
-    {
-        ASSERT(firstID);
-        s_NextID = firstID;
-    }
-
-    UniqueID GenerateID()
-    {
-        return s_NextID.fetch_add(1);
-    }
-}
+#include "../IDGen.h"
 
 RenderPipelineEditor::~RenderPipelineEditor()
 {
@@ -49,7 +34,6 @@ void RenderPipelineEditor::Load(const std::string& settingsPath, NodeGraph* node
     m_EditorContext = ImNode::CreateEditor(&config);
 
     m_NodeGraph = Ptr<NodeGraph>(nodeGraph);
-    EditorPrivate::InitIDGenerator(m_NodeGraph->GetFirstID());
 }
 
 void RenderPipelineEditor::UpdateEditor()
@@ -85,7 +69,7 @@ void RenderPipelineEditor::UpdateEditor()
                 }
                 else if (ImNode::AcceptNewItem(ImColor(128, 255, 128), 4.0f))
                 {
-                    m_NodeGraph->AddLink(EditorNodeLink{ EditorPrivate::GenerateID(), startPin.ID, endPin.ID });
+                    m_NodeGraph->AddLink(EditorNodeLink{ IDGen::Generate(), startPin.ID, endPin.ID });
                 }
             }
         }
@@ -165,6 +149,8 @@ void RenderPipelineEditor::RenderContextMenus()
         if (ImGui::MenuItem("Float node")) newNode = new FloatEditorNode();
         if (ImGui::MenuItem("Print node")) newNode = new PrintEditorNode();
         if (ImGui::MenuItem("Float binary operator node")) newNode = new FloatBinaryOperatorEditorNode();
+        if (ImGui::MenuItem("Asign float")) newNode = new AsignFloatEditorNode();
+        if (ImGui::MenuItem("Var float")) newNode = new VarFloatEditorNode();
 
         if (newNode)
         {

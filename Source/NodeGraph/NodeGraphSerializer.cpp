@@ -28,7 +28,7 @@ void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& no
 
 	WriteToken(BEGIN_FILE_TOKEN);
 	WriteAttribute("Version", VERSION);
-	WriteAttribute("FirstID", EditorPrivate::GenerateID());
+	WriteAttribute("FirstID", IDGen::Generate());
 	WriteNodeList();
 	WriteLinkList();
 	WriteToken(END_FILE_TOKEN);
@@ -38,26 +38,19 @@ void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& no
 	m_NodeReadGraph = nullptr;
 }
 
-bool NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGraph)
+UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGraph)
 {
 	m_OperationSuccess = true;
 	m_NodeWriteGraph = &nodeGraph;
 
 	m_Input = std::ifstream{ path };
-	if (!m_Input.is_open()) return false;
+	if (!m_Input.is_open()) return 0;
 
 	EatToken(BEGIN_FILE_TOKEN);
 	
 	m_Version = ReadIntAttr("Version");
+	unsigned firstID = ReadIntAttr("FirstID");
 
-	if (m_Version != VERSION)
-	{
-		std::cout << "Incompatible file version!" << std::endl;
-		m_OperationSuccess = false;
-	}
-
-	nodeGraph.SetFirstID(ReadIntAttr("FirstID"));
-	
 	ReadNodeList();
 	ReadLinkList();
 
@@ -66,7 +59,7 @@ bool NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGr
 	m_Input.close();
 	m_NodeWriteGraph = nullptr;
 
-	return m_OperationSuccess;
+	return m_OperationSuccess ? firstID : 0;
 }
 
 //////////////////////////////
@@ -128,6 +121,9 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 
 	switch (node->GetType())
 	{
+	case EditorNodeType::Invalid:
+		ASSERT(0);
+		break;
 	case EditorNodeType::Bool:
 	{
 		BoolEditorNode* boolNode = static_cast<BoolEditorNode*>(node);
@@ -164,8 +160,21 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		ExecutionEditorNode* exNode = static_cast<ExecutionEditorNode*>(node);
 		WriteExecutionNodeDetails(exNode);
 	} break;
+	case EditorNodeType::AsignFloat:
+	{
+		AsignVariableEditorNode* asignNode = static_cast<AsignVariableEditorNode*>(node);
+		WriteExecutionNodeDetails(asignNode);
+		WriteAttribute("ValuePin", asignNode->m_ValuePin);
+		WriteAttribute("Name", asignNode->m_Name);
+	} break;
+	case EditorNodeType::VarFloat:
+	{
+		VariableEditorNode* varNode = static_cast<VariableEditorNode*>(node);
+		WriteAttribute("Name", varNode->m_VariableName);
+	} break;
 	default:
 		NOT_IMPLEMENTED;
+		break;
 	}
 
 	WriteAttribute("ID", node->m_ID);
@@ -296,6 +305,18 @@ EditorNode* NodeGraphSerializer::ReadNode()
 		INIT_NODE(OnStartEditorNode);
 		ReadExecutionNode(newNode);
 	} break;
+	case EditorNodeType::AsignFloat:
+	{
+		INIT_NODE(AsignFloatEditorNode);
+		ReadExecutionNode(newNode);
+		ReadAsignVariableNode(newNode);
+
+	} break;
+	case EditorNodeType::VarFloat:
+	{
+		INIT_NODE(VarFloatEditorNode);
+		ReadVariableNode(newNode);
+	} break;
 	default:
 		NOT_IMPLEMENTED;
 		m_OperationSuccess = false;
@@ -348,6 +369,17 @@ void NodeGraphSerializer::ReadExecutionNode(ExecutionEditorNode* exNode)
 {
 	exNode->m_ExectuionPinInput = ReadIntAttr("ExecutionInput");
 	exNode->m_ExectuionPinOutput = ReadIntAttr("ExecutionOutput");
+}
+
+void NodeGraphSerializer::ReadAsignVariableNode(AsignVariableEditorNode* asignNode)
+{
+	asignNode->m_ValuePin = ReadIntAttr("ValuePin");
+	asignNode->m_Name = ReadStrAttr("Name");
+}
+
+void NodeGraphSerializer::ReadVariableNode(VariableEditorNode* varNode)
+{
+	varNode->m_VariableName = ReadStrAttr("Name");
 }
 
 // Tmp hack since nodes will self initialize some data

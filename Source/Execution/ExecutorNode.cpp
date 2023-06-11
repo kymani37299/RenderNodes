@@ -2,12 +2,12 @@
 
 #include "../Common.h"
 
-void IfExecutorNode::Execute()
+void IfExecutorNode::Execute(ExecuteContext& context)
 {
-	m_PassedCondition = m_Condition->GetValue();
+	m_PassedCondition = m_Condition->GetValue(context);
 }
 
-void PrintExecutorNode::Execute()
+void PrintExecutorNode::Execute(ExecuteContext& context)
 {
-	std::cout << m_FloatNode->GetValue() << std::endl;
+	std::cout << m_FloatNode->GetValue(context) << std::endl;
 }

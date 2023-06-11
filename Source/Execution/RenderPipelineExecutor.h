@@ -16,5 +16,6 @@ public:
         m_Pipeline = pipeline;
     }
 private:
+    ExecuteContext m_Context;
     CompiledPipeline m_Pipeline;
 };

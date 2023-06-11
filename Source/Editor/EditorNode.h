@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Common.h"
+#include "../IDGen.h"
 
 #include <string>
 #include <vector>
@@ -21,6 +22,8 @@ enum class EditorNodeType
     Print,
     OnUpdate,
     OnStart,
+    AsignFloat,
+    VarFloat,
 };
 
 // DO NOT CHANGE ORDER OF VALUES
@@ -34,6 +37,19 @@ enum class PinType
     Bool,
     Float,
 };
+
+static const std::string ToString(PinType pinType)
+{
+    switch (pinType)
+    {
+    case PinType::Invalid: return "Invalid";
+    case PinType::Execution: return "Execution";
+    case PinType::Bool: return "Bool";
+    case PinType::Float: return "Float";
+    default: NOT_IMPLEMENTED;
+    }
+    return "<unknown>";
+}
 
 struct EditorNodePin
 {
@@ -245,3 +261,63 @@ public:
 private:
     PinID m_FloatInputPin;
 };
+
+class AsignVariableEditorNode : public ExecutionEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	AsignVariableEditorNode(EditorNodeType nodeType, PinType inputType) :
+        ExecutionEditorNode("Asign " + ToString(inputType) + " node", nodeType)
+	{
+		m_ValuePin = AddInputPin(EditorNodePin::CreateInputPin("Value", inputType));
+	}
+
+	PinID GetValuePin() const { return m_ValuePin; }
+	const std::string& GetName() const { return m_Name; }
+
+protected:
+    virtual void RenderContent() override;
+
+private:
+	PinID m_ValuePin;
+	std::string m_Name;
+};
+
+template<EditorNodeType nodeType, PinType pinType>
+class AsignVariableEditorNodeT : public AsignVariableEditorNode
+{
+public:
+    AsignVariableEditorNodeT() :
+        AsignVariableEditorNode(nodeType, pinType) {}
+};
+
+class VariableEditorNode : public EvaluationEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	VariableEditorNode(EditorNodeType nodeType, PinType outputType) :
+		EvaluationEditorNode("Var " + ToString(outputType) + " node", nodeType)
+	{
+		AddOutputPin(EditorNodePin::CreateOutputPin("    ->", outputType));
+	}
+
+	const std::string& GetVaraibleName() const { return m_VariableName; }
+
+protected:
+	virtual void RenderContent() override;
+
+private:
+	std::string m_VariableName;
+};
+
+template<EditorNodeType nodeType, PinType outputType>
+class VariableEditorNodeT : public VariableEditorNode
+{
+public:
+	VariableEditorNodeT() :
+		VariableEditorNode(nodeType, outputType) {}
+};
+
+using VarFloatEditorNode = VariableEditorNodeT<EditorNodeType::VarFloat, PinType::Float>;
+using AsignFloatEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat, PinType::Float>;
+

@@ -1,6 +1,7 @@
 #include "App.h"
 
 #include "Common.h"
+#include "IDGen.h"
 
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
@@ -9,6 +10,9 @@
 #include "Execution/RenderPipelineExecutor.h"
 #include "NodeGraph/NodeGraphCompiler.h"
 #include "NodeGraph/NodeGraphSerializer.h"
+
+// From IDGen.h
+std::atomic<UniqueID> IDGen::Allocator = 1;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -100,20 +104,20 @@ void App::Run()
     NodeGraphCompiler compiler;
     NodeGraphSerializer serializer;
 
-    static const std::string TEMP_FILE_PATH = "Temp.json";
     static const std::string FILE_PATH = "LastSession.rn";
     static const std::string JSON_FILE_PATH = GetPathWithoutExtension(FILE_PATH) + ".json";
 
     NodeGraph* nodeGraph = new NodeGraph{};
-    if (serializer.Deserialize(FILE_PATH, *nodeGraph))
-    {
-        editor->Load(JSON_FILE_PATH, nodeGraph);
-    }
-    else
+
+    const UniqueID firstID = serializer.Deserialize(FILE_PATH, *nodeGraph);
+    IDGen::Init(firstID);
+
+    if (!firstID)
     {
         delete nodeGraph;
-        editor->Load(TEMP_FILE_PATH, NodeGraph::CreateDefaultNodeGraph());
+        nodeGraph = NodeGraph::CreateDefaultNodeGraph(); 
     }
+    editor->Load(JSON_FILE_PATH, nodeGraph);
 
     // Render loop
     while (!glfwWindowShouldClose(m_Window))

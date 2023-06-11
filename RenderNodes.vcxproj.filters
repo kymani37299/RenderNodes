@@ -152,6 +152,12 @@
     <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Util\Hash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\IDGen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="External\ImGUI-Nodes\imgui_bezier_math.inl">

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Common.h"
+#include "IDGen.h"
 
 #include <string>
 #include <fstream>
@@ -9,6 +10,8 @@
 class NodeGraph;
 class EditorNode;
 class ExecutionEditorNode;
+class AsignVariableEditorNode;
+class VariableEditorNode;
 struct EditorNodeLink;
 struct EditorNodePin;
 
@@ -18,7 +21,7 @@ class NodeGraphSerializer
 
 public:
 	void Serialize(const std::string& path, const NodeGraph& nodeGraph);
-	bool Deserialize(const std::string& path, NodeGraph& nodeGraph);
+	UniqueID Deserialize(const std::string& path, NodeGraph& nodeGraph);
 
 	// Hack since I need to use it in lambda
 public:
@@ -40,7 +43,10 @@ private:
 	EditorNode* ReadNode();
 	EditorNodeLink ReadLink();
 	EditorNodePin ReadPin();
+	
 	void ReadExecutionNode(ExecutionEditorNode* exNode);
+	void ReadAsignVariableNode(AsignVariableEditorNode* asignNode);
+	void ReadVariableNode(VariableEditorNode* varNode);
 
 	// Tmp hack since nodes will self initialize some data
 	void ClearNode(EditorNode* node);

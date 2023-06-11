@@ -58,6 +58,7 @@ ValueNode<float>* NodeGraphCompiler::EvaluateFloatPin(EditorNodePin pin)
 	{
 	case EditorNodeType::Float: return EvaluateFloat(static_cast<FloatEditorNode*>(node));
 	case EditorNodeType::FloatBinaryOperator: return EvaluateFloatBinaryOperator(static_cast<FloatBinaryOperatorEditorNode*>(node));
+	case EditorNodeType::VarFloat: return EvaluateVarFloat(static_cast<VarFloatEditorNode*>(node));
 	default: 
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
@@ -68,6 +69,12 @@ ValueNode<float>* NodeGraphCompiler::EvaluateFloatPin(EditorNodePin pin)
 ValueNode<float>* NodeGraphCompiler::EvaluateFloat(FloatEditorNode* floatNode)
 {
 	return new ConstantValueNode<float>(floatNode->GetValue());
+}
+
+ValueNode<float>* NodeGraphCompiler::EvaluateVarFloat(VarFloatEditorNode* floatNode)
+{
+	// TODO: Validate if the variable is actually initialized at this point
+	return new VariableValueNode<float>(floatNode->GetVaraibleName());
 }
 
 ValueNode<float>* NodeGraphCompiler::EvaluateFloatBinaryOperator(FloatBinaryOperatorEditorNode* floatOpNode)
@@ -114,16 +121,24 @@ ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode)
 ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 {
 	EditorNodePin floatInputPin = m_CurrentGraph->GetPinByID(printNode->GetFloatInputPin());
-	ASSERT(floatInputPin.Type != PinType::Invalid);
+	ASSERT(floatInputPin.Type == PinType::Float);
 	return new PrintExecutorNode{ EvaluateFloatPin(floatInputPin) };
+}
+
+ExecutorNode* NodeGraphCompiler::CompileAsignFloatNode(AsignFloatEditorNode* asignFloatNode)
+{
+	const EditorNodePin asignValuePin = m_CurrentGraph->GetPinByID(asignFloatNode->GetValuePin());
+	ASSERT(asignValuePin.Type == PinType::Float);
+	return new AsignVariableExecutorNode<float>(asignFloatNode->GetName(), EvaluateFloatPin(asignValuePin));
 }
 
 ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* executorNode)
 {
 	switch (executorNode->GetType())
 	{
-	case EditorNodeType::Print: return CompilePrintNode(static_cast<PrintEditorNode*>(executorNode));
-	case EditorNodeType::If:	return CompileIfNode(static_cast<IfEditorNode*>(executorNode));
+	case EditorNodeType::Print:			return CompilePrintNode(static_cast<PrintEditorNode*>(executorNode));
+	case EditorNodeType::If:			return CompileIfNode(static_cast<IfEditorNode*>(executorNode));
+	case EditorNodeType::AsignFloat:	return CompileAsignFloatNode(static_cast<AsignFloatEditorNode*>(executorNode));
 	case EditorNodeType::OnStart:
 	case EditorNodeType::OnUpdate:
 		return new EmptyExecutorNode();

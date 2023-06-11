@@ -15,7 +15,7 @@ EditorNodePin EditorNodePin::CreateInputPin(const std::string& label, PinType ty
     EditorNodePin pin;
     pin.IsInput = true;
     pin.Type = type;
-    pin.ID = EditorPrivate::GenerateID();
+    pin.ID = IDGen::Generate();
     pin.Label = label;
     return pin;
 }
@@ -25,14 +25,14 @@ EditorNodePin EditorNodePin::CreateOutputPin(const std::string& label, PinType t
     EditorNodePin pin;
     pin.IsInput = false;
     pin.Type = type;
-    pin.ID = EditorPrivate::GenerateID();
+    pin.ID = IDGen::Generate();
     pin.Label = label;
     return pin;
 }
 
 EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
     m_Label(label),
-    m_ID(EditorPrivate::GenerateID()),
+    m_ID(IDGen::Generate()),
     m_Type(nodeType)
 { }
 
@@ -94,6 +94,19 @@ void FloatEditorNode::RenderContent()
     ImGui::DragFloat("Value", &m_Value);
 }
 
+void ImGuiInputText(const char* label, std::string& text)
+{
+	constexpr unsigned BUF_SIZE = 50;
+	char buf[BUF_SIZE];
+	strcpy_s(buf, text.c_str());
+
+	ImGui::SetNextItemWidth(250.0f);
+	if (ImGui::InputText(label, buf, BUF_SIZE))
+	{
+		text = std::string{ buf };
+	}
+}
+
 void RenderBinaryOperatorNode(char& op)
 {
     std::string opStr{ op };
@@ -115,4 +128,14 @@ void RenderBinaryOperatorNode(char& op)
         }
         ImGui::EndCombo();
     }
+}
+
+void AsignVariableEditorNode::RenderContent()
+{
+    ImGuiInputText("Name", m_Name);
+}
+
+void VariableEditorNode::RenderContent()
+{
+    ImGuiInputText("Name", m_VariableName);
 }

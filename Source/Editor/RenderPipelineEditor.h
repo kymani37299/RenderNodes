@@ -5,11 +5,6 @@
 #include "../Common.h"
 #include "../NodeGraph/NodeGraph.h"
 
-namespace EditorPrivate
-{
-    UniqueID GenerateID();
-}
-
 class RenderPipelineEditor
 {
 public:

@@ -1,11 +1,27 @@
 #pragma once
 
 #include "../Common.h"
+#include "../Util/Hash.h"
+
+#include <unordered_map>
+
+struct VariableBlock
+{
+	std::unordered_map<uint32_t, float> Floats;
+
+	template<typename T> std::unordered_map<uint32_t, T>& GetMapFromType();
+	template<> std::unordered_map<uint32_t, float>& GetMapFromType<float>() { return Floats; }
+};
+
+struct ExecuteContext
+{
+	VariableBlock Variables;
+};
 
 class ExecutorNode
 {
 public:
-	virtual void Execute() = 0;
+	virtual void Execute(ExecuteContext& context) = 0;
 
 	void SetNextNode(ExecutorNode* node)
 	{
@@ -30,14 +46,14 @@ struct CompiledPipeline
 class EmptyExecutorNode : public ExecutorNode
 {
 public:
-	void Execute() override {}
+	void Execute(ExecuteContext& context) override {}
 };
 
 template<typename T>
 class ValueNode
 {
 public:
-	virtual T GetValue() const = 0;
+	virtual T GetValue(ExecuteContext& context) const = 0;
 };
 
 template<typename T>
@@ -47,7 +63,7 @@ public:
 	ConstantValueNode(const T& value) :
 		m_Value(value) {}
 
-	virtual T GetValue() const override { return m_Value; }
+	virtual T GetValue(ExecuteContext& context) const override { return m_Value; }
 
 private:
 	T m_Value;
@@ -62,10 +78,10 @@ public:
 		m_B(Ptr<ValueNode<T>>(b)),
 		m_Op(op) {}
 
-	virtual T GetValue() const override
+	virtual T GetValue(ExecuteContext& context) const override
 	{
-		const T a = m_A->GetValue();
-		const T b = m_B->GetValue();
+		const T a = m_A->GetValue(context);
+		const T b = m_B->GetValue(context);
 
 		switch (m_Op)
 		{
@@ -88,6 +104,22 @@ private:
 	char m_Op;
 };
 
+template<typename T>
+class VariableValueNode : public ValueNode<T>
+{
+public:
+	VariableValueNode(const std::string& varName) :
+		m_VarKey(Hash::Crc32(varName)) {}
+
+	virtual T GetValue(ExecuteContext& context) const override
+	{
+		return context.Variables.GetMapFromType<T>()[m_VarKey];
+	}
+
+private:
+	uint32_t m_VarKey;
+};
+
 class IfExecutorNode : public ExecutorNode
 {
 public:
@@ -95,7 +127,7 @@ public:
 		m_Condition(Ptr<ValueNode<bool>>(conditionNode)),
 		m_Else(Ptr<ExecutorNode>(elseBranch)) {}
 
-	void Execute() override;
+	void Execute(ExecuteContext& context) override;
 
 	ExecutorNode* GetNextNode() const override
 	{
@@ -118,8 +150,26 @@ public:
 	PrintExecutorNode(ValueNode<float>* floatNode):
 		m_FloatNode(Ptr<ValueNode<float>>(floatNode)) {}
 
-	void Execute() override;
+	void Execute(ExecuteContext& context) override;
 
 private:
 	Ptr<ValueNode<float>> m_FloatNode;
+};
+
+template<typename T>
+class AsignVariableExecutorNode : public ExecutorNode
+{
+public:
+	AsignVariableExecutorNode(const std::string& variableName, ValueNode<T>* value):
+		m_VariableKey(Hash::Crc32(variableName)),
+		m_InitialValueNode(Ptr<ValueNode<T>>(value)) {}
+
+	void Execute(ExecuteContext& context) override
+	{
+		context.Variables.GetMapFromType<T>()[m_VariableKey] = m_InitialValueNode->GetValue(context);
+	}
+
+private:
+	uint32_t m_VariableKey;
+	Ptr<ValueNode<T>> m_InitialValueNode;
 };
