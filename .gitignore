@@ -2,3 +2,5 @@
 Build/*
 
 imgui.ini
+*.json
+*.rn

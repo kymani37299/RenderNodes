@@ -57,7 +57,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\GLFW\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -74,7 +74,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\GLFW\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -87,7 +87,58 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="External\GLAD\src\glad.c" />
+    <ClCompile Include="External\ImGUI-Nodes\crude_json.cpp" />
+    <ClCompile Include="External\ImGUI-Nodes\imgui_canvas.cpp" />
+    <ClCompile Include="External\ImGUI-Nodes\imgui_node_editor.cpp" />
+    <ClCompile Include="External\ImGUI-Nodes\imgui_node_editor_api.cpp" />
+    <ClCompile Include="External\ImGUI\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="External\ImGUI\backends\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="External\ImGUI\imgui.cpp" />
+    <ClCompile Include="External\ImGUI\imgui_demo.cpp" />
+    <ClCompile Include="External\ImGUI\imgui_draw.cpp" />
+    <ClCompile Include="External\ImGUI\imgui_tables.cpp" />
+    <ClCompile Include="External\ImGUI\imgui_widgets.cpp" />
+    <ClCompile Include="Source\App.cpp" />
+    <ClCompile Include="Source\Editor\EditorNode.cpp" />
+    <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
+    <ClCompile Include="Source\Editor\RenderPipelineEditor.cpp" />
+    <ClCompile Include="Source\Execution\ExecutorNode.cpp" />
+    <ClCompile Include="Source\Execution\RenderPipelineExecutor.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\NodeGraph\NodeGraphCompiler.cpp" />
+    <ClCompile Include="Source\NodeGraph\NodeGraphSerializer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="External\ImGUI-Nodes\crude_json.h" />
+    <ClInclude Include="External\ImGUI-Nodes\imgui_bezier_math.h" />
+    <ClInclude Include="External\ImGUI-Nodes\imgui_canvas.h" />
+    <ClInclude Include="External\ImGUI-Nodes\imgui_extra_math.h" />
+    <ClInclude Include="External\ImGUI-Nodes\imgui_node_editor.h" />
+    <ClInclude Include="External\ImGUI-Nodes\imgui_node_editor_internal.h" />
+    <ClInclude Include="External\ImGUI\backends\imgui_impl_glfw.h" />
+    <ClInclude Include="External\ImGUI\backends\imgui_impl_opengl3.h" />
+    <ClInclude Include="External\ImGUI\imconfig.h" />
+    <ClInclude Include="External\ImGUI\imgui.h" />
+    <ClInclude Include="External\ImGUI\imgui_internal.h" />
+    <ClInclude Include="External\ImGUI\imstb_rectpack.h" />
+    <ClInclude Include="External\ImGUI\imstb_textedit.h" />
+    <ClInclude Include="External\ImGUI\imstb_truetype.h" />
+    <ClInclude Include="External\ScopeGuard\ScopeGuard.h" />
+    <ClInclude Include="Source\App.h" />
+    <ClInclude Include="Source\Common.h" />
+    <ClInclude Include="Source\Editor\EditorNode.h" />
+    <ClInclude Include="Source\NodeGraph\NodeGraph.h" />
+    <ClInclude Include="Source\Editor\RenderPipelineEditor.h" />
+    <ClInclude Include="Source\Execution\ExecutorNode.h" />
+    <ClInclude Include="Source\Execution\RenderPipelineExecutor.h" />
+    <ClInclude Include="Source\NodeGraph\NodeGraphCompiler.h" />
+    <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="External\ImGUI-Nodes\imgui_bezier_math.inl" />
+    <None Include="External\ImGUI-Nodes\imgui_extra_math.inl" />
+    <None Include="External\ImGUI-Nodes\imgui_node_editor_internal.inl" />
+    <None Include="External\ImGUI-Nodes\LICENSE" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
