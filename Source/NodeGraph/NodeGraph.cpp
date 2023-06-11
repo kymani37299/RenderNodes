@@ -1,10 +1,13 @@
 #include "NodeGraph.h"
 
+#include "../Editor/RenderPipelineEditor.h"
+
 NodeGraph* NodeGraph::CreateDefaultNodeGraph()
 {
     NodeGraph* nodeGraph = new NodeGraph{};
     nodeGraph->AddNode(new OnStartEditorNode());
     nodeGraph->AddNode(new OnUpdateEditorNode());
+    nodeGraph->SetFirstID(EditorPrivate::GenerateID());
     return nodeGraph;
 }
 
