@@ -3,10 +3,12 @@
 #include "../Common.h"
 #include "RenderPipelineEditor.h"
 
+#include <imgui_internal.h>
+
 static void DrawPin(const EditorNodePin& pin)
 {
     ImNode::BeginPin(pin.ID, pin.IsInput ? ImNode::PinKind::Input : ImNode::PinKind::Output);
-    ImGui::Text(pin.Label.c_str());
+    ImGui::Text("->");
     ImNode::EndPin();
 }
 
@@ -36,29 +38,82 @@ EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
     m_Type(nodeType)
 { }
 
+inline ImRect ImGui_GetItemRect()
+{
+	return ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+}
+
 void EditorNode::Render()
 {
     ImGui::PushID(m_ID);
 
     ImNode::BeginNode(m_ID);
-    ImGui::Text(m_Label.c_str());
 
-    for (const auto pin : m_Executions)
+    ImGui::BeginVertical("Node");
+    ImGui::Spring();
     {
-        DrawPin(pin);
+        ImGui::BeginHorizontal("Node header");
+
+        ImGui::Spring(0);
+
+        ImGui::BeginVertical("Input execution pins");
+        for (const auto& pin : m_Executions) if (pin.IsInput) DrawPin(pin);
+        ImGui::EndVertical();
+
+        ImGui::BeginVertical("Input execution labels");
+        for (const auto& pin : m_Executions) if (pin.IsInput) ImGui::Text(pin.Label.c_str());
+        ImGui::EndVertical();
+
+        ImGui::Spring(0.5f);
+
+        ImGui::Text(m_Label.c_str());
+
+        ImGui::Spring(1.0f);
+
+		ImGui::BeginVertical("Output execution labels");
+		for (const auto& pin : m_Executions) if (!pin.IsInput) ImGui::Text(pin.Label.c_str());
+		ImGui::EndVertical();
+
+        ImGui::BeginVertical("Output execution pins");
+		for (const auto& pin : m_Executions) if (!pin.IsInput) DrawPin(pin);
+        ImGui::EndVertical();
+
+        ImGui::EndHorizontal();
     }
 
-    for (const auto pin : m_Inputs)
+	ImGui::Dummy({ 5, 5 });
+
     {
-        DrawPin(pin);
+        ImGui::BeginHorizontal("Node body");
+
+        ImGui::Spring(0);
+
+        ImGui::BeginVertical("Input pins");
+		for (const auto& pin : m_Inputs) DrawPin(pin);
+        ImGui::EndVertical();
+
+		ImGui::BeginVertical("Input labels");
+		for (const auto& pin : m_Inputs) ImGui::Text(pin.Label.c_str());
+		ImGui::EndVertical();
+
+        ImGui::BeginVertical("Render content");
+        RenderContent();
+        ImGui::EndVertical();
+
+        ImGui::Spring(1);
+
+		ImGui::BeginVertical("Output labels");
+		for (const auto& pin : m_Outputs) ImGui::Text(pin.Label.c_str());
+		ImGui::EndVertical();
+
+        ImGui::BeginVertical("Output pins");
+        for (const auto& pin : m_Outputs) DrawPin(pin);
+        ImGui::EndVertical();
+
+        ImGui::EndHorizontal();
     }
 
-    for (const auto pin : m_Outputs)
-    {
-        DrawPin(pin);
-    }
-
-    RenderContent();
+    ImGui::EndVertical();
 
     ImNode::EndNode();
 
@@ -81,6 +136,11 @@ PinID EditorNode::AddExecutionPin(const EditorNodePin& pin)
 {
     m_Executions.push_back(pin);
     return pin.ID;
+}
+
+void EditorNode::RenderContent()
+{
+    ImGui::Dummy(ImVec2{ 25, 25 });
 }
 
 void BoolEditorNode::RenderContent()

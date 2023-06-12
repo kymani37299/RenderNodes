@@ -6,8 +6,15 @@
 #include "NodeGraph/NodeGraph.h"
 #include "Editor/RenderPipelineEditor.h"
 
-static const std::string BEGIN_FILE_TOKEN = "BEGIN_FILE";
-static const std::string END_FILE_TOKEN = "END_FILE";
+// #define ENABLE_TOKEN_VERIFICATION
+// #define ASSERT_ON_LOAD_FAILED
+
+#ifdef ASSERT_ON_LOAD_FAILED
+#define LOAD_ASSERT() ASSERT(0)
+#else
+#define LOAD_ASSERT()
+#endif // ASSERT_ON_LOAD_FAILED
+
 static const std::string BEGIN_NODE_LIST_TOKEN = "BEGIN_NODE_LIST";
 static const std::string END_NODE_LIST_TOKEN = "END_NODE_LIST";
 static const std::string BEGIN_LINK_LIST_TOKEN = "BEGIN_LINK_LIST";
@@ -18,20 +25,23 @@ static const std::string BEGIN_LINK_TOKEN = "BEGIN_LINK";
 static const std::string END_LINK_TOKEN = "END_LINK";
 static const std::string BEGIN_PIN_LIST_TOKEN = "BEGIN_PIN_LIST";
 static const std::string END_PIN_LIST_TOKEN = "END_PIN_LIST";
-static const std::string BEGIN_PIN_TOKEN = "BEGIN_PIN";
-static const std::string END_PIN_TOKEN = "END_PIN";
 
 void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& nodeGraph)
 {
 	m_NodeReadGraph = &nodeGraph;
 	m_Output.open(path);
 
-	WriteToken(BEGIN_FILE_TOKEN);
+#ifdef ENABLE_TOKEN_VERIFICATION
+	m_UseTokens = true;
+#else
+	m_UseTokens = false;
+#endif
+
 	WriteAttribute("Version", VERSION);
+	WriteAttribute("UseTokens", m_UseTokens);
 	WriteAttribute("FirstID", IDGen::Generate());
 	WriteNodeList();
 	WriteLinkList();
-	WriteToken(END_FILE_TOKEN);
 
 	m_Output.close();
 
@@ -46,15 +56,12 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 	m_Input = std::ifstream{ path };
 	if (!m_Input.is_open()) return 0;
 
-	EatToken(BEGIN_FILE_TOKEN);
-	
 	m_Version = ReadIntAttr("Version");
+	m_UseTokens = ReadIntAttr("UseTokens");
 	unsigned firstID = ReadIntAttr("FirstID");
 
 	ReadNodeList();
 	ReadLinkList();
-
-	EatToken(END_FILE_TOKEN);
 
 	m_Input.close();
 	m_NodeWriteGraph = nullptr;
@@ -93,24 +100,9 @@ void NodeGraphSerializer::WriteLinkList()
 void NodeGraphSerializer::WritePinList(const std::vector<EditorNodePin>& pins)
 {
 	WriteToken(BEGIN_PIN_LIST_TOKEN);
-
 	WriteAttribute("Count", pins.size());
-	for (const EditorNodePin& pin : pins)
-		WritePin(pin);
-
+	for (const EditorNodePin& pin : pins) WriteAttribute("ID", pin.ID);
 	WriteToken(END_PIN_LIST_TOKEN);
-}
-
-void NodeGraphSerializer::WritePin(const EditorNodePin& pin)
-{
-	WriteToken(BEGIN_PIN_TOKEN);
-
-	WriteAttribute("ID", pin.ID);
-	WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
-	WriteAttribute("Type", EnumToInt(pin.Type));
-	WriteAttribute("Label", pin.Label);
-
-	WriteToken(END_PIN_TOKEN);
 }
 
 void NodeGraphSerializer::WriteNode(EditorNode* node)
@@ -205,8 +197,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	}
 
 	WriteAttribute("ID", node->m_ID);
-	WriteAttribute("Label", node->m_Label);
-
+	
 	WritePinList(node->m_Inputs);
 	WritePinList(node->m_Outputs);
 	WritePinList(node->m_Executions);
@@ -267,21 +258,26 @@ void NodeGraphSerializer::ReadLinkList()
 	EatToken(END_LINK_LIST_TOKEN);
 }
 
-std::vector<EditorNodePin> NodeGraphSerializer::ReadPinList()
+void NodeGraphSerializer::ReadPinList(std::vector<EditorNodePin>& pins)
 {
-	std::vector<EditorNodePin> pins{};
 	EatToken(BEGIN_PIN_LIST_TOKEN);
 
 	unsigned pinCount = ReadIntAttr("Count");
+	if (pinCount != pins.size())
+	{
+		LOAD_ASSERT();
+		m_OperationSuccess = false;
+		return;
+	}
+
 	pins.resize(pinCount);
 	for (unsigned i = 0; i < pinCount; i++)
-		pins[i] = ReadPin();
+		pins[i].ID = ReadIntAttr("ID");
 
 	EatToken(END_PIN_LIST_TOKEN);
-	return pins;
 }
 
-#define INIT_NODE(NodeType) NodeType* newNode = new NodeType{}; node = newNode; ClearNode(node)
+#define INIT_NODE(NodeType) NodeType* newNode = new NodeType{}; node = newNode
 
 EditorNode* NodeGraphSerializer::ReadNode()
 {
@@ -421,11 +417,10 @@ EditorNode* NodeGraphSerializer::ReadNode()
 
 	node->m_Type = nodeType;
 	node->m_ID = ReadIntAttr("ID");
-	node->m_Label = ReadStrAttr("Label");
-
-	node->m_Inputs = ReadPinList();
-	node->m_Outputs = ReadPinList();
-	node->m_Executions = ReadPinList();
+	
+	ReadPinList(node->m_Inputs);
+	ReadPinList(node->m_Outputs);
+	ReadPinList(node->m_Executions);
 
 	EatToken(END_NODE_TOKEN);
 
@@ -444,21 +439,6 @@ EditorNodeLink NodeGraphSerializer::ReadLink()
 	EatToken(END_LINK_TOKEN);
 
 	return link;
-}
-
-EditorNodePin NodeGraphSerializer::ReadPin()
-{
-	EatToken(BEGIN_PIN_TOKEN);
-
-	EditorNodePin pin;
-	pin.ID = ReadIntAttr("ID");
-	pin.IsInput = ReadBoolAttr("IsInput");
-	pin.Type = IntToEnum<PinType>(ReadIntAttr("Type"));
-	pin.Label = ReadStrAttr("Label");
-
-	EatToken(END_PIN_TOKEN);
-
-	return pin;
 }
 
 void NodeGraphSerializer::ReadExecutionNode(ExecutionEditorNode* exNode)
@@ -509,8 +489,6 @@ void NodeGraphSerializer::ClearNode(EditorNode* node)
 ///			UTILITY			//
 //////////////////////////////
 
-#define ENABLE_TOKEN_VERIFICATION
-
 void NodeGraphSerializer::WriteToken(const std::string& token)
 {
 #ifdef ENABLE_TOKEN_VERIFICATION
@@ -520,27 +498,29 @@ void NodeGraphSerializer::WriteToken(const std::string& token)
 
 void NodeGraphSerializer::EatToken(const std::string& token)
 {
-#ifdef ENABLE_TOKEN_VERIFICATION
+	if (!m_UseTokens)
+		return;
+
 	if (!m_OperationSuccess) return;
 
 	std::string line;
 	if (!std::getline(m_Input, line) || token != line)
 	{
+		LOAD_ASSERT();
 		m_OperationSuccess = false;
 	}
-#endif
 }
 
 std::string NodeGraphSerializer::ReadAttribute(const std::string& name)
 {
 	// Optimize this
-	ASSERT(m_OperationSuccess);
 	if (!m_OperationSuccess) return "";
 
 	// Read line from stream
 	std::string line;
 	if (!std::getline(m_Input, line))
 	{
+		LOAD_ASSERT();
 		m_OperationSuccess = false;
 		return "";
 	}
@@ -553,6 +533,7 @@ std::string NodeGraphSerializer::ReadAttribute(const std::string& name)
 
 	if (attrName != name)
 	{
+		LOAD_ASSERT();
 		m_OperationSuccess = false;
 		return "";
 	}
@@ -562,7 +543,11 @@ std::string NodeGraphSerializer::ReadAttribute(const std::string& name)
 
 	// Validate separator
 	m_OperationSuccess = line[it++] == ':';
-	if (!m_OperationSuccess) return "";
+	if (!m_OperationSuccess)
+	{
+		LOAD_ASSERT();
+		return "";
+	}
 
 	// Skip after separator space
 	it++;

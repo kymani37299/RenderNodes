@@ -120,6 +120,7 @@
     <ClInclude Include="External\ImGUI-Nodes\imgui_extra_math.h" />
     <ClInclude Include="External\ImGUI-Nodes\imgui_node_editor.h" />
     <ClInclude Include="External\ImGUI-Nodes\imgui_node_editor_internal.h" />
+    <ClInclude Include="External\ImGUI\backends\imgui_extra_keys.h" />
     <ClInclude Include="External\ImGUI\backends\imgui_impl_glfw.h" />
     <ClInclude Include="External\ImGUI\backends\imgui_impl_opengl3.h" />
     <ClInclude Include="External\ImGUI\imconfig.h" />

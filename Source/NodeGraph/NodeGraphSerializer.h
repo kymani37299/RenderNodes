@@ -35,16 +35,14 @@ private:
 	void WriteNodeList();
 	void WriteLinkList();
 	void WritePinList(const std::vector<EditorNodePin>& pins);
-	void WritePin(const EditorNodePin& pin);
 	void WriteExecutionNodeDetails(ExecutionEditorNode* node);
 
 	// Reads
 	void ReadNodeList();
 	void ReadLinkList();
-	std::vector<EditorNodePin> ReadPinList();
+	void ReadPinList(std::vector<EditorNodePin>& pins);
 	EditorNode* ReadNode();
 	EditorNodeLink ReadLink();
-	EditorNodePin ReadPin();
 	
 	void ReadExecutionNode(ExecutionEditorNode* exNode);
 	void ReadAsignVariableNode(AsignVariableEditorNode* asignNode);
@@ -73,6 +71,7 @@ private:
 	std::string ReadStrAttr(const std::string& name);
 
 private:
+	bool m_UseTokens = false;
 	unsigned m_Version = 1;
 
 	const NodeGraph* m_NodeReadGraph = nullptr;

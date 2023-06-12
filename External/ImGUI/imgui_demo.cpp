@@ -1,4 +1,4 @@
-// dear imgui, v1.84
+// dear imgui, v1.84 WIP
 // (demo code)
 
 // Help:
@@ -458,7 +458,7 @@ void ImGui::ShowDemoWindow(bool* p_open)
         {
             HelpMarker(
                 "Those flags are set by the backends (imgui_impl_xxx files) to specify their capabilities.\n"
-                "Here we expose them as read-only fields to avoid breaking interactions with your backend.");
+                "Here we expose then as read-only fields to avoid breaking interactions with your backend.");
 
             // Make a local copy to avoid modifying actual backend flags.
             ImGuiBackendFlags backend_flags = io.BackendFlags;
@@ -532,10 +532,6 @@ static void ShowDemoWindowWidgets()
 {
     if (!ImGui::CollapsingHeader("Widgets"))
         return;
-
-    static bool disable_all = false; // The Checkbox for that is inside the "Disabled" section at the bottom
-    if (disable_all)
-        ImGui::BeginDisabled();
 
     if (ImGui::TreeNode("Basic"))
     {
@@ -2185,28 +2181,24 @@ static void ShowDemoWindowWidgets()
         ImGui::TreePop();
     }
 
-    if (ImGui::TreeNode("Querying Status (Edited/Active/Hovered etc.)"))
+    if (ImGui::TreeNode("Querying Status (Edited/Active/Focused/Hovered etc.)"))
     {
         // Select an item type
         const char* item_names[] =
         {
             "Text", "Button", "Button (w/ repeat)", "Checkbox", "SliderFloat", "InputText", "InputFloat",
-            "InputFloat3", "ColorEdit4", "Selectable", "MenuItem", "TreeNode", "TreeNode (w/ double-click)", "Combo", "ListBox"
+            "InputFloat3", "ColorEdit4", "MenuItem", "TreeNode", "TreeNode (w/ double-click)", "Combo", "ListBox"
         };
-        static int item_type = 4;
-        static bool item_disabled = false;
+        static int item_type = 1;
         ImGui::Combo("Item Type", &item_type, item_names, IM_ARRAYSIZE(item_names), IM_ARRAYSIZE(item_names));
         ImGui::SameLine();
         HelpMarker("Testing how various types of items are interacting with the IsItemXXX functions. Note that the bool return value of most ImGui function is generally equivalent to calling ImGui::IsItemHovered().");
-        ImGui::Checkbox("Item Disabled",  &item_disabled);
 
         // Submit selected item item so we can query their status in the code following it.
         bool ret = false;
         static bool b = false;
         static float col4f[4] = { 1.0f, 0.5, 0.0f, 1.0f };
         static char str[16] = {};
-        if (item_disabled)
-            ImGui::BeginDisabled(true);
         if (item_type == 0) { ImGui::Text("ITEM: Text"); }                                              // Testing text items with no identifier/interaction
         if (item_type == 1) { ret = ImGui::Button("ITEM: Button"); }                                    // Testing button
         if (item_type == 2) { ImGui::PushButtonRepeat(true); ret = ImGui::Button("ITEM: Button"); ImGui::PopButtonRepeat(); } // Testing button (with repeater)
@@ -2216,12 +2208,11 @@ static void ShowDemoWindowWidgets()
         if (item_type == 6) { ret = ImGui::InputFloat("ITEM: InputFloat", col4f, 1.0f); }               // Testing +/- buttons on scalar input
         if (item_type == 7) { ret = ImGui::InputFloat3("ITEM: InputFloat3", col4f); }                   // Testing multi-component items (IsItemXXX flags are reported merged)
         if (item_type == 8) { ret = ImGui::ColorEdit4("ITEM: ColorEdit4", col4f); }                     // Testing multi-component items (IsItemXXX flags are reported merged)
-        if (item_type == 9) { ret = ImGui::Selectable("ITEM: Selectable"); }                            // Testing selectable item
-        if (item_type == 10){ ret = ImGui::MenuItem("ITEM: MenuItem"); }                                // Testing menu item (they use ImGuiButtonFlags_PressedOnRelease button policy)
-        if (item_type == 11){ ret = ImGui::TreeNode("ITEM: TreeNode"); if (ret) ImGui::TreePop(); }     // Testing tree node
-        if (item_type == 12){ ret = ImGui::TreeNodeEx("ITEM: TreeNode w/ ImGuiTreeNodeFlags_OpenOnDoubleClick", ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_NoTreePushOnOpen); } // Testing tree node with ImGuiButtonFlags_PressedOnDoubleClick button policy.
-        if (item_type == 13){ const char* items[] = { "Apple", "Banana", "Cherry", "Kiwi" }; static int current = 1; ret = ImGui::Combo("ITEM: Combo", &current, items, IM_ARRAYSIZE(items)); }
-        if (item_type == 14){ const char* items[] = { "Apple", "Banana", "Cherry", "Kiwi" }; static int current = 1; ret = ImGui::ListBox("ITEM: ListBox", &current, items, IM_ARRAYSIZE(items), IM_ARRAYSIZE(items)); }
+        if (item_type == 9) { ret = ImGui::MenuItem("ITEM: MenuItem"); }                                // Testing menu item (they use ImGuiButtonFlags_PressedOnRelease button policy)
+        if (item_type == 10){ ret = ImGui::TreeNode("ITEM: TreeNode"); if (ret) ImGui::TreePop(); }     // Testing tree node
+        if (item_type == 11){ ret = ImGui::TreeNodeEx("ITEM: TreeNode w/ ImGuiTreeNodeFlags_OpenOnDoubleClick", ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_NoTreePushOnOpen); } // Testing tree node with ImGuiButtonFlags_PressedOnDoubleClick button policy.
+        if (item_type == 12){ const char* items[] = { "Apple", "Banana", "Cherry", "Kiwi" }; static int current = 1; ret = ImGui::Combo("ITEM: Combo", &current, items, IM_ARRAYSIZE(items)); }
+        if (item_type == 13){ const char* items[] = { "Apple", "Banana", "Cherry", "Kiwi" }; static int current = 1; ret = ImGui::ListBox("ITEM: ListBox", &current, items, IM_ARRAYSIZE(items), IM_ARRAYSIZE(items)); }
 
         // Display the values of IsItemHovered() and other common item state functions.
         // Note that the ImGuiHoveredFlags_XXX flags can be combined.
@@ -2234,7 +2225,6 @@ static void ShowDemoWindowWidgets()
             "IsItemHovered(_AllowWhenBlockedByPopup) = %d\n"
             "IsItemHovered(_AllowWhenBlockedByActiveItem) = %d\n"
             "IsItemHovered(_AllowWhenOverlapped) = %d\n"
-            "IsItemHovered(_AllowWhenDisabled) = %d\n"
             "IsItemHovered(_RectOnly) = %d\n"
             "IsItemActive() = %d\n"
             "IsItemEdited() = %d\n"
@@ -2253,7 +2243,6 @@ static void ShowDemoWindowWidgets()
             ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup),
             ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem),
             ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped),
-            ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled),
             ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly),
             ImGui::IsItemActive(),
             ImGui::IsItemEdited(),
@@ -2267,9 +2256,6 @@ static void ShowDemoWindowWidgets()
             ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y,
             ImGui::GetItemRectSize().x, ImGui::GetItemRectSize().y
         );
-
-        if (item_disabled)
-            ImGui::EndDisabled();
 
         static bool embed_all_inside_a_child_window = false;
         ImGui::Checkbox("Embed everything inside a child window (for additional testing)", &embed_all_inside_a_child_window);
@@ -2338,18 +2324,6 @@ static void ShowDemoWindowWidgets()
             ImGui::End();
         }
 
-        ImGui::TreePop();
-    }
-
-    // Demonstrate BeginDisabled/EndDisabled using a checkbox located at the bottom of the section (which is a bit odd:
-    // logically we'd have this checkbox at the top of the section, but we don't want this feature to steal that space)
-    if (disable_all)
-        ImGui::EndDisabled();
-
-    if (ImGui::TreeNode("Disable block"))
-    {
-        ImGui::Checkbox("Disable entire section above", &disable_all);
-        ImGui::SameLine(); HelpMarker("Demonstrate using BeginDisabled()/EndDisabled() across this section.");
         ImGui::TreePop();
     }
 }
@@ -2421,7 +2395,7 @@ static void ShowDemoWindowLayout()
         //   You can also call SetNextWindowPos() to position the child window. The parent window will effectively
         //   layout from this position.
         // - Using ImGui::GetItemRectMin/Max() to query the "item" state (because the child window is an item from
-        //   the POV of the parent window). See 'Demo->Querying Status (Edited/Active/Hovered etc.)' for details.
+        //   the POV of the parent window). See 'Demo->Querying Status (Active/Focused/Hovered etc.)' for details.
         {
             static int offset_x = 0;
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8);
@@ -3115,6 +3089,139 @@ static void ShowDemoWindowLayout()
             ImGui::EndGroup();
             ImGui::PopID();
         }
+
+        ImGui::TreePop();
+    }
+
+    if (ImGui::TreeNode("Stack Layout"))
+    {
+        static bool widget_a = true, widget_b = true, widget_c = true;
+        static bool spring_a = true, spring_ab = true, spring_bc = true, spring_c = true;
+        static bool minimize_width = false, minimize_height = true;
+        static bool horizontal = true, draw_springs = true;
+        static ImVec2 item_spacing = ImGui::GetStyle().ItemSpacing;
+        static float a_c_spring_weight = 0.0f;
+        static float ab_spring_weight = 0.5f;
+        static float alignment = 0.5f;
+
+        struct funcs
+        {
+            static void VisibleSpring(float spring_weight)
+            {
+                ImVec2 start_cursor_pos = ImGui::GetCursorScreenPos();
+                ImGui::Spring(spring_weight);
+                ImVec2 end_cursor_pos = ImGui::GetCursorScreenPos();
+
+                if (!draw_springs)
+                    return;
+
+                if (spring_weight <= 0.0f)
+                    return;
+
+                if (fabsf(start_cursor_pos.x - end_cursor_pos.x) < 1.0f && fabsf(start_cursor_pos.y - end_cursor_pos.y) < 1.0f)
+                    return;
+
+                // Draw zig-zag
+                ImDrawList* draw_list = ImGui::GetWindowDrawList();
+                ImVec2 rect_min = ImGui::GetItemRectMin();
+                ImVec2 rect_max = ImGui::GetItemRectMax();
+
+                draw_list->PushClipRect(rect_min, rect_max, true);
+
+                float width = 0.0f;
+                ImVec2 direction, origin;
+
+                if (horizontal)
+                {
+                    width     = rect_max.x - rect_min.x;
+                    origin    = ImVec2(floorf(rect_min.x), floorf(rect_min.y + (rect_max.y - rect_min.y) / 2));
+                    direction = ImVec2(1.0f, 0.0f);
+                }
+                else
+                {
+                    width     = rect_max.y - rect_min.y;
+                    origin    = ImVec2(floorf(rect_min.x + (rect_max.x - rect_min.x) / 2), floorf(rect_min.y));
+                    direction = ImVec2(0.0f, 1.0f);
+                }
+
+                draw_list->AddRectFilled(rect_min, rect_max, ImColor(255, 128, 255, 40));
+
+                const float zig_zag_size = 3;
+                ImVec2 normal = ImVec2(-direction.y, direction.x);
+
+                draw_list->PathClear();
+                origin.x += 0.5f;
+                origin.y += 0.5f;
+                draw_list->PathLineTo(origin);
+                for (float x = zig_zag_size * 0.5f; x <= width; x += zig_zag_size)
+                {
+                    ImVec2 p;
+                    p.x = origin.x + direction.x * x + normal.x * zig_zag_size;
+                    p.y = origin.y + direction.y * x + normal.y * zig_zag_size;
+                    draw_list->PathLineTo(p);
+                    normal = ImVec2(-normal.x, -normal.y);
+                }
+                draw_list->PathStroke(ImColor(255, 255, 255, 190), false, 1.0f);
+
+                draw_list->PopClipRect();
+            }
+        };
+
+        ImGui::Checkbox("Widget A",  &widget_a);  ImGui::SameLine();
+        ImGui::Checkbox("Widget B",  &widget_b);  ImGui::SameLine();
+        ImGui::Checkbox("Widget C",  &widget_c);
+        ImGui::Checkbox("Spring A",  &spring_a);  ImGui::SameLine();
+        ImGui::Checkbox("Spring AB", &spring_ab); ImGui::SameLine();
+        ImGui::Checkbox("Spring BC", &spring_bc); ImGui::SameLine();
+        ImGui::Checkbox("Spring C",  &spring_c);
+        ImGui::Checkbox("Horizontal", &horizontal);            ImGui::SameLine();
+        ImGui::Checkbox("Minimize Width", &minimize_width);     ImGui::SameLine();
+        ImGui::Checkbox("Minimize Height",  &minimize_height);
+        ImGui::DragFloat("Item Spacing", horizontal ? &item_spacing.x : &item_spacing.y, 0.1f, 0.0f, 50.0f);
+        ImGui::DragFloat("A & C Spring Weight", &a_c_spring_weight, 0.002f, 0.0f, 1.0f);
+        ImGui::DragFloat("AB Spring Weight", &ab_spring_weight, 0.002f, 0.0f, 1.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("BC Spring Weight = 1 - AB Spring Weight");
+        ImGui::DragFloat("Minor Axis Alignment", &alignment, 0.002f, 0.0f, 1.0f);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("This is vertical alignment for horizontal layouts and horizontal alignment for vertical layouts.");
+        ImGui::Text("Layout widgets:");
+        ImGui::Text("| Spring A | Widget A | Spring AB | Widget B | Spring BC | Widget C | Spring C |");
+
+        ImGui::Spacing();
+
+        ImVec2 widget_size;
+        widget_size.x = ImGui::GetContentRegionAvail().x / 4;
+        widget_size.y = horizontal ? floorf(widget_size.x / 3) : widget_size.x;
+
+        ImVec2 small_widget_size = widget_size;
+        if (horizontal)
+            small_widget_size.y = floorf(small_widget_size.y / 2);
+        else
+            small_widget_size.x = floorf(small_widget_size.x / 2);
+
+        ImVec2 layout_size = ImVec2(widget_size.x * 4, widget_size.y * 4);
+        if (minimize_width)  layout_size.x = 0.0f;
+        if (minimize_height) layout_size.y = 0.0f;
+
+        // Minor axis alignment can be set by style or directly in BeginHorizontal/BeginVertical
+        // Example:
+        //    ImGui::PushStyleVar(ImGuiStyleVar_LayoutAlign, alignment);
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, item_spacing);
+
+        if (horizontal) { ImGui::BeginHorizontal("h1", layout_size, alignment); } else { ImGui::BeginVertical("v1", layout_size, alignment); }
+        if (spring_a)   { funcs::VisibleSpring(a_c_spring_weight); }
+        if (widget_a)   { ImGui::Button("Widget A", widget_size); }
+        if (spring_ab)  { funcs::VisibleSpring(ab_spring_weight); }
+        if (widget_b)   { ImGui::Button("Widget B", small_widget_size); }
+        if (spring_bc)  { funcs::VisibleSpring(1.0f - ab_spring_weight); }
+        if (widget_c)   { ImGui::Button("Widget C", widget_size); }
+        if (spring_c)   { funcs::VisibleSpring(a_c_spring_weight); }
+        if (horizontal) { ImGui::EndHorizontal(); } else { ImGui::EndVertical(); }
+
+        ImGui::PopStyleVar();
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetColorU32(ImGuiCol_Border));
 
         ImGui::TreePop();
     }
@@ -5506,9 +5613,9 @@ static void ShowDemoWindowMisc()
         // Display Keyboard/Mouse state
         if (ImGui::TreeNode("Keyboard & Navigation State"))
         {
-            ImGui::Text("Keys down:");          for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyDown(i))        { ImGui::SameLine(); ImGui::Text("%d (0x%X) (%.02f secs)", i, i, io.KeysDownDuration[i]); }
-            ImGui::Text("Keys pressed:");       for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))     { ImGui::SameLine(); ImGui::Text("%d (0x%X)", i, i); }
-            ImGui::Text("Keys release:");       for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyReleased(i))    { ImGui::SameLine(); ImGui::Text("%d (0x%X)", i, i); }
+            ImGui::Text("Keys down:");          for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyDown(i))                { ImGui::SameLine(); ImGui::Text("\"%s\" %d (0x%X) (%.02f secs)", ImGui::GetKeyName(ImGui::FindImGuiKey(i)), i, i, io.KeysDownDuration[i]); }
+            ImGui::Text("Keys pressed:");       for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyPressed(i))             { ImGui::SameLine(); ImGui::Text("\"%s\" %d (0x%X)", ImGui::GetKeyName(ImGui::FindImGuiKey(i)), i, i); }
+            ImGui::Text("Keys release:");       for (int i = 0; i < IM_ARRAYSIZE(io.KeysDown); i++) if (ImGui::IsKeyReleased(i))            { ImGui::SameLine(); ImGui::Text("\"%s\" %d (0x%X)", ImGui::GetKeyName(ImGui::FindImGuiKey(i)), i, i); }
             ImGui::Text("Keys mods: %s%s%s%s", io.KeyCtrl ? "CTRL " : "", io.KeyShift ? "SHIFT " : "", io.KeyAlt ? "ALT " : "", io.KeySuper ? "SUPER " : "");
             ImGui::Text("Chars queue:");        for (int i = 0; i < io.InputQueueCharacters.Size; i++) { ImWchar c = io.InputQueueCharacters[i]; ImGui::SameLine();  ImGui::Text("\'%c\' (0x%04X)", (c > ' ' && c <= 255) ? (char)c : '?', c); } // FIXME: We should convert 'c' to UTF-8 here but the functions are not public.
 
@@ -6066,7 +6173,6 @@ void ImGui::ShowStyleEditor(ImGuiStyle* ref)
             HelpMarker("When drawing circle primitives with \"num_segments == 0\" tesselation will be calculated automatically.");
 
             ImGui::DragFloat("Global Alpha", &style.Alpha, 0.005f, 0.20f, 1.0f, "%.2f"); // Not exposing zero here so user doesn't "lose" the UI (zero alpha clips all widgets). But application code could have a toggle to switch between zero and non-zero.
-            ImGui::DragFloat("Disabled Alpha", &style.DisabledAlpha, 0.005f, 0.0f, 1.0f, "%.2f"); ImGui::SameLine(); HelpMarker("Additional alpha multiplier for disabled items (multiply over current value of Alpha).");
             ImGui::PopItemWidth();
 
             ImGui::EndTabItem();

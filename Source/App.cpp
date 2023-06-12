@@ -139,6 +139,7 @@ void App::Run()
 
                     std::filesystem::remove("NodeEditor.json");
 
+                    IDGen::Init(1);
 					editor->Load(NodeGraph::CreateDefaultNodeGraph());
 					editor->InitializeDefaultNodePositions();
 

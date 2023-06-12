@@ -1,4 +1,4 @@
-// dear imgui, v1.84
+// dear imgui, v1.84 WIP
 // (tables and columns code)
 
 /*
@@ -1956,9 +1956,8 @@ void ImGui::TableBeginCell(ImGuiTable* table, int column_n)
     window->SkipItems = column->IsSkipItems;
     if (column->IsSkipItems)
     {
-        ImGuiContext& g = *GImGui;
-        g.LastItemData.ID = 0;
-        g.LastItemData.StatusFlags = 0;
+        window->DC.LastItemId = 0;
+        window->DC.LastItemStatusFlags = 0;
     }
 
     if (table->Flags & ImGuiTableFlags_NoClip)

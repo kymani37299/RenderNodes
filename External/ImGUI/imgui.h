@@ -1,4 +1,4 @@
-// dear imgui, v1.84
+// dear imgui, v1.84 WIP
 // (headers)
 
 // Help:
@@ -11,7 +11,7 @@
 // - FAQ                   http://dearimgui.org/faq
 // - Homepage & latest     https://github.com/ocornut/imgui
 // - Releases & changelog  https://github.com/ocornut/imgui/releases
-// - Gallery               https://github.com/ocornut/imgui/issues/4451 (please post your screenshots/video there!)
+// - Gallery               https://github.com/ocornut/imgui/issues/3793 (please post your screenshots/video there!)
 // - Wiki                  https://github.com/ocornut/imgui/wiki (lots of good stuff there)
 // - Glossary              https://github.com/ocornut/imgui/wiki/Glossary
 // - Issues & support      https://github.com/ocornut/imgui/issues
@@ -60,10 +60,11 @@ Index of this file:
 
 // Version
 // (Integer encoded as XYYZZ for use in #if preprocessor conditionals. Work in progress versions typically starts at XYY99 then bounce up to XYY00, XYY01 etc. when release tagging happens)
-#define IMGUI_VERSION               "1.84"
-#define IMGUI_VERSION_NUM           18400
+#define IMGUI_VERSION               "1.84 WIP"
+#define IMGUI_VERSION_NUM           18309
 #define IMGUI_CHECKVERSION()        ImGui::DebugCheckVersionAndDataLayout(IMGUI_VERSION, sizeof(ImGuiIO), sizeof(ImGuiStyle), sizeof(ImVec2), sizeof(ImVec4), sizeof(ImDrawVert), sizeof(ImDrawIdx))
 #define IMGUI_HAS_TABLE
+#define IMGUI_HAS_STACK_LAYOUT      1 // Stack-Layout PR #846
 
 // Define attributes of all API symbols declarations (e.g. for DLL under Windows)
 // IMGUI_API is used for core imgui functions, IMGUI_IMPL_API is used for the default backends files (imgui_impl_xxx.h)
@@ -446,6 +447,18 @@ namespace ImGui
     IMGUI_API float         GetFrameHeight();                                               // ~ FontSize + style.FramePadding.y * 2
     IMGUI_API float         GetFrameHeightWithSpacing();                                    // ~ FontSize + style.FramePadding.y * 2 + style.ItemSpacing.y (distance in pixels between 2 consecutive lines of framed widgets)
 
+    IMGUI_API void          BeginHorizontal(const char* str_id, const ImVec2& size = ImVec2(0, 0), float align = -1.0f);
+    IMGUI_API void          BeginHorizontal(const void* ptr_id, const ImVec2& size = ImVec2(0, 0), float align = -1.0f);
+    IMGUI_API void          BeginHorizontal(int id, const ImVec2& size = ImVec2(0, 0), float align = -1);
+    IMGUI_API void          EndHorizontal();
+    IMGUI_API void          BeginVertical(const char* str_id, const ImVec2& size = ImVec2(0, 0), float align = -1.0f);
+    IMGUI_API void          BeginVertical(const void* ptr_id, const ImVec2& size = ImVec2(0, 0), float align = -1.0f);
+    IMGUI_API void          BeginVertical(int id, const ImVec2& size = ImVec2(0, 0), float align = -1);
+    IMGUI_API void          EndVertical();
+    IMGUI_API void          Spring(float weight = 1.0f, float spacing = -1.0f);
+    IMGUI_API void          SuspendLayout();
+    IMGUI_API void          ResumeLayout();
+
     // ID stack/scopes
     // Read the FAQ (docs/FAQ.md or http://dearimgui.org/faq) for more details about how ID are handled in dear imgui.
     // - Those questions are answered and impacted by understanding of the ID stack system:
@@ -799,11 +812,6 @@ namespace ImGui
     IMGUI_API void                  EndDragDropTarget();                                                            // only call EndDragDropTarget() if BeginDragDropTarget() returns true!
     IMGUI_API const ImGuiPayload*   GetDragDropPayload();                                                           // peek directly into the current payload from anywhere. may return NULL. use ImGuiPayload::IsDataType() to test for the payload type.
 
-    // Disabling [BETA API]
-    // - Disable all user interactions and dim items visuals (applying style.DisabledAlpha over current colors)
-    IMGUI_API void          BeginDisabled(bool disabled = true);
-    IMGUI_API void          EndDisabled();
-
     // Clipping
     // - Mouse hovering is affected by ImGui::PushClipRect() calls, unlike direct calls to ImDrawList::PushClipRect() which are render only.
     IMGUI_API void          PushClipRect(const ImVec2& clip_rect_min, const ImVec2& clip_rect_max, bool intersect_with_current_clip_rect);
@@ -869,6 +877,8 @@ namespace ImGui
     // - For 'int user_key_index' you can use your own indices/enums according to how your backend/engine stored them in io.KeysDown[].
     // - We don't know the meaning of those value. You can use GetKeyIndex() to map a ImGuiKey_ value into the user index.
     IMGUI_API int           GetKeyIndex(ImGuiKey imgui_key);                                    // map ImGuiKey_* values into user's key index. == io.KeyMap[key]
+    IMGUI_API const char*   GetKeyName(ImGuiKey imgui_key);                                     // returns English name of the key
+    IMGUI_API int           FindImGuiKey(int user_key_index);                                   // finds ImGuiKey_* associated to specified user_key_index. Returns ImGuiKey_None if not found.
     IMGUI_API bool          IsKeyDown(int user_key_index);                                      // is key being held. == io.KeysDown[user_key_index].
     IMGUI_API bool          IsKeyPressed(int user_key_index, bool repeat = true);               // was key pressed (went from !Down to Down)? if repeat=true, uses io.KeyRepeatDelay / KeyRepeatRate
     IMGUI_API bool          IsKeyReleased(int user_key_index);                                  // was key released (went from Down to !Down)?
@@ -903,7 +913,6 @@ namespace ImGui
     // Settings/.Ini Utilities
     // - The disk functions are automatically called if io.IniFilename != NULL (default is "imgui.ini").
     // - Set io.IniFilename to NULL to load/save manually. Read io.WantSaveIniSettings description about handling .ini saving manually.
-    // - Important: default value "imgui.ini" is relative to current working dir! Most apps will want to lock this to an absolute path (e.g. same path as executables).
     IMGUI_API void          LoadIniSettingsFromDisk(const char* ini_filename);                  // call after CreateContext() and before the first call to NewFrame(). NewFrame() automatically calls LoadIniSettingsFromDisk(io.IniFilename).
     IMGUI_API void          LoadIniSettingsFromMemory(const char* ini_data, size_t ini_size=0); // call after CreateContext() and before the first call to NewFrame() to provide .ini data from your own data source.
     IMGUI_API void          SaveIniSettingsToDisk(const char* ini_filename);                    // this is automatically called (if io.IniFilename is not empty) a few seconds after any modification that should be reflected in the .ini file (and also by DestroyContext).
@@ -1332,6 +1341,7 @@ enum ImGuiSortDirection_
 // User fill ImGuiIO.KeyMap[] array with indices into the ImGuiIO.KeysDown[512] array
 enum ImGuiKey_
 {
+    ImGuiKey_None,
     ImGuiKey_Tab,
     ImGuiKey_LeftArrow,
     ImGuiKey_RightArrow,
@@ -1347,13 +1357,96 @@ enum ImGuiKey_
     ImGuiKey_Space,
     ImGuiKey_Enter,
     ImGuiKey_Escape,
+    ImGuiKey_Apostrophe,     // '
+    ImGuiKey_Comma,          // ,
+    ImGuiKey_Minus,          // -
+    ImGuiKey_Period,         // .
+    ImGuiKey_Slash,          // /
+    ImGuiKey_Semicolon,      // ;
+    ImGuiKey_Equal,          // =
+    ImGuiKey_LeftBracket,    // [
+    ImGuiKey_Backslash,      // \ (this text inhibit multiline comment caused by backlash)
+    ImGuiKey_RightBracket,   // ]
+    ImGuiKey_GraveAccent,    // `
+    ImGuiKey_CapsLock,
+    ImGuiKey_ScrollLock,
+    ImGuiKey_NumLock,
+    ImGuiKey_PrintScreen,
+    ImGuiKey_Pause,
+    ImGuiKey_KeyPad0,
+    ImGuiKey_KeyPad1,
+    ImGuiKey_KeyPad2,
+    ImGuiKey_KeyPad3,
+    ImGuiKey_KeyPad4,
+    ImGuiKey_KeyPad5,
+    ImGuiKey_KeyPad6,
+    ImGuiKey_KeyPad7,
+    ImGuiKey_KeyPad8,
+    ImGuiKey_KeyPad9,
+    ImGuiKey_KeyPadDecimal,
+    ImGuiKey_KeyPadDivide,
+    ImGuiKey_KeyPadMultiply,
+    ImGuiKey_KeyPadSubtract,
+    ImGuiKey_KeyPadAdd,
     ImGuiKey_KeyPadEnter,
-    ImGuiKey_A,                 // for text edit CTRL+A: select all
-    ImGuiKey_C,                 // for text edit CTRL+C: copy
-    ImGuiKey_V,                 // for text edit CTRL+V: paste
-    ImGuiKey_X,                 // for text edit CTRL+X: cut
-    ImGuiKey_Y,                 // for text edit CTRL+Y: redo
-    ImGuiKey_Z,                 // for text edit CTRL+Z: undo
+    ImGuiKey_KeyPadEqual,
+    ImGuiKey_LeftShift,
+    ImGuiKey_LeftControl,
+    ImGuiKey_LeftAlt,
+    ImGuiKey_LeftSuper,
+    ImGuiKey_RightShift,
+    ImGuiKey_RightControl,
+    ImGuiKey_RightAlt,
+    ImGuiKey_RightSuper,
+    ImGuiKey_Menu,
+    ImGuiKey_0,         //
+    ImGuiKey_1,         //
+    ImGuiKey_2,         //
+    ImGuiKey_3,         //
+    ImGuiKey_4,         //
+    ImGuiKey_5,         //
+    ImGuiKey_6,         //
+    ImGuiKey_7,         //
+    ImGuiKey_8,         //
+    ImGuiKey_9,         //
+    ImGuiKey_A,         // for text edit CTRL+A: select all
+    ImGuiKey_B,         //
+    ImGuiKey_C,         // for text edit CTRL+C: copy
+    ImGuiKey_D,         //
+    ImGuiKey_E,         //
+    ImGuiKey_F,         //
+    ImGuiKey_G,         //
+    ImGuiKey_H,         //
+    ImGuiKey_I,         //
+    ImGuiKey_J,         //
+    ImGuiKey_K,         //
+    ImGuiKey_L,         //
+    ImGuiKey_M,         //
+    ImGuiKey_N,         //
+    ImGuiKey_O,         //
+    ImGuiKey_P,         //
+    ImGuiKey_Q,         //
+    ImGuiKey_R,         //
+    ImGuiKey_S,         //
+    ImGuiKey_T,         //
+    ImGuiKey_U,         //
+    ImGuiKey_V,         // for text edit CTRL+V: paste
+    ImGuiKey_W,         //
+    ImGuiKey_X,         // for text edit CTRL+X: cut
+    ImGuiKey_Y,         // for text edit CTRL+Y: redo
+    ImGuiKey_Z,         // for text edit CTRL+Z: undo
+    ImGuiKey_F1,        //
+    ImGuiKey_F2,        //
+    ImGuiKey_F3,        //
+    ImGuiKey_F4,        //
+    ImGuiKey_F5,        //
+    ImGuiKey_F6,        //
+    ImGuiKey_F7,        //
+    ImGuiKey_F8,        //
+    ImGuiKey_F9,        //
+    ImGuiKey_F10,       //
+    ImGuiKey_F11,       //
+    ImGuiKey_F12,       //
     ImGuiKey_COUNT
 };
 
@@ -1393,12 +1486,13 @@ enum ImGuiNavInput_
 
     // [Internal] Don't use directly! This is used internally to differentiate keyboard from gamepad inputs for behaviors that require to differentiate them.
     // Keyboard behavior that have no corresponding gamepad mapping (e.g. CTRL+TAB) will be directly reading from io.KeysDown[] instead of io.NavInputs[].
+    ImGuiNavInput_KeyMenu_,      // toggle menu                                  // = io.KeyAlt
     ImGuiNavInput_KeyLeft_,      // move left                                    // = Arrow keys
     ImGuiNavInput_KeyRight_,     // move right
     ImGuiNavInput_KeyUp_,        // move up
     ImGuiNavInput_KeyDown_,      // move down
     ImGuiNavInput_COUNT,
-    ImGuiNavInput_InternalStart_ = ImGuiNavInput_KeyLeft_
+    ImGuiNavInput_InternalStart_ = ImGuiNavInput_KeyMenu_
 };
 
 // Configuration flags stored in io.ConfigFlags. Set by user/application.
@@ -1497,7 +1591,6 @@ enum ImGuiStyleVar_
 {
     // Enum name --------------------- // Member in ImGuiStyle structure (see ImGuiStyle for descriptions)
     ImGuiStyleVar_Alpha,               // float     Alpha
-    ImGuiStyleVar_DisabledAlpha,       // float     DisabledAlpha
     ImGuiStyleVar_WindowPadding,       // ImVec2    WindowPadding
     ImGuiStyleVar_WindowRounding,      // float     WindowRounding
     ImGuiStyleVar_WindowBorderSize,    // float     WindowBorderSize
@@ -1521,6 +1614,7 @@ enum ImGuiStyleVar_
     ImGuiStyleVar_TabRounding,         // float     TabRounding
     ImGuiStyleVar_ButtonTextAlign,     // ImVec2    ButtonTextAlign
     ImGuiStyleVar_SelectableTextAlign, // ImVec2    SelectableTextAlign
+    ImGuiStyleVar_LayoutAlign,         // float     LayoutAlign
     ImGuiStyleVar_COUNT
 };
 
@@ -1569,13 +1663,13 @@ enum ImGuiColorEditFlags_
 
     // Defaults Options. You can set application defaults using SetColorEditOptions(). The intent is that you probably don't want to
     // override them in most of your calls. Let the user choose via the option menu and/or call SetColorEditOptions() once during startup.
-    ImGuiColorEditFlags_DefaultOptions_ = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_PickerHueBar,
+    ImGuiColorEditFlags__OptionsDefault = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_PickerHueBar,
 
     // [Internal] Masks
-    ImGuiColorEditFlags_DisplayMask_    = ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_DisplayHex,
-    ImGuiColorEditFlags_DataTypeMask_   = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_Float,
-    ImGuiColorEditFlags_PickerMask_     = ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_PickerHueBar,
-    ImGuiColorEditFlags_InputMask_      = ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_InputHSV
+    ImGuiColorEditFlags__DisplayMask    = ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_DisplayHex,
+    ImGuiColorEditFlags__DataTypeMask   = ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_Float,
+    ImGuiColorEditFlags__PickerMask     = ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_PickerHueBar,
+    ImGuiColorEditFlags__InputMask      = ImGuiColorEditFlags_InputRGB | ImGuiColorEditFlags_InputHSV
 
     // Obsolete names (will be removed)
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
@@ -1744,7 +1838,6 @@ IM_MSVC_RUNTIME_CHECKS_RESTORE
 struct ImGuiStyle
 {
     float       Alpha;                      // Global alpha applies to everything in Dear ImGui.
-    float       DisabledAlpha;              // Additional alpha multiplier applied by BeginDisabled(). Multiply over current value of Alpha.
     ImVec2      WindowPadding;              // Padding within a window.
     float       WindowRounding;             // Radius of window corners rounding. Set to 0.0f to have rectangular windows. Large values tend to lead to variety of artifacts and are not recommended.
     float       WindowBorderSize;           // Thickness of border around windows. Generally set to 0.0f or 1.0f. (Other values are not well tested and more CPU/GPU costly).
@@ -1768,6 +1861,7 @@ struct ImGuiStyle
     float       ScrollbarRounding;          // Radius of grab corners for scrollbar.
     float       GrabMinSize;                // Minimum width/height of a grab box for slider/scrollbar.
     float       GrabRounding;               // Radius of grabs corners rounding. Set to 0.0f to have rectangular slider grabs.
+    float       LayoutAlign;                // Element alignment inside horizontal and vertical layouts (0.0f - left/top, 1.0f - right/bottom, 0.5f - center).
     float       LogSliderDeadzone;          // The size in pixels of the dead-zone around zero on logarithmic sliders that cross zero.
     float       TabRounding;                // Radius of upper corners of a tab. Set to 0.0f to have rectangular tabs.
     float       TabBorderSize;              // Thickness of border around tabs.
@@ -1807,7 +1901,7 @@ struct ImGuiIO
     ImVec2      DisplaySize;                    // <unset>          // Main display size, in pixels (generally == GetMainViewport()->Size)
     float       DeltaTime;                      // = 1.0f/60.0f     // Time elapsed since last frame, in seconds.
     float       IniSavingRate;                  // = 5.0f           // Minimum time between saving positions/sizes to .ini file, in seconds.
-    const char* IniFilename;                    // = "imgui.ini"    // Path to .ini file (important: default "imgui.ini" is relative to current working dir!). Set NULL to disable automatic .ini loading/saving or if you want to manually call LoadIniSettingsXXX() / SaveIniSettingsXXX() functions.
+    const char* IniFilename;                    // = "imgui.ini"    // Path to .ini file. Set NULL to disable automatic .ini loading/saving, if e.g. you want to manually load/save from memory.
     const char* LogFilename;                    // = "imgui_log.txt"// Path to .log file (default parameter to ImGui::LogToFile when no file is specified).
     float       MouseDoubleClickTime;           // = 0.30f          // Time for a double-click, in seconds.
     float       MouseDoubleClickMaxDist;        // = 6.0f           // Distance threshold to stay in to validate a double-click, in pixels.
@@ -1875,7 +1969,6 @@ struct ImGuiIO
     IMGUI_API void  AddInputCharacterUTF16(ImWchar16 c);        // Queue new character input from an UTF-16 character, it can be a surrogate
     IMGUI_API void  AddInputCharactersUTF8(const char* str);    // Queue new characters input from an UTF-8 string
     IMGUI_API void  ClearInputCharacters();                     // Clear the text input buffer manually
-    IMGUI_API void  AddFocusEvent(bool focused);                // Notifies Dear ImGui when hosting platform windows lose or gain input focus
 
     //------------------------------------------------------------------
     // Output - Updated by NewFrame() or EndFrame()/Render()
@@ -1903,7 +1996,6 @@ struct ImGuiIO
     //------------------------------------------------------------------
 
     ImGuiKeyModFlags KeyMods;                   // Key mods flags (same as io.KeyCtrl/KeyShift/KeyAlt/KeySuper but merged into flags), updated by NewFrame()
-    ImGuiKeyModFlags KeyModsPrev;               // Previous key mods
     ImVec2      MousePosPrev;                   // Previous mouse position (note that MouseDelta is not necessary == MousePos-MousePosPrev, in case either position is invalid)
     ImVec2      MouseClickedPos[5];             // Position at time of clicking
     double      MouseClickedTime[5];            // Time of last click (used to figure out double-click)
@@ -2709,7 +2801,7 @@ struct ImFontAtlas
 
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
     typedef ImFontAtlasCustomRect    CustomRect;         // OBSOLETED in 1.72+
-    //typedef ImFontGlyphRangesBuilder GlyphRangesBuilder; // OBSOLETED in 1.67+
+    typedef ImFontGlyphRangesBuilder GlyphRangesBuilder; // OBSOLETED in 1.67+
 #endif
 };
 
@@ -2839,18 +2931,8 @@ namespace ImGui
     static inline void  SetNextTreeNodeOpen(bool open, ImGuiCond cond = 0) { SetNextItemOpen(open, cond); }
     // OBSOLETED in 1.70 (from May 2019)
     static inline float GetContentRegionAvailWidth()        { return GetContentRegionAvail().x; }
-
-    // Some of the older obsolete names along with their replacement (commented out so they are not reported in IDE)
-    //static inline ImDrawList* GetOverlayDrawList()            { return GetForegroundDrawList(); }                         // OBSOLETED in 1.69 (from Mar 2019)
-    //static inline void  SetScrollHere(float ratio = 0.5f)     { SetScrollHereY(ratio); }                                  // OBSOLETED in 1.66 (from Nov 2018)
-    //static inline bool  IsItemDeactivatedAfterChange()        { return IsItemDeactivatedAfterEdit(); }                    // OBSOLETED in 1.63 (from Aug 2018)
-    //static inline bool  IsAnyWindowFocused()                  { return IsWindowFocused(ImGuiFocusedFlags_AnyWindow); }    // OBSOLETED in 1.60 (from Apr 2018)
-    //static inline bool  IsAnyWindowHovered()                  { return IsWindowHovered(ImGuiHoveredFlags_AnyWindow); }    // OBSOLETED in 1.60 (between Dec 2017 and Apr 2018)
-    //static inline void  ShowTestWindow()                      { return ShowDemoWindow(); }                                // OBSOLETED in 1.53 (between Oct 2017 and Dec 2017)
-    //static inline bool  IsRootWindowFocused()                 { return IsWindowFocused(ImGuiFocusedFlags_RootWindow); }   // OBSOLETED in 1.53 (between Oct 2017 and Dec 2017)
-    //static inline bool  IsRootWindowOrAnyChildFocused()       { return IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows); } // OBSOLETED in 1.53 (between Oct 2017 and Dec 2017)
-    //static inline void  SetNextWindowContentWidth(float w)    { SetNextWindowContentSize(ImVec2(w, 0.0f)); }              // OBSOLETED in 1.53 (between Oct 2017 and Dec 2017)
-    //static inline float GetItemsLineHeightWithSpacing()       { return GetFrameHeightWithSpacing(); }                     // OBSOLETED in 1.53 (between Oct 2017 and Dec 2017)
+    // OBSOLETED in 1.69 (from Mar 2019)
+    static inline ImDrawList* GetOverlayDrawList()          { return GetForegroundDrawList(); }
 }
 
 // OBSOLETED in 1.82 (from Mars 2021): flags for AddRect(), AddRectFilled(), AddImageRounded(), PathRect()

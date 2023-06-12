@@ -111,7 +111,7 @@ public:
     }
 
 protected:
-    virtual void RenderContent() {}
+    virtual void RenderContent();
 
     PinID AddInputPin(const EditorNodePin& pin);
     PinID AddOutputPin(const EditorNodePin& pin);
@@ -139,9 +139,9 @@ class BoolEditorNode : public EvaluationEditorNode
     SERIALIZEABLE_EDITOR_NODE();
 public:
     BoolEditorNode() :
-        EvaluationEditorNode("Bool node", EditorNodeType::Bool)
+        EvaluationEditorNode("Bool", EditorNodeType::Bool)
     {
-        AddOutputPin(EditorNodePin::CreateOutputPin("    ->", PinType::Bool));
+        AddOutputPin(EditorNodePin::CreateOutputPin("", PinType::Bool));
     }
 
     bool GetValue() const { return m_Value; }
@@ -160,8 +160,8 @@ public:
     ExecutionEditorNode(const std::string& label, EditorNodeType nodeType, bool skipInput = false):
         EditorNode(label, nodeType)
     {
-        if (!skipInput) m_ExectuionPinInput = AddExecutionPin(EditorNodePin::CreateInputPin("-> EXECUTION", PinType::Execution));
-        m_ExectuionPinOutput = AddExecutionPin(EditorNodePin::CreateOutputPin("EXECUTION ->", PinType::Execution));
+        if (!skipInput) m_ExectuionPinInput = AddExecutionPin(EditorNodePin::CreateInputPin("", PinType::Execution));
+        m_ExectuionPinOutput = AddExecutionPin(EditorNodePin::CreateOutputPin("", PinType::Execution));
     }
 
     PinID GetExecutionInput() const { return m_ExectuionPinInput; }
@@ -186,7 +186,7 @@ public:
     OnUpdateEditorNode() :
         ExecutionEditorNode("On update", EditorNodeType::OnUpdate, true) 
     {
-        AddOutputPin(EditorNodePin::CreateOutputPin("DT ->", PinType::Float));
+        AddOutputPin(EditorNodePin::CreateOutputPin("DT", PinType::Float));
     }
 };
 
@@ -195,9 +195,9 @@ class IfEditorNode : public ExecutionEditorNode
     SERIALIZEABLE_EDITOR_NODE();
 public:
     IfEditorNode():
-        ExecutionEditorNode("If node", EditorNodeType::If) 
+        ExecutionEditorNode("If", EditorNodeType::If) 
     {
-        m_ExectuionPinElse = AddExecutionPin(EditorNodePin::CreateOutputPin("ELSE    ->", PinType::Execution));
+        m_ExectuionPinElse = AddExecutionPin(EditorNodePin::CreateOutputPin("ELSE", PinType::Execution));
         m_ConditionPin = AddInputPin(EditorNodePin::CreateInputPin("Condition", PinType::Bool));
     }
 
@@ -216,10 +216,10 @@ public:
     PrintEditorNode():
         ExecutionEditorNode("Print node", EditorNodeType::Print)
     {
-        m_FloatInputPin = AddInputPin(EditorNodePin::CreateInputPin("<- Float", PinType::Float));
-        m_Float2InputPin = AddInputPin(EditorNodePin::CreateInputPin("<- Float2", PinType::Float2));
-        m_Float3InputPin = AddInputPin(EditorNodePin::CreateInputPin("<- Float3", PinType::Float3));
-        m_Float4InputPin = AddInputPin(EditorNodePin::CreateInputPin("<- Float4", PinType::Float4));
+        m_FloatInputPin = AddInputPin(EditorNodePin::CreateInputPin("Float", PinType::Float));
+        m_Float2InputPin = AddInputPin(EditorNodePin::CreateInputPin("Float2", PinType::Float2));
+        m_Float3InputPin = AddInputPin(EditorNodePin::CreateInputPin("Float3", PinType::Float3));
+        m_Float4InputPin = AddInputPin(EditorNodePin::CreateInputPin("Float4", PinType::Float4));
     }
 
     PinID GetFloatInputPin() const { return m_FloatInputPin; }
@@ -255,10 +255,10 @@ class FloatNEditorNode : public EvaluationEditorNode
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 	FloatNEditorNode(unsigned numFloats, EditorNodeType nodeType, PinType pinType) :
-		EvaluationEditorNode("Float" + (numFloats == 1 ? "" : std::to_string(numFloats)) + " node", nodeType),
+		EvaluationEditorNode("Float" + (numFloats == 1 ? "" : std::to_string(numFloats)), nodeType),
         m_NumValues(numFloats)
 	{
-        m_Pin = AddOutputPin(EditorNodePin::CreateOutputPin("    ->", pinType));
+        m_Pin = AddOutputPin(EditorNodePin::CreateOutputPin("", pinType));
 
 		for (unsigned i = 0; i < 4; i++) 
 			m_Values[i] = 0.0f;
@@ -292,9 +292,9 @@ class AsignVariableEditorNode : public ExecutionEditorNode
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 	AsignVariableEditorNode(EditorNodeType nodeType, PinType inputType) :
-        ExecutionEditorNode("Asign " + ToString(inputType) + " node", nodeType)
+        ExecutionEditorNode("Asign " + ToString(inputType), nodeType)
 	{
-		m_ValuePin = AddInputPin(EditorNodePin::CreateInputPin("Value", inputType));
+		m_ValuePin = AddInputPin(EditorNodePin::CreateInputPin("", inputType));
 	}
 
 	PinID GetValuePin() const { return m_ValuePin; }
@@ -321,9 +321,9 @@ class VariableEditorNode : public EvaluationEditorNode
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 	VariableEditorNode(EditorNodeType nodeType, PinType outputType) :
-		EvaluationEditorNode("Var " + ToString(outputType) + " node", nodeType)
+		EvaluationEditorNode("Var " + ToString(outputType), nodeType)
 	{
-		AddOutputPin(EditorNodePin::CreateOutputPin("    ->", outputType));
+		AddOutputPin(EditorNodePin::CreateOutputPin("", outputType));
 	}
 
 	const std::string& GetVaraibleName() const { return m_VariableName; }
@@ -352,7 +352,7 @@ public:
 	{
 		m_Apin = AddInputPin(EditorNodePin::CreateInputPin("A", pinType));
 		m_Bpin = AddInputPin(EditorNodePin::CreateInputPin("B", pinType));
-		AddOutputPin(EditorNodePin::CreateOutputPin("   Result", pinType));
+		AddOutputPin(EditorNodePin::CreateOutputPin("Result", pinType));
 	}
 
 	PinID GetAPin() const { return m_Apin; }
