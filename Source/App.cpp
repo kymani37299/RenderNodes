@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "IDGen.h"
 
+#include <filesystem>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
@@ -10,6 +11,8 @@
 #include "Execution/RenderPipelineExecutor.h"
 #include "NodeGraph/NodeGraphCompiler.h"
 #include "NodeGraph/NodeGraphSerializer.h"
+
+#include "Util/FileDialog.h"
 
 // From IDGen.h
 std::atomic<UniqueID> IDGen::Allocator = 1;
@@ -73,10 +76,14 @@ App::App()
 
     ImGui_ImplGlfw_InitForOpenGL(m_Window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+
+    FileDialog::Init();
 }
 
 App::~App()
 {
+    FileDialog::Destroy();
+
     // Deinit imgui
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
@@ -99,25 +106,11 @@ inline std::string GetPathWithoutExtension(const std::string path)
 void App::Run()
 {
     bool editMode = true;
+    bool editorInitialized = false;
     Ptr<RenderPipelineEditor> editor{ new RenderPipelineEditor{} };
     Ptr<RenderPipelineExecutor> executor{ new RenderPipelineExecutor{} };
     NodeGraphCompiler compiler;
     NodeGraphSerializer serializer;
-
-    static const std::string FILE_PATH = "LastSession.rn";
-    static const std::string JSON_FILE_PATH = GetPathWithoutExtension(FILE_PATH) + ".json";
-
-    NodeGraph* nodeGraph = new NodeGraph{};
-
-    const UniqueID firstID = serializer.Deserialize(FILE_PATH, *nodeGraph);
-    IDGen::Init(firstID);
-
-    if (!firstID)
-    {
-        delete nodeGraph;
-        nodeGraph = NodeGraph::CreateDefaultNodeGraph(); 
-    }
-    editor->Load(JSON_FILE_PATH, nodeGraph);
 
     // Render loop
     while (!glfwWindowShouldClose(m_Window))
@@ -135,10 +128,63 @@ void App::Run()
             ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
             ImGui::Begin("Window", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize);
 
-            ImGui::SetWindowFontScale(m_Width / 1024.0f);
+            ImGui::SetWindowFontScale(m_Width / 1920.0f);
 
             // Render
             {
+                if (ImGui::Button("New") || !editorInitialized)
+                {
+                    if (!editorInitialized)
+                        editor->Unload();
+
+                    std::filesystem::remove("NodeEditor.json");
+
+					editor->Load(NodeGraph::CreateDefaultNodeGraph());
+					editor->InitializeDefaultNodePositions();
+
+                    editorInitialized = true;
+                }
+
+                ImGui::SameLine();
+
+                if (ImGui::Button("Load"))
+                {
+                    std::string path;
+                    if (FileDialog::OpenRenderNodeFile(path))
+                    {
+                        NodeGraph* loadedNodeGraph = new NodeGraph{};
+						const UniqueID firstID = serializer.Deserialize(path, *loadedNodeGraph);
+						IDGen::Init(firstID);
+
+						if (firstID)
+						{
+							editor->Unload();
+							const std::string nodeEditorConfigPath = GetPathWithoutExtension(path) + ".json";
+                            std::filesystem::copy(nodeEditorConfigPath, "NodeEditor.json", std::filesystem::copy_options::overwrite_existing);
+							editor->Load(loadedNodeGraph);
+						}
+                        else
+                        {
+                            delete loadedNodeGraph;
+                        }
+                    }
+                }
+
+                ImGui::SameLine();
+
+				if (ImGui::Button("Save"))
+				{
+					std::string path;
+					if (FileDialog::SaveRenderNodeFile(path))
+					{
+						std::cout << path << std::endl;
+                        serializer.Serialize(path, editor->GetNodeGraph());
+
+                        const std::string jsonDest = GetPathWithoutExtension(path) + ".json";
+                        std::filesystem::copy("NodeEditor.json", jsonDest, std::filesystem::copy_options::overwrite_existing);
+					}
+				}
+
                 if (ImGui::Checkbox("Edit mode", &editMode))
                 {
                     if (!editMode)
@@ -154,7 +200,12 @@ void App::Run()
                 if (editMode)
                     editor->Render();
                 else
-                    executor->OnUpdate();
+                {
+                    const float dt = 1000.0f / ImGui::GetIO().Framerate;
+                    executor->OnUpdate(dt);
+                    executor->Render();
+                }
+                   
             }
 
             ImGui::End();
@@ -163,5 +214,4 @@ void App::Run()
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         }
     }
-    serializer.Serialize(FILE_PATH, editor->GetNodeGraph());
 }

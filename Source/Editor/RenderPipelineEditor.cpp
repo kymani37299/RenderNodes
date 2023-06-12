@@ -7,7 +7,16 @@
 
 RenderPipelineEditor::~RenderPipelineEditor()
 {
-    ImNode::DestroyEditor(m_EditorContext);
+    Unload();
+   
+}
+
+void RenderPipelineEditor::InitializeDefaultNodePositions()
+{
+    ImNode::SetCurrentEditor(m_EditorContext);
+    ImNode::SetNodePosition(m_NodeGraph->GetOnStartNode()->GetID(), ImVec2{ 100, 200 });
+    ImNode::SetNodePosition(m_NodeGraph->GetOnUpdateNode()->GetID(), ImVec2{ 100, 600 });
+    ImNode::SetCurrentEditor(nullptr);
 }
 
 void RenderPipelineEditor::Render()
@@ -27,10 +36,15 @@ void RenderPipelineEditor::Render()
     ImNode::SetCurrentEditor(nullptr);
 }
 
-void RenderPipelineEditor::Load(const std::string& settingsPath, NodeGraph* nodeGraph)
+void RenderPipelineEditor::Unload()
+{
+    ImNode::DestroyEditor(m_EditorContext);
+}
+
+void RenderPipelineEditor::Load(NodeGraph* nodeGraph)
 {
     ImNode::Config config;
-    config.SettingsFile = settingsPath.c_str();
+    config.SettingsFile = "NodeEditor.json";
     m_EditorContext = ImNode::CreateEditor(&config);
 
     m_NodeGraph = Ptr<NodeGraph>(nodeGraph);
@@ -78,8 +92,10 @@ void RenderPipelineEditor::UpdateEditor()
         {
             if (ImNode::AcceptNewItem())
             {
+                m_NewNodePinID = pin.Get();
+
                 ImNode::Suspend();
-                ImGui::OpenPopup("Create New Node");
+                ImGui::OpenPopup("New Node Context Menu");
                 ImNode::Resume();
             }
         }
@@ -144,22 +160,97 @@ void RenderPipelineEditor::RenderContextMenus()
     {
         EditorNode* newNode = nullptr;
 
-        if (ImGui::MenuItem("If node")) newNode = new IfEditorNode();
-        if (ImGui::MenuItem("Bool node")) newNode = new BoolEditorNode();
-        if (ImGui::MenuItem("Float node")) newNode = new FloatEditorNode();
-        if (ImGui::MenuItem("Print node")) newNode = new PrintEditorNode();
-        if (ImGui::MenuItem("Float binary operator node")) newNode = new FloatBinaryOperatorEditorNode();
-        if (ImGui::MenuItem("Asign float")) newNode = new AsignFloatEditorNode();
-        if (ImGui::MenuItem("Var float")) newNode = new VarFloatEditorNode();
+        if (ImGui::BeginMenu("Constants"))
+		{
+			if (ImGui::MenuItem("Bool")) newNode = new BoolEditorNode();
+			if (ImGui::MenuItem("Float")) newNode = new FloatEditorNode();
+			if (ImGui::MenuItem("Float2")) newNode = new Float2EditorNode();
+			if (ImGui::MenuItem("Float3")) newNode = new Float3EditorNode();
+			if (ImGui::MenuItem("Float4")) newNode = new Float4EditorNode();
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Assign variable"))
+        {
+            if (ImGui::MenuItem("Float")) newNode = new AsignFloatEditorNode();
+            if (ImGui::MenuItem("Float2")) newNode = new AsignFloat2EditorNode();
+            if (ImGui::MenuItem("Float3")) newNode = new AsignFloat3EditorNode();
+            if (ImGui::MenuItem("Float4")) newNode = new AsignFloat4EditorNode();
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Get variable"))
+		{
+			if (ImGui::MenuItem("Float")) newNode = new VarFloatEditorNode();
+			if (ImGui::MenuItem("Float2")) newNode = new VarFloat2EditorNode();
+			if (ImGui::MenuItem("Float3")) newNode = new VarFloat3EditorNode();
+			if (ImGui::MenuItem("Float4")) newNode = new VarFloat4EditorNode();
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Operator"))
+        {
+            if (ImGui::MenuItem("Float")) newNode = new FloatBinaryOperatorEditorNode();
+            if (ImGui::MenuItem("Float2")) newNode = new Float2BinaryOperatorEditorNode();
+            if (ImGui::MenuItem("Float3")) newNode = new Float3BinaryOperatorEditorNode();
+            if (ImGui::MenuItem("Float4")) newNode = new Float4BinaryOperatorEditorNode();
+            ImGui::EndMenu();
+        }
 
+        if (ImGui::BeginMenu("Render"))
+        {
+            if (ImGui::MenuItem("Clear render target")) newNode = new ClearRenderTargetEditorNode();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::MenuItem("If condition")) newNode = new IfEditorNode();
+        if (ImGui::MenuItem("Print")) newNode = new PrintEditorNode();
+       
         if (newNode)
         {
+            if (m_NewNodePinID)
+            {
+                EditorNodePin nodePin = m_NodeGraph->GetPinByID(m_NewNodePinID);
+                unsigned pinCounts = 0;
+                EditorNodePin targetPin;
+                const auto fn = [&pinCounts, &nodePin, &targetPin, this](const EditorNodePin& pin)
+                {
+                    if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+                    {
+                        targetPin = pin;
+                        pinCounts++;
+                    }
+                };
+                newNode->ForEachPin(fn);
+                if (pinCounts == 1)
+                {
+                    const PinID startPin = nodePin.IsInput ? targetPin.ID : nodePin.ID;
+                    const PinID endPin = nodePin.IsInput ? nodePin.ID : targetPin.ID;
+                    m_NodeGraph->AddLink({ IDGen::Generate(), startPin, endPin });
+                }
+            }
+
             m_NodeGraph->AddNode(newNode);
             ImNode::SetNodePosition(newNode->GetID(), ImNode::ScreenToCanvas(ImGui::GetMousePos()));
         }
 
         ImGui::EndPopup();
     }
+
+    if (ImGui::BeginPopup("Node Context Menu"))
+    {
+        ImGui::Text("Node context - TODO");
+        ImGui::EndPopup();
+    }
+
+	if (ImGui::BeginPopup("Pin Context Menu"))
+	{
+		ImGui::Text("Pin context - TODO");
+        ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopup("Link Context Menu"))
+	{
+		ImGui::Text("Link context - TODO");
+        ImGui::EndPopup();
+	}
 
     ImNode::Resume();
 }

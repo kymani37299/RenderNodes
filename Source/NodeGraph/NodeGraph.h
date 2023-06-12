@@ -13,7 +13,7 @@ public:
     void AddNode(EditorNode* node);
     void AddLink(const EditorNodeLink& link);
 
-    void RemoveNode(PinID nodeID);
+    void RemoveNode(NodeID nodeID);
     void RemoveLink(LinkID linkID);
 
     EditorNodePin GetPinByID(PinID pinID) const;

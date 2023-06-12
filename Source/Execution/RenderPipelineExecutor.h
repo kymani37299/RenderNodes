@@ -7,8 +7,9 @@ class RenderPipelineExecutor
 {
 public:
     void OnStart();
-    void OnUpdate();
-
+    void OnUpdate(float dt);
+    void Render();
+    
     void SetCompiledPipeline(CompiledPipeline pipeline)
     {
         delete m_Pipeline.OnStartNode;

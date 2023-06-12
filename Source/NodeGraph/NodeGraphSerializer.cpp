@@ -130,16 +130,28 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteAttribute("Value", boolNode->m_Value ? 1 : 0);
 	} break;
 	case EditorNodeType::Float:
+	case EditorNodeType::Float2:
+	case EditorNodeType::Float3:
+	case EditorNodeType::Float4:
 	{
-		FloatEditorNode* boolNode = static_cast<FloatEditorNode*>(node);
-		WriteAttribute("Value", boolNode->m_Value);
+		FloatNEditorNode* floatNode = static_cast<FloatEditorNode*>(node);
+		WriteAttribute("NumFloats", floatNode->m_NumValues);
+		WriteAttribute("Pin", floatNode->m_Pin);
+		for (unsigned i = 0; i < floatNode->m_NumValues; i++)
+		{
+			WriteAttribute("Value" + std::to_string(i), floatNode->m_Values[i]);
+
+		}
 	} break;
 	case EditorNodeType::FloatBinaryOperator:
+	case EditorNodeType::Float2BinaryOperator:
+	case EditorNodeType::Float3BinaryOperator:
+	case EditorNodeType::Float4BinaryOperator:
 	{
-		FloatBinaryOperatorEditorNode* floatOperator = static_cast<FloatBinaryOperatorEditorNode*>(node);
-		WriteAttribute("A", floatOperator->m_Apin);
-		WriteAttribute("B", floatOperator->m_Bpin);
-		WriteAttribute("OP", floatOperator->m_Op);
+		BinaryOperatorEditorNode* binaryOperator = static_cast<BinaryOperatorEditorNode*>(node);
+		WriteAttribute("A", binaryOperator->m_Apin);
+		WriteAttribute("B", binaryOperator->m_Bpin);
+		WriteAttribute("OP", binaryOperator->m_Op);
 	} break;
 	case EditorNodeType::If:
 	{
@@ -153,6 +165,9 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		PrintEditorNode* printNode = static_cast<PrintEditorNode*>(node);
 		WriteExecutionNodeDetails(printNode);
 		WriteAttribute("FloatInput", printNode->m_FloatInputPin);
+		WriteAttribute("Float2Input", printNode->m_Float2InputPin);
+		WriteAttribute("Float3Input", printNode->m_Float3InputPin);
+		WriteAttribute("Float4Input", printNode->m_Float4InputPin);
 	} break;
 	case EditorNodeType::OnUpdate:
 	case EditorNodeType::OnStart:
@@ -161,6 +176,9 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteExecutionNodeDetails(exNode);
 	} break;
 	case EditorNodeType::AsignFloat:
+	case EditorNodeType::AsignFloat2:
+	case EditorNodeType::AsignFloat3:
+	case EditorNodeType::AsignFloat4:
 	{
 		AsignVariableEditorNode* asignNode = static_cast<AsignVariableEditorNode*>(node);
 		WriteExecutionNodeDetails(asignNode);
@@ -168,9 +186,18 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteAttribute("Name", asignNode->m_Name);
 	} break;
 	case EditorNodeType::VarFloat:
+	case EditorNodeType::VarFloat2:
+	case EditorNodeType::VarFloat3:
+	case EditorNodeType::VarFloat4:
 	{
 		VariableEditorNode* varNode = static_cast<VariableEditorNode*>(node);
 		WriteAttribute("Name", varNode->m_VariableName);
+	} break;
+	case EditorNodeType::ClearRenderTarget:
+	{
+		ClearRenderTargetEditorNode* clearRTNode = static_cast<ClearRenderTargetEditorNode*>(node);
+		WriteExecutionNodeDetails(clearRTNode);
+		WriteAttribute("ClearColorPin", clearRTNode->GetClearColorPin());
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -273,14 +300,42 @@ EditorNode* NodeGraphSerializer::ReadNode()
 	case EditorNodeType::Float:
 	{
 		INIT_NODE(FloatEditorNode);
-		newNode->m_Value = ReadFloatAttr("Value");
+		ReadFloatNode(newNode);
+	} break;
+	case EditorNodeType::Float2:
+	{
+		INIT_NODE(Float2EditorNode);
+		ReadFloatNode(newNode);
+	} break;
+	case EditorNodeType::Float3:
+	{
+		INIT_NODE(Float3EditorNode);
+		ReadFloatNode(newNode);
+	} break;
+	case EditorNodeType::Float4:
+	{
+		INIT_NODE(Float4EditorNode);
+		ReadFloatNode(newNode);
 	} break;
 	case EditorNodeType::FloatBinaryOperator:
 	{
 		INIT_NODE(FloatBinaryOperatorEditorNode);
-		newNode->m_Apin = ReadIntAttr("A");
-		newNode->m_Bpin = ReadIntAttr("B");
-		newNode->m_Op = ReadCharAttr("OP");
+		ReadBinaryOperatorNode(newNode);
+	} break;
+	case EditorNodeType::Float2BinaryOperator:
+	{
+		INIT_NODE(Float2BinaryOperatorEditorNode);
+		ReadBinaryOperatorNode(newNode);
+	} break;
+	case EditorNodeType::Float3BinaryOperator:
+	{
+		INIT_NODE(Float3BinaryOperatorEditorNode);
+		ReadBinaryOperatorNode(newNode);
+	} break;
+	case EditorNodeType::Float4BinaryOperator:
+	{
+		INIT_NODE(Float4BinaryOperatorEditorNode);
+		ReadBinaryOperatorNode(newNode);
 	} break;
 	case EditorNodeType::If:
 	{
@@ -294,6 +349,9 @@ EditorNode* NodeGraphSerializer::ReadNode()
 		INIT_NODE(PrintEditorNode);
 		ReadExecutionNode(newNode);
 		newNode->m_FloatInputPin = ReadIntAttr("FloatInput");
+		newNode->m_Float2InputPin = ReadIntAttr("Float2Input");
+		newNode->m_Float3InputPin = ReadIntAttr("Float3Input");
+		newNode->m_Float4InputPin = ReadIntAttr("Float4Input");
 	} break;
 	case EditorNodeType::OnUpdate:
 	{
@@ -310,12 +368,50 @@ EditorNode* NodeGraphSerializer::ReadNode()
 		INIT_NODE(AsignFloatEditorNode);
 		ReadExecutionNode(newNode);
 		ReadAsignVariableNode(newNode);
-
+	} break;
+	case EditorNodeType::AsignFloat2:
+	{
+		INIT_NODE(AsignFloat2EditorNode);
+		ReadExecutionNode(newNode);
+		ReadAsignVariableNode(newNode);
+	} break;
+	case EditorNodeType::AsignFloat3:
+	{
+		INIT_NODE(AsignFloat3EditorNode);
+		ReadExecutionNode(newNode);
+		ReadAsignVariableNode(newNode);
+	} break;
+	case EditorNodeType::AsignFloat4:
+	{
+		INIT_NODE(AsignFloat3EditorNode);
+		ReadExecutionNode(newNode);
+		ReadAsignVariableNode(newNode);
 	} break;
 	case EditorNodeType::VarFloat:
 	{
 		INIT_NODE(VarFloatEditorNode);
 		ReadVariableNode(newNode);
+	} break;
+	case EditorNodeType::VarFloat2:
+	{
+		INIT_NODE(VarFloat2EditorNode);
+		ReadVariableNode(newNode);
+	} break;
+	case EditorNodeType::VarFloat3:
+	{
+		INIT_NODE(VarFloat3EditorNode);
+		ReadVariableNode(newNode);
+	} break;
+	case EditorNodeType::VarFloat4:
+	{
+		INIT_NODE(VarFloat4EditorNode);
+		ReadVariableNode(newNode);
+	} break;
+	case EditorNodeType::ClearRenderTarget:
+	{
+		INIT_NODE(ClearRenderTargetEditorNode);
+		ReadExecutionNode(newNode);
+		ReadAttribute("ClearColorPin");
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -380,6 +476,23 @@ void NodeGraphSerializer::ReadAsignVariableNode(AsignVariableEditorNode* asignNo
 void NodeGraphSerializer::ReadVariableNode(VariableEditorNode* varNode)
 {
 	varNode->m_VariableName = ReadStrAttr("Name");
+}
+
+void NodeGraphSerializer::ReadFloatNode(FloatNEditorNode* floatNode)
+{
+	const unsigned numFloats = ReadIntAttr("NumFloats");
+	floatNode->m_Pin = ReadIntAttr("Pin");
+	for (unsigned i = 0; i < numFloats; i++)
+	{
+		floatNode->m_Values[i] = ReadFloatAttr("Value" + std::to_string(i));
+	}
+}
+
+void NodeGraphSerializer::ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOpNode)
+{
+	binOpNode->m_Apin = ReadIntAttr("A");
+	binOpNode->m_Bpin = ReadIntAttr("B");
+	binOpNode->m_Op = ReadCharAttr("OP");
 }
 
 // Tmp hack since nodes will self initialize some data

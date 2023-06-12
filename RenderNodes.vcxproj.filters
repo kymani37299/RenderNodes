@@ -78,6 +78,15 @@
     <ClCompile Include="Source\NodeGraph\NodeGraphSerializer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\Texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="External\NativeFileDialog\src\nfd_win.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Util\FileDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h">
@@ -158,6 +167,18 @@
     <ClInclude Include="Source\IDGen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\Texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\NativeFileDialog\src\include\nfd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\NativeFileDialog\src\include\nfd.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Util\FileDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="External\ImGUI-Nodes\imgui_bezier_math.inl">
@@ -170,5 +191,6 @@
       <Filter>Header Files</Filter>
     </None>
     <None Include="External\ImGUI-Nodes\LICENSE" />
+    <None Include="External\NativeFileDialog\src\nfd_cocoa.m" />
   </ItemGroup>
 </Project>

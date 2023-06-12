@@ -2,19 +2,27 @@
 
 #include "../Common.h"
 #include "../Util/Hash.h"
+#include "../Render/Texture.h"
 
 #include <unordered_map>
 
 struct VariableBlock
 {
 	std::unordered_map<uint32_t, float> Floats;
+	std::unordered_map<uint32_t, glm::vec2> Float2s;
+	std::unordered_map<uint32_t, glm::vec3> Float3s;
+	std::unordered_map<uint32_t, glm::vec4> Float4s;
 
 	template<typename T> std::unordered_map<uint32_t, T>& GetMapFromType();
 	template<> std::unordered_map<uint32_t, float>& GetMapFromType<float>() { return Floats; }
+	template<> std::unordered_map<uint32_t, glm::vec2>& GetMapFromType<glm::vec2>() { return Float2s; }
+	template<> std::unordered_map<uint32_t, glm::vec3>& GetMapFromType<glm::vec3>() { return Float3s; }
+	template<> std::unordered_map<uint32_t, glm::vec4>& GetMapFromType<glm::vec4>() { return Float4s; }
 };
 
 struct ExecuteContext
 {
+	Ptr<Texture> RenderTarget;
 	VariableBlock Variables;
 };
 
@@ -150,10 +158,34 @@ public:
 	PrintExecutorNode(ValueNode<float>* floatNode):
 		m_FloatNode(Ptr<ValueNode<float>>(floatNode)) {}
 
+	PrintExecutorNode(ValueNode<glm::vec2>* floatNode) :
+		m_Float2Node(Ptr<ValueNode<glm::vec2>>(floatNode)) {}
+
+	PrintExecutorNode(ValueNode<glm::vec3>* floatNode) :
+		m_Float3Node(Ptr<ValueNode<glm::vec3>>(floatNode)) {}
+
+	PrintExecutorNode(ValueNode<glm::vec4>* floatNode) :
+		m_Float4Node(Ptr<ValueNode<glm::vec4>>(floatNode)) {}
+
 	void Execute(ExecuteContext& context) override;
 
 private:
 	Ptr<ValueNode<float>> m_FloatNode;
+	Ptr<ValueNode<glm::vec2>> m_Float2Node;
+	Ptr<ValueNode<glm::vec3>> m_Float3Node;
+	Ptr<ValueNode<glm::vec4>> m_Float4Node;
+};
+
+class ClearRenderTargetExecutorNode : public ExecutorNode
+{
+public:
+	ClearRenderTargetExecutorNode(ValueNode<glm::vec4>* clearColorNode) :
+		m_ClearColorNode(clearColorNode) {}
+
+	void Execute(ExecuteContext& context) override;
+
+private:
+	Ptr<ValueNode<glm::vec4>> m_ClearColorNode;
 };
 
 template<typename T>

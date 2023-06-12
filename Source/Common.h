@@ -6,6 +6,7 @@
 #include <imgui.h>
 #include <imgui_node_editor.h>
 #include <memory>
+#include <glm/glm.hpp>
 
 #define FORCE_CRASH *((unsigned int*)0) = 0xDEAD
 #define STATIC_ARRAY_SIZE(X) (sizeof(X)/(sizeof(X[0])))

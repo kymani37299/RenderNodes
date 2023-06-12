@@ -22,6 +22,20 @@ void NodeGraph::AddLink(const EditorNodeLink& link)
 
 void NodeGraph::RemoveNode(NodeID nodeID)
 {
+    EditorNode* node = m_Nodes[nodeID].get();
+
+    // Also remove all links that were attached to this node
+    std::vector<LinkID> linksToRemove;
+    for (const auto& it : m_Links)
+    {
+		const auto& link = it.second;
+        if (GetPinOwner(link.Start) == node || GetPinOwner(link.End) == node)
+            linksToRemove.push_back(link.ID);
+    }
+
+    for (const LinkID& linkID : linksToRemove)
+        RemoveLink(linkID);
+
     m_Nodes.erase(nodeID);
 }
 

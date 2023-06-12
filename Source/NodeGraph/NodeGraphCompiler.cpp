@@ -56,6 +56,7 @@ ValueNode<float>* NodeGraphCompiler::EvaluateFloatPin(EditorNodePin pin)
 	EditorNode* node = m_CurrentGraph->GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
+	case EditorNodeType::OnUpdate: return new VariableValueNode<float>("dt");
 	case EditorNodeType::Float: return EvaluateFloat(static_cast<FloatEditorNode*>(node));
 	case EditorNodeType::FloatBinaryOperator: return EvaluateFloatBinaryOperator(static_cast<FloatBinaryOperatorEditorNode*>(node));
 	case EditorNodeType::VarFloat: return EvaluateVarFloat(static_cast<VarFloatEditorNode*>(node));
@@ -68,7 +69,7 @@ ValueNode<float>* NodeGraphCompiler::EvaluateFloatPin(EditorNodePin pin)
 
 ValueNode<float>* NodeGraphCompiler::EvaluateFloat(FloatEditorNode* floatNode)
 {
-	return new ConstantValueNode<float>(floatNode->GetValue());
+	return new ConstantValueNode<float>(floatNode->GetFloat());
 }
 
 ValueNode<float>* NodeGraphCompiler::EvaluateVarFloat(VarFloatEditorNode* floatNode)
@@ -86,6 +87,144 @@ ValueNode<float>* NodeGraphCompiler::EvaluateFloatBinaryOperator(FloatBinaryOper
 	ValueNode<float>* b = EvaluateFloatPin(bPin);
 
 	return new BinaryOperatorValueNode<float>{ a, b, floatOpNode->GetOp()};
+}
+
+ValueNode<glm::vec2>* NodeGraphCompiler::EvaluateFloat2Pin(EditorNodePin pin)
+{
+	ASSERT(pin.Type == PinType::Float2);
+
+	pin = GetOutputPinIfInput(m_CurrentGraph, pin);
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("Add node missing outputs!");
+		return new ConstantValueNode<glm::vec2>({});
+	}
+
+	EditorNode* node = m_CurrentGraph->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::Float2: return EvaluateFloat2(static_cast<Float2EditorNode*>(node));
+	case EditorNodeType::VarFloat2: return EvaluateVarFloat2(static_cast<VarFloat2EditorNode*>(node));
+	case EditorNodeType::Float2BinaryOperator: return EvaluateFloat2BinaryOperator(static_cast<Float2BinaryOperatorEditorNode*>(node));
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
+	}
+	return new ConstantValueNode<glm::vec2>({});
+}
+
+ValueNode<glm::vec2>* NodeGraphCompiler::EvaluateFloat2(Float2EditorNode* floatNode)
+{
+	return new ConstantValueNode<glm::vec2>(floatNode->GetFloat2());
+}
+
+ValueNode<glm::vec2>* NodeGraphCompiler::EvaluateVarFloat2(VarFloat2EditorNode* floatNode)
+{
+	// TODO: Validate if the variable is actually initialized at this point
+	return new VariableValueNode<glm::vec2>(floatNode->GetVaraibleName());
+}
+
+ValueNode<glm::vec2>* NodeGraphCompiler::EvaluateFloat2BinaryOperator(Float2BinaryOperatorEditorNode* floatOpNode)
+{
+	const auto& aPin = m_CurrentGraph->GetPinByID(floatOpNode->GetAPin());
+	const auto& bPin = m_CurrentGraph->GetPinByID(floatOpNode->GetBPin());
+
+	ValueNode<glm::vec2>* a = EvaluateFloat2Pin(aPin);
+	ValueNode<glm::vec2>* b = EvaluateFloat2Pin(bPin);
+
+	return new BinaryOperatorValueNode<glm::vec2>{ a, b, floatOpNode->GetOp() };
+}
+
+ValueNode<glm::vec3>* NodeGraphCompiler::EvaluateFloat3Pin(EditorNodePin pin)
+{
+	ASSERT(pin.Type == PinType::Float3);
+
+	pin = GetOutputPinIfInput(m_CurrentGraph, pin);
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("Add node missing outputs!");
+		return new ConstantValueNode<glm::vec3>({});
+	}
+
+	EditorNode* node = m_CurrentGraph->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::Float3: return EvaluateFloat3(static_cast<Float3EditorNode*>(node));
+	case EditorNodeType::VarFloat3: return EvaluateVarFloat3(static_cast<VarFloat3EditorNode*>(node));
+	case EditorNodeType::Float3BinaryOperator: return EvaluateFloat3BinaryOperator(static_cast<Float3BinaryOperatorEditorNode*>(node));
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
+	}
+	return new ConstantValueNode<glm::vec3>({});
+}
+
+ValueNode<glm::vec3>* NodeGraphCompiler::EvaluateFloat3(Float3EditorNode* floatNode)
+{
+	return new ConstantValueNode<glm::vec3>(floatNode->GetFloat3());
+}
+
+ValueNode<glm::vec3>* NodeGraphCompiler::EvaluateVarFloat3(VarFloat3EditorNode* floatNode)
+{
+	// TODO: Validate if the variable is actually initialized at this point
+	return new VariableValueNode<glm::vec3>(floatNode->GetVaraibleName());
+}
+
+ValueNode<glm::vec3>* NodeGraphCompiler::EvaluateFloat3BinaryOperator(Float3BinaryOperatorEditorNode* floatOpNode)
+{
+	const auto& aPin = m_CurrentGraph->GetPinByID(floatOpNode->GetAPin());
+	const auto& bPin = m_CurrentGraph->GetPinByID(floatOpNode->GetBPin());
+
+	ValueNode<glm::vec3>* a = EvaluateFloat3Pin(aPin);
+	ValueNode<glm::vec3>* b = EvaluateFloat3Pin(bPin);
+
+	return new BinaryOperatorValueNode<glm::vec3>{ a, b, floatOpNode->GetOp() };
+}
+
+ValueNode<glm::vec4>* NodeGraphCompiler::EvaluateFloat4Pin(EditorNodePin pin)
+{
+	ASSERT(pin.Type == PinType::Float4);
+
+	pin = GetOutputPinIfInput(m_CurrentGraph, pin);
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("Add node missing outputs!");
+		return new ConstantValueNode<glm::vec4>({});
+	}
+
+	EditorNode* node = m_CurrentGraph->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::Float4: return EvaluateFloat4(static_cast<Float4EditorNode*>(node));
+	case EditorNodeType::VarFloat4: return EvaluateVarFloat4(static_cast<VarFloat4EditorNode*>(node));
+	case EditorNodeType::Float4BinaryOperator: return EvaluateFloat4BinaryOperator(static_cast<Float4BinaryOperatorEditorNode*>(node));
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
+	}
+	return new ConstantValueNode<glm::vec4>({});
+}
+
+ValueNode<glm::vec4>* NodeGraphCompiler::EvaluateFloat4(Float4EditorNode* floatNode)
+{
+	return new ConstantValueNode<glm::vec4>(floatNode->GetFloat4());
+}
+
+ValueNode<glm::vec4>* NodeGraphCompiler::EvaluateVarFloat4(VarFloat4EditorNode* floatNode)
+{
+	// TODO: Validate if the variable is actually initialized at this point
+	return new VariableValueNode<glm::vec4>(floatNode->GetVaraibleName());
+}
+
+ValueNode<glm::vec4>* NodeGraphCompiler::EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* floatOpNode)
+{
+	const auto& aPin = m_CurrentGraph->GetPinByID(floatOpNode->GetAPin());
+	const auto& bPin = m_CurrentGraph->GetPinByID(floatOpNode->GetBPin());
+
+	ValueNode<glm::vec4>* a = EvaluateFloat4Pin(aPin);
+	ValueNode<glm::vec4>* b = EvaluateFloat4Pin(bPin);
+
+	return new BinaryOperatorValueNode<glm::vec4>{ a, b, floatOpNode->GetOp() };
 }
 
 ExecutionEditorNode* NodeGraphCompiler::GetNextExecutorNode(ExecutionEditorNode* executorNode)
@@ -120,16 +259,46 @@ ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode)
 
 ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 {
-	EditorNodePin floatInputPin = m_CurrentGraph->GetPinByID(printNode->GetFloatInputPin());
-	ASSERT(floatInputPin.Type == PinType::Float);
-	return new PrintExecutorNode{ EvaluateFloatPin(floatInputPin) };
+	PinID inputPinID = m_CurrentGraph->GetOutputPinForInput(printNode->GetFloatInputPin());
+	if(!inputPinID) inputPinID = m_CurrentGraph->GetOutputPinForInput(printNode->GetFloat2InputPin());
+	if(!inputPinID) inputPinID = m_CurrentGraph->GetOutputPinForInput(printNode->GetFloat3InputPin());
+	if(!inputPinID) inputPinID = m_CurrentGraph->GetOutputPinForInput(printNode->GetFloat4InputPin());
+
+	EditorNodePin floatInputPin = m_CurrentGraph->GetPinByID(inputPinID);
+	switch (floatInputPin.Type)
+	{
+	case PinType::Float: return new PrintExecutorNode{ EvaluateFloatPin(floatInputPin) };
+	case PinType::Float2: return new PrintExecutorNode{ EvaluateFloat2Pin(floatInputPin) };
+	case PinType::Float3: return new PrintExecutorNode{ EvaluateFloat3Pin(floatInputPin) };
+	case PinType::Float4: return new PrintExecutorNode{ EvaluateFloat4Pin(floatInputPin) };
+	default:
+		NOT_IMPLEMENTED;
+	}
+	return nullptr;
 }
 
-ExecutorNode* NodeGraphCompiler::CompileAsignFloatNode(AsignFloatEditorNode* asignFloatNode)
+ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNode* asignFloatNode)
 {
 	const EditorNodePin asignValuePin = m_CurrentGraph->GetPinByID(asignFloatNode->GetValuePin());
-	ASSERT(asignValuePin.Type == PinType::Float);
-	return new AsignVariableExecutorNode<float>(asignFloatNode->GetName(), EvaluateFloatPin(asignValuePin));
+	switch (asignValuePin.Type)
+	{
+	case PinType::Float: return new AsignVariableExecutorNode<float>(asignFloatNode->GetName(), EvaluateFloatPin(asignValuePin));
+	case PinType::Float2: return new AsignVariableExecutorNode<glm::vec2>(asignFloatNode->GetName(), EvaluateFloat2Pin(asignValuePin));
+	case PinType::Float3: return new AsignVariableExecutorNode<glm::vec3>(asignFloatNode->GetName(), EvaluateFloat3Pin(asignValuePin));
+	case PinType::Float4: return new AsignVariableExecutorNode<glm::vec4>(asignFloatNode->GetName(), EvaluateFloat4Pin(asignValuePin));
+	default:
+		NOT_IMPLEMENTED;
+	}
+	return new EmptyExecutorNode{};
+}
+
+ExecutorNode* NodeGraphCompiler::CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode)
+{
+	const PinID clearColorOutPin = m_CurrentGraph->GetOutputPinForInput(clearRtNode->GetClearColorPin());
+	ValueNode<glm::vec4>* clearColorNode = clearColorOutPin ? 
+		EvaluateFloat4Pin(m_CurrentGraph->GetPinByID(clearColorOutPin)) :
+		new ConstantValueNode<glm::vec4>(glm::vec4{ 0.0f, 0.0f, 0.0f, 0.0f });
+	return new ClearRenderTargetExecutorNode{ clearColorNode };
 }
 
 ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* executorNode)
@@ -138,7 +307,13 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 	{
 	case EditorNodeType::Print:			return CompilePrintNode(static_cast<PrintEditorNode*>(executorNode));
 	case EditorNodeType::If:			return CompileIfNode(static_cast<IfEditorNode*>(executorNode));
-	case EditorNodeType::AsignFloat:	return CompileAsignFloatNode(static_cast<AsignFloatEditorNode*>(executorNode));
+	case EditorNodeType::AsignFloat:	
+	case EditorNodeType::AsignFloat2:	
+	case EditorNodeType::AsignFloat3:	
+	case EditorNodeType::AsignFloat4:	
+		return CompileAsignVariableNode(static_cast<AsignFloatEditorNode*>(executorNode));
+	case EditorNodeType::ClearRenderTarget:
+		return CompileClearRenderTargetNode(static_cast<ClearRenderTargetEditorNode*>(executorNode));
 	case EditorNodeType::OnStart:
 	case EditorNodeType::OnUpdate:
 		return new EmptyExecutorNode();

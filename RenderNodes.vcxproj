@@ -55,9 +55,10 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;PROJECT_DIR="$(ProjectDir.Replace('\', '/'))";_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -72,10 +73,10 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;PROJECT_DIR="$(ProjectDir.Replace('\', '/'))";NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>Default</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -99,6 +100,7 @@
     <ClCompile Include="External\ImGUI\imgui_draw.cpp" />
     <ClCompile Include="External\ImGUI\imgui_tables.cpp" />
     <ClCompile Include="External\ImGUI\imgui_widgets.cpp" />
+    <ClCompile Include="External\NativeFileDialog\src\nfd_win.cpp" />
     <ClCompile Include="Source\App.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
@@ -108,6 +110,8 @@
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphCompiler.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphSerializer.cpp" />
+    <ClCompile Include="Source\Render\Texture.cpp" />
+    <ClCompile Include="Source\Util\FileDialog.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="External\ImGUI-Nodes\crude_json.h" />
@@ -124,6 +128,8 @@
     <ClInclude Include="External\ImGUI\imstb_rectpack.h" />
     <ClInclude Include="External\ImGUI\imstb_textedit.h" />
     <ClInclude Include="External\ImGUI\imstb_truetype.h" />
+    <ClInclude Include="External\NativeFileDialog\src\include\nfd.h" />
+    <ClInclude Include="External\NativeFileDialog\src\include\nfd.hpp" />
     <ClInclude Include="External\ScopeGuard\ScopeGuard.h" />
     <ClInclude Include="Source\App.h" />
     <ClInclude Include="Source\Common.h" />
@@ -135,6 +141,8 @@
     <ClInclude Include="Source\NodeGraph\NodeGraphCompiler.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h" />
     <ClInclude Include="Source\IDGen.h" />
+    <ClInclude Include="Source\Render\Texture.h" />
+    <ClInclude Include="Source\Util\FileDialog.h" />
     <ClInclude Include="Source\Util\Hash.h" />
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +150,7 @@
     <None Include="External\ImGUI-Nodes\imgui_extra_math.inl" />
     <None Include="External\ImGUI-Nodes\imgui_node_editor_internal.inl" />
     <None Include="External\ImGUI-Nodes\LICENSE" />
+    <None Include="External\NativeFileDialog\src\nfd_cocoa.m" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

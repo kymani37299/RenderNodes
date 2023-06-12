@@ -12,6 +12,8 @@ class EditorNode;
 class ExecutionEditorNode;
 class AsignVariableEditorNode;
 class VariableEditorNode;
+class FloatNEditorNode;
+class BinaryOperatorEditorNode;
 struct EditorNodeLink;
 struct EditorNodePin;
 
@@ -47,6 +49,8 @@ private:
 	void ReadExecutionNode(ExecutionEditorNode* exNode);
 	void ReadAsignVariableNode(AsignVariableEditorNode* asignNode);
 	void ReadVariableNode(VariableEditorNode* varNode);
+	void ReadFloatNode(FloatNEditorNode* floatNode);
+	void ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOpNode);
 
 	// Tmp hack since nodes will self initialize some data
 	void ClearNode(EditorNode* node);

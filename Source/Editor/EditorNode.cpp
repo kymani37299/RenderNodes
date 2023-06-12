@@ -88,10 +88,15 @@ void BoolEditorNode::RenderContent()
     ImGui::Checkbox("", &m_Value);
 }
 
-void FloatEditorNode::RenderContent()
+void FloatNEditorNode::RenderContent()
 {
-    ImGui::SetNextItemWidth(50.0f);
-    ImGui::DragFloat("Value", &m_Value);
+    const std::string valueNames[] = { "X", "Y", "Z", "W" };
+
+    for (unsigned i = 0; i < m_NumValues; i++)
+    {
+		ImGui::SetNextItemWidth(50.0f);
+		ImGui::DragFloat(valueNames[i].c_str(), &m_Values[i]);
+    }
 }
 
 void ImGuiInputText(const char* label, std::string& text)
@@ -100,16 +105,16 @@ void ImGuiInputText(const char* label, std::string& text)
 	char buf[BUF_SIZE];
 	strcpy_s(buf, text.c_str());
 
-	ImGui::SetNextItemWidth(250.0f);
+	ImGui::SetNextItemWidth(150.0f);
 	if (ImGui::InputText(label, buf, BUF_SIZE))
 	{
 		text = std::string{ buf };
 	}
 }
 
-void RenderBinaryOperatorNode(char& op)
+void BinaryOperatorEditorNode::RenderContent()
 {
-    std::string opStr{ op };
+    std::string opStr{ m_Op };
 
     static const std::vector<std::string> operators = { "+", "-", "*", "/" };
 
@@ -122,7 +127,7 @@ void RenderBinaryOperatorNode(char& op)
             ImGui::Selectable(opSelection.c_str(), &isSelected);
             if (isSelected)
             {
-                op = opSelection[0];
+                m_Op = opSelection[0];
                 ImGui::SetItemDefaultFocus();
             }
         }
