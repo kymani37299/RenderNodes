@@ -105,12 +105,17 @@ inline std::string GetPathWithoutExtension(const std::string path)
 
 void App::Run()
 {
+    static const std::string RUN_STR = "   Run   ";
+    static const std::string STOP_STR = "   Stop   ";
+
     bool editMode = true;
     bool editorInitialized = false;
     Ptr<RenderPipelineEditor> editor{ new RenderPipelineEditor{} };
     Ptr<RenderPipelineExecutor> executor{ new RenderPipelineExecutor{} };
     NodeGraphCompiler compiler;
     NodeGraphSerializer serializer;
+
+    bool compilationSuccessful = false;
 
     // Render loop
     while (!glfwWindowShouldClose(m_Window))
@@ -178,7 +183,6 @@ void App::Run()
 					std::string path;
 					if (FileDialog::SaveRenderNodeFile(path))
 					{
-						std::cout << path << std::endl;
                         serializer.Serialize(path, editor->GetNodeGraph());
 
                         const std::string jsonDest = GetPathWithoutExtension(path) + ".json";
@@ -186,15 +190,28 @@ void App::Run()
 					}
 				}
 
-                if (ImGui::Checkbox("Edit mode", &editMode))
+                ImGui::Separator();
+                ImGui::SetNextItemWidth(250.0f);
+                if (ImGui::Button(editMode ? RUN_STR.c_str() : STOP_STR.c_str()))
                 {
-                    if (!editMode)
-                    {
-                        CompiledPipeline pipeline = compiler.Compile(editor->GetNodeGraph());
-                        executor->SetCompiledPipeline(pipeline);
+                    editMode = !editMode;
 
-                        executor->OnStart();
-                    }   
+					if (!editMode)
+					{
+						CompiledPipeline pipeline = compiler.Compile(editor->GetNodeGraph());
+						compilationSuccessful = compiler.GetErrorMessages().empty();
+						if (compilationSuccessful)
+						{
+							executor->SetCompiledPipeline(pipeline);
+							executor->OnStart();
+						}
+						else
+						{
+							for (const std::string& err : compiler.GetErrorMessages())
+								std::cout << "[Compilation error] " << err << std::endl;
+							editMode = true;
+						}
+					}
                 }
                 ImGui::Separator();
 
@@ -202,6 +219,7 @@ void App::Run()
                     editor->Render();
                 else
                 {
+                    ASSERT(compilationSuccessful);
                     const float dt = 1000.0f / ImGui::GetIO().Framerate;
                     executor->OnUpdate(dt);
                     executor->Render();

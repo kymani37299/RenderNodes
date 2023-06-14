@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Common.h"
-#include "ExecutorNode.h"
+#include "ExecuteContext.h"
 
 class RenderPipelineExecutor
 {
@@ -10,12 +10,7 @@ public:
     void OnUpdate(float dt);
     void Render();
     
-    void SetCompiledPipeline(CompiledPipeline pipeline)
-    {
-        delete m_Pipeline.OnStartNode;
-        delete m_Pipeline.OnUpdateNode;
-        m_Pipeline = pipeline;
-    }
+    void SetCompiledPipeline(CompiledPipeline pipeline);
 private:
     ExecuteContext m_Context;
     CompiledPipeline m_Pipeline;

@@ -3,6 +3,8 @@
 #include <unordered_map>
 
 #include "../Editor/EditorNode.h"
+#include "../Editor/ExecutorEditorNode.h"
+#include "../Editor/EvaluationEditorNode.h"
 
 class NodeGraph
 {
@@ -16,7 +18,7 @@ public:
     void RemoveNode(NodeID nodeID);
     void RemoveLink(LinkID linkID);
 
-    EditorNodePin GetPinByID(PinID pinID) const;
+	EditorNodePin GetPinByID(PinID pinID) const;
     PinID GetInputPinFromOutput(PinID outputPinID) const;
     PinID GetOutputPinForInput(PinID inputPinID) const;
     EditorNode* GetPinOwner(PinID pinID) const;

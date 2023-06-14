@@ -2,33 +2,16 @@
 
 #include "../Common.h"
 #include "../Util/Hash.h"
-#include "../Render/Texture.h"
 
-#include <unordered_map>
-
-struct VariableBlock
-{
-	std::unordered_map<uint32_t, float> Floats;
-	std::unordered_map<uint32_t, glm::vec2> Float2s;
-	std::unordered_map<uint32_t, glm::vec3> Float3s;
-	std::unordered_map<uint32_t, glm::vec4> Float4s;
-
-	template<typename T> std::unordered_map<uint32_t, T>& GetMapFromType();
-	template<> std::unordered_map<uint32_t, float>& GetMapFromType<float>() { return Floats; }
-	template<> std::unordered_map<uint32_t, glm::vec2>& GetMapFromType<glm::vec2>() { return Float2s; }
-	template<> std::unordered_map<uint32_t, glm::vec3>& GetMapFromType<glm::vec3>() { return Float3s; }
-	template<> std::unordered_map<uint32_t, glm::vec4>& GetMapFromType<glm::vec4>() { return Float4s; }
-};
-
-struct ExecuteContext
-{
-	Ptr<Texture> RenderTarget;
-	VariableBlock Variables;
-};
+#include "ValueNode.h"
+#include "ExecuteContext.h"
 
 class ExecutorNode
 {
 public:
+	virtual ~ExecutorNode() {}
+
+	// If node reutrns false it means failure and execution stops
 	virtual void Execute(ExecuteContext& context) = 0;
 
 	void SetNextNode(ExecutorNode* node)
@@ -45,95 +28,18 @@ private:
 	Ptr<ExecutorNode> m_NextNode;
 };
 
-struct CompiledPipeline
-{
-	ExecutorNode* OnStartNode = nullptr;
-	ExecutorNode* OnUpdateNode = nullptr;
-};
-
 class EmptyExecutorNode : public ExecutorNode
 {
 public:
-	void Execute(ExecuteContext& context) override {}
-};
-
-template<typename T>
-class ValueNode
-{
-public:
-	virtual T GetValue(ExecuteContext& context) const = 0;
-};
-
-template<typename T>
-class ConstantValueNode : public ValueNode<T>
-{
-public:
-	ConstantValueNode(const T& value) :
-		m_Value(value) {}
-
-	virtual T GetValue(ExecuteContext& context) const override { return m_Value; }
-
-private:
-	T m_Value;
-};
-
-template<typename T>
-class BinaryOperatorValueNode : public ValueNode<T>
-{
-public:
-	BinaryOperatorValueNode(ValueNode<T>* a, ValueNode<T>* b, char op) :
-		m_A(Ptr<ValueNode<T>>(a)),
-		m_B(Ptr<ValueNode<T>>(b)),
-		m_Op(op) {}
-
-	virtual T GetValue(ExecuteContext& context) const override
-	{
-		const T a = m_A->GetValue(context);
-		const T b = m_B->GetValue(context);
-
-		switch (m_Op)
-		{
-		case '+':
-			return a + b;
-		case '-':
-			return a - b;
-		case '/':
-			return a / b;
-		case '*':
-			return a * b;
-		}
-		NOT_IMPLEMENTED;
-		return a;
-	}
-
-private:
-	Ptr<ValueNode<T>> m_A;
-	Ptr<ValueNode<T>> m_B;
-	char m_Op;
-};
-
-template<typename T>
-class VariableValueNode : public ValueNode<T>
-{
-public:
-	VariableValueNode(const std::string& varName) :
-		m_VarKey(Hash::Crc32(varName)) {}
-
-	virtual T GetValue(ExecuteContext& context) const override
-	{
-		return context.Variables.GetMapFromType<T>()[m_VarKey];
-	}
-
-private:
-	uint32_t m_VarKey;
+	void Execute(ExecuteContext& context) override {  }
 };
 
 class IfExecutorNode : public ExecutorNode
 {
 public:
-	IfExecutorNode(ValueNode<bool>* conditionNode, ExecutorNode* elseBranch) :
-		m_Condition(Ptr<ValueNode<bool>>(conditionNode)),
-		m_Else(Ptr<ExecutorNode>(elseBranch)) {}
+	IfExecutorNode(BoolValueNode* conditionNode, ExecutorNode* elseBranch) :
+		m_Condition(conditionNode),
+		m_Else(elseBranch) {}
 
 	void Execute(ExecuteContext& context) override;
 
@@ -148,44 +54,46 @@ public:
 private:
 	bool m_PassedCondition = false;
 
-	Ptr<ValueNode<bool>> m_Condition;
+	Ptr<BoolValueNode> m_Condition;
 	Ptr<ExecutorNode> m_Else;
 };
 
 class PrintExecutorNode : public ExecutorNode
 {
 public:
-	PrintExecutorNode(ValueNode<float>* floatNode):
-		m_FloatNode(Ptr<ValueNode<float>>(floatNode)) {}
+	PrintExecutorNode(FloatValueNode* floatNode):
+		m_FloatNode(floatNode) {}
 
-	PrintExecutorNode(ValueNode<glm::vec2>* floatNode) :
-		m_Float2Node(Ptr<ValueNode<glm::vec2>>(floatNode)) {}
+	PrintExecutorNode(Float2ValueNode* floatNode) :
+		m_Float2Node(floatNode) {}
 
-	PrintExecutorNode(ValueNode<glm::vec3>* floatNode) :
-		m_Float3Node(Ptr<ValueNode<glm::vec3>>(floatNode)) {}
+	PrintExecutorNode(Float3ValueNode* floatNode) :
+		m_Float3Node(floatNode) {}
 
-	PrintExecutorNode(ValueNode<glm::vec4>* floatNode) :
-		m_Float4Node(Ptr<ValueNode<glm::vec4>>(floatNode)) {}
+	PrintExecutorNode(Float4ValueNode* floatNode) :
+		m_Float4Node(floatNode) {}
 
 	void Execute(ExecuteContext& context) override;
 
 private:
-	Ptr<ValueNode<float>> m_FloatNode;
-	Ptr<ValueNode<glm::vec2>> m_Float2Node;
-	Ptr<ValueNode<glm::vec3>> m_Float3Node;
-	Ptr<ValueNode<glm::vec4>> m_Float4Node;
+	Ptr<FloatValueNode> m_FloatNode;
+	Ptr<Float2ValueNode> m_Float2Node;
+	Ptr<Float3ValueNode> m_Float3Node;
+	Ptr<Float4ValueNode> m_Float4Node;
 };
 
 class ClearRenderTargetExecutorNode : public ExecutorNode
 {
 public:
-	ClearRenderTargetExecutorNode(ValueNode<glm::vec4>* clearColorNode) :
+	ClearRenderTargetExecutorNode(TextureValueNode* textureNode, Float4ValueNode* clearColorNode) :
+		m_TextureNode(textureNode),
 		m_ClearColorNode(clearColorNode) {}
 
 	void Execute(ExecuteContext& context) override;
 
 private:
-	Ptr<ValueNode<glm::vec4>> m_ClearColorNode;
+	Ptr<Float4ValueNode> m_ClearColorNode;
+	Ptr<TextureValueNode> m_TextureNode;
 };
 
 template<typename T>
@@ -194,14 +102,92 @@ class AsignVariableExecutorNode : public ExecutorNode
 public:
 	AsignVariableExecutorNode(const std::string& variableName, ValueNode<T>* value):
 		m_VariableKey(Hash::Crc32(variableName)),
-		m_InitialValueNode(Ptr<ValueNode<T>>(value)) {}
+		m_InitialValueNode(value) {}
 
 	void Execute(ExecuteContext& context) override
 	{
-		context.Variables.GetMapFromType<T>()[m_VariableKey] = m_InitialValueNode->GetValue(context);
+		auto& variableMap = context.Variables.GetMapFromType<T>();
+		variableMap[m_VariableKey] = m_InitialValueNode->GetValue(context);
 	}
 
 private:
 	uint32_t m_VariableKey;
 	Ptr<ValueNode<T>> m_InitialValueNode;
+};
+
+class CreateTextureExecutorNode : public ExecutorNode
+{
+public:
+	CreateTextureExecutorNode(const std::string& textureName, int width, int height, bool isFramebuffer):
+		m_TextureKey(Hash::Crc32(textureName)),
+		m_Width(width),
+		m_Height(height),
+		m_IsFramebuffer(isFramebuffer) {}
+
+	void Execute(ExecuteContext& context) override;
+
+private:
+	uint32_t m_TextureKey;
+	int m_Width;
+	int m_Height;
+	bool m_IsFramebuffer;
+};
+
+class PresentTextureExecutorNode : public ExecutorNode
+{
+public:
+	PresentTextureExecutorNode(TextureValueNode* texture):
+		m_Texture(texture)
+	{ }
+
+	void Execute(ExecuteContext& context) override;
+
+private:
+	Ptr<TextureValueNode> m_Texture;
+};
+
+class LoadTextureExecutorNode : public ExecutorNode
+{
+public:
+	LoadTextureExecutorNode(const std::string& texutreName, const std::string& texturePath) :
+		m_TextureKey(Hash::Crc32(texutreName)),
+		m_TexturePath(texturePath) {}
+
+	void Execute(ExecuteContext& context) override;
+
+private:
+	uint32_t m_TextureKey = 0;
+	std::string m_TexturePath;
+};
+
+class LoadShaderExecutorNode : public ExecutorNode
+{
+public:
+	LoadShaderExecutorNode(const std::string& shaderName, const std::string& shaderPath) :
+		m_ShaderKey(Hash::Crc32(shaderName)),
+		m_ShaderPath(shaderPath) {}
+
+	void Execute(ExecuteContext& context) override;
+private:
+	uint32_t m_ShaderKey = 0;
+	std::string m_ShaderPath;
+};
+
+class DrawMeshExecutorNode : public ExecutorNode
+{
+public:
+	DrawMeshExecutorNode(TextureValueNode* framebufferNode, ShaderValueNode* shaderNode, MeshValueNode* meshNode):
+		m_FramebufferNode(framebufferNode),
+		m_ShaderNode(shaderNode),
+		m_MeshNode(meshNode) {}
+
+	~DrawMeshExecutorNode();
+
+	void Execute(ExecuteContext& context) override;
+private:
+	unsigned m_VAO = 0;
+
+	Ptr<TextureValueNode> m_FramebufferNode;
+	Ptr<ShaderValueNode> m_ShaderNode;
+	Ptr<MeshValueNode> m_MeshNode;
 };

@@ -43,13 +43,12 @@ namespace FileDialog
 		NFD_Quit();
 	}
 
-	bool OpenRenderNodeFile(std::string& path)
+	bool OpenFile(std::string& path, const std::vector<nfdfilteritem_t>& filters)
 	{
 		if (!s_Initialized) return false;
 
 		nfdchar_t* outPath;
-		nfdfilteritem_t filterItem[1] = { { "Render node file", "rn" } };
-		nfdresult_t result = NFD_OpenDialog(&outPath, filterItem, 1, NULL);
+		nfdresult_t result = NFD_OpenDialog(&outPath, filters.data(), filters.size(), NULL);
 		if (result == NFD_OKAY)
 		{
 			path = std::string{ outPath };
@@ -60,13 +59,12 @@ namespace FileDialog
 		return false;
 	}
 
-	bool SaveRenderNodeFile(std::string& path)
+	bool SaveFile(std::string& path, const std::vector<nfdfilteritem_t>& filters)
 	{
 		if (!s_Initialized) return false;
 
 		nfdchar_t* outPath;
-		nfdfilteritem_t filterItem[1] = { { "Render node file", "rn" } };
-		nfdresult_t result = NFD_SaveDialog(&outPath, filterItem, 1, NULL, NULL);
+		nfdresult_t result = NFD_SaveDialog(&outPath, filters.data(), filters.size(), NULL, NULL);
 		if (result == NFD_OKAY)
 		{
 			path = std::string{ outPath };
@@ -75,5 +73,25 @@ namespace FileDialog
 			return true;
 		}
 		return false;
+	}
+
+	bool OpenRenderNodeFile(std::string& path)
+	{
+		return OpenFile(path, { {{ "Render node file", "rn" }} });
+	}
+
+	bool SaveRenderNodeFile(std::string& path)
+	{
+		return SaveFile(path, { { "Render node file", "rn" } });
+	}
+
+	bool OpenTextureFile(std::string& path)
+	{
+		return OpenFile(path, { { "Texture file", "jpg,jpeg,png" } });
+	}
+
+	bool OpenShaderFile(std::string& path)
+	{
+		return OpenFile(path, { { "GLSL shader", "glsl"} });
 	}
 }

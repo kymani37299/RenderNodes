@@ -57,7 +57,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;PROJECT_DIR="$(ProjectDir.Replace('\', '/'))";_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb_image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -75,7 +75,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;PROJECT_DIR="$(ProjectDir.Replace('\', '/'))";NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb-image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb_image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -110,6 +110,9 @@
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphCompiler.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphSerializer.cpp" />
+    <ClCompile Include="Source\NodeGraph\PinEvaluator.cpp" />
+    <ClCompile Include="Source\Render\Buffer.cpp" />
+    <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Util\FileDialog.cpp" />
   </ItemGroup>
@@ -135,6 +138,10 @@
     <ClInclude Include="Source\App.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\Editor\EditorNode.h" />
+    <ClInclude Include="Source\Editor\EvaluationEditorNode.h" />
+    <ClInclude Include="Source\Editor\ExecutorEditorNode.h" />
+    <ClInclude Include="Source\Execution\ExecuteContext.h" />
+    <ClInclude Include="Source\Execution\ValueNode.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraph.h" />
     <ClInclude Include="Source\Editor\RenderPipelineEditor.h" />
     <ClInclude Include="Source\Execution\ExecutorNode.h" />
@@ -142,6 +149,9 @@
     <ClInclude Include="Source\NodeGraph\NodeGraphCompiler.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h" />
     <ClInclude Include="Source\IDGen.h" />
+    <ClInclude Include="Source\NodeGraph\PinEvaluator.h" />
+    <ClInclude Include="Source\Render\Buffer.h" />
+    <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Util\FileDialog.h" />
     <ClInclude Include="Source\Util\Hash.h" />

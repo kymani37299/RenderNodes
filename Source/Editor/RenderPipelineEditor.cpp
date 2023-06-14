@@ -152,6 +152,23 @@ void RenderPipelineEditor::RenderEditor()
     m_NodeGraph->ForEachLink(renderLink);
 }
 
+static bool IsCompatible(const EditorNodePin& nodePin, EditorNode node)
+{
+    if (nodePin.Type == PinType::Invalid)
+        return true;
+
+	EditorNodePin targetPin;
+	for (const auto& pin : node.GetPins())
+	{
+		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		{
+			targetPin = pin;
+			break;
+		}
+	}
+    return targetPin.Type != PinType::Invalid;
+}
+
 void RenderPipelineEditor::RenderContextMenus()
 {
     ImNode::Suspend();
@@ -160,66 +177,82 @@ void RenderPipelineEditor::RenderContextMenus()
     {
         EditorNode* newNode = nullptr;
 
+        EditorNodePin nodePin;
+        if (m_NewNodePinID) 
+            nodePin = m_NodeGraph->GetPinByID(m_NewNodePinID);
+
         if (ImGui::BeginMenu("Constants"))
 		{
-			if (ImGui::MenuItem("Bool")) newNode = new BoolEditorNode();
-			if (ImGui::MenuItem("Float")) newNode = new FloatEditorNode();
-			if (ImGui::MenuItem("Float2")) newNode = new Float2EditorNode();
-			if (ImGui::MenuItem("Float3")) newNode = new Float3EditorNode();
-			if (ImGui::MenuItem("Float4")) newNode = new Float4EditorNode();
+            if (IsCompatible(nodePin, BoolEditorNode{}) && ImGui::MenuItem("Bool")) newNode = new BoolEditorNode();
+            if (IsCompatible(nodePin, FloatEditorNode{}) && ImGui::MenuItem("Float")) newNode = new FloatEditorNode();
+            if (IsCompatible(nodePin, Float2EditorNode{}) && ImGui::MenuItem("Float2")) newNode = new Float2EditorNode();
+            if (IsCompatible(nodePin, Float3EditorNode{}) && ImGui::MenuItem("Float3")) newNode = new Float3EditorNode();
+            if (IsCompatible(nodePin, Float4EditorNode{}) && ImGui::MenuItem("Float4")) newNode = new Float4EditorNode();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Assign variable"))
         {
-            if (ImGui::MenuItem("Float")) newNode = new AsignFloatEditorNode();
-            if (ImGui::MenuItem("Float2")) newNode = new AsignFloat2EditorNode();
-            if (ImGui::MenuItem("Float3")) newNode = new AsignFloat3EditorNode();
-            if (ImGui::MenuItem("Float4")) newNode = new AsignFloat4EditorNode();
+            if (IsCompatible(nodePin, AsignFloatEditorNode{}) && ImGui::MenuItem("Float")) newNode = new AsignFloatEditorNode();
+            if (IsCompatible(nodePin, AsignFloat2EditorNode{}) && ImGui::MenuItem("Float2")) newNode = new AsignFloat2EditorNode();
+            if (IsCompatible(nodePin, AsignFloat3EditorNode{}) && ImGui::MenuItem("Float3")) newNode = new AsignFloat3EditorNode();
+            if (IsCompatible(nodePin, AsignFloat4EditorNode{}) && ImGui::MenuItem("Float4")) newNode = new AsignFloat4EditorNode();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Get variable"))
 		{
-			if (ImGui::MenuItem("Float")) newNode = new VarFloatEditorNode();
-			if (ImGui::MenuItem("Float2")) newNode = new VarFloat2EditorNode();
-			if (ImGui::MenuItem("Float3")) newNode = new VarFloat3EditorNode();
-			if (ImGui::MenuItem("Float4")) newNode = new VarFloat4EditorNode();
+			if (IsCompatible(nodePin, VarFloatEditorNode{}) && ImGui::MenuItem("Float")) newNode = new VarFloatEditorNode();
+			if (IsCompatible(nodePin, VarFloat2EditorNode{}) && ImGui::MenuItem("Float2")) newNode = new VarFloat2EditorNode();
+			if (IsCompatible(nodePin, VarFloat3EditorNode{}) && ImGui::MenuItem("Float3")) newNode = new VarFloat3EditorNode();
+			if (IsCompatible(nodePin, VarFloat4EditorNode{}) && ImGui::MenuItem("Float4")) newNode = new VarFloat4EditorNode();
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Operator"))
         {
-            if (ImGui::MenuItem("Float")) newNode = new FloatBinaryOperatorEditorNode();
-            if (ImGui::MenuItem("Float2")) newNode = new Float2BinaryOperatorEditorNode();
-            if (ImGui::MenuItem("Float3")) newNode = new Float3BinaryOperatorEditorNode();
-            if (ImGui::MenuItem("Float4")) newNode = new Float4BinaryOperatorEditorNode();
+			if (IsCompatible(nodePin, FloatBinaryOperatorEditorNode{}) && ImGui::MenuItem("Float")) newNode = new FloatBinaryOperatorEditorNode();
+			if (IsCompatible(nodePin, Float2BinaryOperatorEditorNode{}) && ImGui::MenuItem("Float2")) newNode = new Float2BinaryOperatorEditorNode();
+			if (IsCompatible(nodePin, Float3BinaryOperatorEditorNode{}) && ImGui::MenuItem("Float3")) newNode = new Float3BinaryOperatorEditorNode();
+			if (IsCompatible(nodePin, Float4BinaryOperatorEditorNode{}) && ImGui::MenuItem("Float4")) newNode = new Float4BinaryOperatorEditorNode();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Texture"))
+        {
+			if (IsCompatible(nodePin, CreateTextureEditorNode{}) && ImGui::MenuItem("Create texture")) newNode = new CreateTextureEditorNode();
+			if (IsCompatible(nodePin, LoadTextureEditorNode{}) && ImGui::MenuItem("Load texture")) newNode = new LoadTextureEditorNode();
+			if (IsCompatible(nodePin, GetTextureEditorNode{}) && ImGui::MenuItem("Get texture")) newNode = new GetTextureEditorNode();
             ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("Render"))
         {
-            if (ImGui::MenuItem("Clear render target")) newNode = new ClearRenderTargetEditorNode();
+            if (IsCompatible(nodePin, LoadShaderEditorNode{}) && ImGui::MenuItem("Load shader")) newNode = new LoadShaderEditorNode();
+            if (IsCompatible(nodePin, ClearRenderTargetEditorNode{}) && ImGui::MenuItem("Clear render target")) newNode = new ClearRenderTargetEditorNode();
+			if (IsCompatible(nodePin, PresentTextureEditorNode{}) && ImGui::MenuItem("Present texture")) newNode = new PresentTextureEditorNode();
+			if (IsCompatible(nodePin, GetCubeMeshEditorNode{}) && ImGui::MenuItem("Get cube mesh")) newNode = new GetCubeMeshEditorNode();
+			if (IsCompatible(nodePin, GetShaderEditorNode{}) && ImGui::MenuItem("Get shader")) newNode = new GetShaderEditorNode();
+			if (IsCompatible(nodePin, DrawMeshEditorNode{}) && ImGui::MenuItem("Draw mesh")) newNode = new DrawMeshEditorNode();
             ImGui::EndMenu();
         }
 
-        if (ImGui::MenuItem("If condition")) newNode = new IfEditorNode();
-        if (ImGui::MenuItem("Print")) newNode = new PrintEditorNode();
-       
+        if (IsCompatible(nodePin, IfEditorNode{}) && ImGui::MenuItem("If condition")) newNode = new IfEditorNode();
+        if (IsCompatible(nodePin, PrintEditorNode{}) && ImGui::MenuItem("Print")) newNode = new PrintEditorNode();
+
         if (newNode)
         {
             if (m_NewNodePinID)
             {
-                EditorNodePin nodePin = m_NodeGraph->GetPinByID(m_NewNodePinID);
-                unsigned pinCounts = 0;
+                const auto nodePin = m_NodeGraph->GetPinByID(m_NewNodePinID);
                 EditorNodePin targetPin;
-                const auto fn = [&pinCounts, &nodePin, &targetPin, this](const EditorNodePin& pin)
+                for (const auto& pin : newNode->GetPins())
                 {
                     if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
                     {
                         targetPin = pin;
-                        pinCounts++;
+                        break;
                     }
-                };
-                newNode->ForEachPin(fn);
-                if (pinCounts == 1)
+                }
+
+                if (targetPin.Type != PinType::Invalid)
                 {
                     const PinID startPin = nodePin.IsInput ? targetPin.ID : nodePin.ID;
                     const PinID endPin = nodePin.IsInput ? nodePin.ID : targetPin.ID;
@@ -229,6 +262,7 @@ void RenderPipelineEditor::RenderContextMenus()
 
             m_NodeGraph->AddNode(newNode);
             ImNode::SetNodePosition(newNode->GetID(), ImNode::ScreenToCanvas(ImGui::GetMousePos()));
+            m_NewNodePinID = 0;
         }
 
         ImGui::EndPopup();

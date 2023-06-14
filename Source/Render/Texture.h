@@ -11,13 +11,13 @@ enum TextureFlags : unsigned
 
 struct Texture
 {
-	static Ptr<Texture> Create(unsigned width, unsigned height, unsigned flags = TF_None);
+	static Ptr<Texture> Create(unsigned width, unsigned height, unsigned flags = TF_None, unsigned char* textureData = nullptr);
 
 	~Texture();
 
+	unsigned Flags = TF_None;
 	unsigned Width = 0;
 	unsigned Height = 0;
-	unsigned Flags = TF_None;
 
 	unsigned FrameBufferHandle = 0;
 	unsigned TextureHandle = 0;

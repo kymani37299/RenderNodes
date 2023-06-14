@@ -2,11 +2,12 @@
 
 #include "../Common.h"
 
-Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags)
+Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags, unsigned char* textureData)
 {
 	Texture* texture = new Texture{};
 	texture->Width = width;
 	texture->Height = height;
+	texture->Flags = flags;
 
 	if(flags & TF_Framebuffer)
 	{
@@ -18,7 +19,7 @@ Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags)
 
 	glGenTextures(1, &texture->TextureHandle);
 	glBindTexture(GL_TEXTURE_2D, texture->TextureHandle);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData);
 
 	// Probably need some sampler struct
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

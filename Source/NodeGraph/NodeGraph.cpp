@@ -68,40 +68,29 @@ PinID NodeGraph::GetOutputPinForInput(PinID inputPinID) const
 
 EditorNodePin NodeGraph::GetPinByID(PinID pinID) const
 {
-    EditorNodePin outputPin;
-    const auto fn = [&pinID, &outputPin](const EditorNodePin& pin)
-    {
-        if (pin.ID == pinID) outputPin = pin;
-    };
-
-    for (const auto& it : m_Nodes)
-    {
+	for (const auto& it : m_Nodes)
+	{
         const auto& node = it.second;
-        node->ForEachPin(fn);
-        if (outputPin.Type != PinType::Invalid) break;
-    }
-
-    ASSERT_M(outputPin.Type != PinType::Invalid, "Pin not found!");
-    return outputPin;
+        for (const auto& pin : node->GetPins())
+        {
+            if (pin.ID == pinID) return pin;
+        }
+	}
+	ASSERT_M(0, "Pin not found!");
+    return EditorNodePin{};
 }
 
 EditorNode* NodeGraph::GetPinOwner(PinID pinID) const
 {
-    EditorNode* outputNode = nullptr;
     for (const auto& it : m_Nodes)
     {
         const auto& node = it.second;
-        const auto fn = [&pinID, &outputNode, &node](const EditorNodePin& pin)
+        for (const auto& pin : node->GetPins())
         {
-            if (pinID == pin.ID)
-                outputNode = node.get();
-        };
-        node->ForEachPin(fn);
-
-        if (outputNode != nullptr) break;
+            if (pinID == pin.ID) return node.get();
+        }
     }
-    ASSERT(outputNode);
-    return outputNode;
+    return nullptr;
 }
 
 OnStartEditorNode* NodeGraph::GetOnStartNode() const

@@ -14,6 +14,7 @@ class AsignVariableEditorNode;
 class VariableEditorNode;
 class FloatNEditorNode;
 class BinaryOperatorEditorNode;
+class NameAndPathExecutionEditorNode;
 struct EditorNodeLink;
 struct EditorNodePin;
 
@@ -35,20 +36,18 @@ private:
 	void WriteNodeList();
 	void WriteLinkList();
 	void WritePinList(const std::vector<EditorNodePin>& pins);
-	void WriteExecutionNodeDetails(ExecutionEditorNode* node);
 
 	// Reads
 	void ReadNodeList();
 	void ReadLinkList();
-	void ReadPinList(std::vector<EditorNodePin>& pins);
 	EditorNode* ReadNode();
 	EditorNodeLink ReadLink();
 	
-	void ReadExecutionNode(ExecutionEditorNode* exNode);
 	void ReadAsignVariableNode(AsignVariableEditorNode* asignNode);
 	void ReadVariableNode(VariableEditorNode* varNode);
 	void ReadFloatNode(FloatNEditorNode* floatNode);
 	void ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOpNode);
+	void ReadNamePathPathNode(NameAndPathExecutionEditorNode* nameAndPathNode);
 
 	// Tmp hack since nodes will self initialize some data
 	void ClearNode(EditorNode* node);
