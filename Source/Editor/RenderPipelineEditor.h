@@ -27,6 +27,7 @@ private:
     void RenderEditor();
 
     void RenderContextMenus();
+    void RenderNodePopups();
 
 private:
     ImNode::EditorContext* m_EditorContext = nullptr;

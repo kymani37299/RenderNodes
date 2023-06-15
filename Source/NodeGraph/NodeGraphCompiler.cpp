@@ -52,16 +52,18 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 	{
 		COMPILE_NODE(Print, CompilePrintNode, PrintEditorNode);
 		COMPILE_NODE(If, CompileIfNode, IfEditorNode);
-		COMPILE_NODE(AsignFloat, CompileAsignVariableNode, AsignFloatEditorNode);
-		COMPILE_NODE(AsignFloat2, CompileAsignVariableNode, AsignFloatEditorNode);
-		COMPILE_NODE(AsignFloat3, CompileAsignVariableNode, AsignFloatEditorNode);
-		COMPILE_NODE(AsignFloat4, CompileAsignVariableNode, AsignFloatEditorNode);
+		COMPILE_NODE(AsignFloat, CompileAsignVariableNode, AsignVariableEditorNode);
+		COMPILE_NODE(AsignFloat2, CompileAsignVariableNode, AsignVariableEditorNode);
+		COMPILE_NODE(AsignFloat3, CompileAsignVariableNode, AsignVariableEditorNode);
+		COMPILE_NODE(AsignFloat4, CompileAsignVariableNode, AsignVariableEditorNode);
+		COMPILE_NODE(AsignBool, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(ClearRenderTarget, CompileClearRenderTargetNode, ClearRenderTargetEditorNode);
 		COMPILE_NODE(CreateTexture, CompileCreateTextureNode, CreateTextureEditorNode);
 		COMPILE_NODE(LoadTexture, CompileLoadTextureNode, LoadTextureEditorNode);
 		COMPILE_NODE(LoadShader, CompileLoadShaderNode, LoadShaderEditorNode);
 		COMPILE_NODE(PresentTexture, CompilePresentTextureTargetNode, PresentTextureEditorNode);
 		COMPILE_NODE(DrawMesh, CompileDrawMeshNode, DrawMeshEditorNode);
+		COMPILE_NODE(LoadMesh, CompileLoadMeshNode, LoadMeshEditorNode);
 		COMPILE_NODE(OnStart, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(OnUpdate, CompileEmptyNode, ExecutionEditorNode);
 	default:
@@ -116,15 +118,16 @@ ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 	return new EmptyExecutorNode{};
 }
 
-ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNode* asignFloatNode)
+ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNode* node)
 {
-	const auto& asignValuePin = asignFloatNode->GetValuePin();
+	const auto& asignValuePin = node->GetValuePin();
 	switch (asignValuePin.Type)
 	{
-	case PinType::Float: return new AsignVariableExecutorNode<float>(asignFloatNode->GetName(), m_PinEvaluator->EvaluateFloat(asignValuePin));
-	case PinType::Float2: return new AsignVariableExecutorNode<glm::vec2>(asignFloatNode->GetName(), m_PinEvaluator->EvaluateFloat2(asignValuePin));
-	case PinType::Float3: return new AsignVariableExecutorNode<glm::vec3>(asignFloatNode->GetName(), m_PinEvaluator->EvaluateFloat3(asignValuePin));
-	case PinType::Float4: return new AsignVariableExecutorNode<glm::vec4>(asignFloatNode->GetName(), m_PinEvaluator->EvaluateFloat4(asignValuePin));
+	case PinType::Float: return new AsignVariableExecutorNode<float>(node->GetName(), m_PinEvaluator->EvaluateFloat(asignValuePin));
+	case PinType::Float2: return new AsignVariableExecutorNode<Float2>(node->GetName(), m_PinEvaluator->EvaluateFloat2(asignValuePin));
+	case PinType::Float3: return new AsignVariableExecutorNode<Float3>(node->GetName(), m_PinEvaluator->EvaluateFloat3(asignValuePin));
+	case PinType::Float4: return new AsignVariableExecutorNode<Float4>(node->GetName(), m_PinEvaluator->EvaluateFloat4(asignValuePin));
+	case PinType::Bool:	return new AsignVariableExecutorNode<bool>(node->GetName(), m_PinEvaluator->EvaluateBool(asignValuePin));
 	default:
 		NOT_IMPLEMENTED;
 	}
@@ -164,7 +167,16 @@ ExecutorNode* NodeGraphCompiler::CompileDrawMeshNode(DrawMeshEditorNode* drawMes
 	TextureValueNode* framebufferNode = m_PinEvaluator->EvaluateTexture(drawMeshNode->GetFrameBufferPin());
 	ShaderValueNode* shaderNode = m_PinEvaluator->EvaluateShader(drawMeshNode->GetShaderPin());
 	MeshValueNode* meshNode = m_PinEvaluator->EvaluateMesh(drawMeshNode->GetMeshPin());
-	return new DrawMeshExecutorNode{ framebufferNode, shaderNode, meshNode };
+
+	PinID bindTableOutputID = m_CurrentGraph->GetOutputPinForInput(drawMeshNode->GetBindTablePin().ID);
+	BindTableValueNode* bindTableNode = nullptr;
+	if (bindTableOutputID) bindTableNode = m_PinEvaluator->EvaluateBindTable(m_CurrentGraph->GetPinByID(bindTableOutputID));
+	return new DrawMeshExecutorNode{ framebufferNode, shaderNode, meshNode, bindTableNode };
+}
+
+ExecutorNode* NodeGraphCompiler::CompileLoadMeshNode(LoadMeshEditorNode* loadMeshNode)
+{
+	return new LoadMeshExecutorNode{ loadMeshNode->GetName(), loadMeshNode->GetPath() };
 }
 
 ExecutorNode* NodeGraphCompiler::CompileEmptyNode(ExecutionEditorNode* node)

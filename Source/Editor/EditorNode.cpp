@@ -11,8 +11,48 @@
 static void DrawPin(const EditorNodePin& pin)
 {
     ImNode::BeginPin(pin.ID, pin.IsInput ? ImNode::PinKind::Input : ImNode::PinKind::Output);
-    ImGui::Text("->");
+    ImGui::PushStyleColor(ImGuiCol_Text, (ImU32) GetPinColor(pin.Type));
+    ImGui::Text(pin.Type == PinType::Execution ? ">>" : "->");
+    ImGui::PopStyleColor();
     ImNode::EndPin();
+}
+
+static void DrawPinLabel(const EditorNodePin& pin)
+{
+    ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)GetPinColor(pin.Type));
+    ImGui::Text(pin.Label.c_str());
+    ImGui::PopStyleColor();
+}
+
+static void ImGuiInputText(const char* label, std::string& text)
+{
+	constexpr unsigned BUF_SIZE = 50;
+	char buf[BUF_SIZE];
+	strcpy_s(buf, text.c_str());
+
+	ImGui::SetNextItemWidth(150.0f);
+	if (ImGui::InputText(label, buf, BUF_SIZE))
+	{
+		text = std::string{ buf };
+	}
+}
+
+static void ImGuiComboBox(const std::string& id, std::string& value, bool& shown, const std::vector<std::string>& values)
+{
+	if (shown) ImGui::OpenPopup(id.c_str());
+
+	if (ImGui::BeginPopup(id.c_str()))
+	{
+		for (const std::string& v : values)
+		{
+			if (ImGui::MenuItem(v.c_str()))
+			{
+                shown = false;
+                value = v;
+			}
+		}
+		ImGui::EndPopup();
+	}
 }
 
 EditorNodePin EditorNodePin::CreateInputPin(const std::string& label, PinType type)
@@ -35,16 +75,13 @@ EditorNodePin EditorNodePin::CreateOutputPin(const std::string& label, PinType t
     return pin;
 }
 
+std::unordered_map<std::type_index, EditorNode*> EditorNode::s_ClassRepresents;
+
 EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
     m_Label(label),
     m_ID(IDGen::Generate()),
     m_Type(nodeType)
 { }
-
-inline ImRect ImGui_GetItemRect()
-{
-	return ImRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-}
 
 void EditorNode::Render()
 {
@@ -61,10 +98,12 @@ void EditorNode::Render()
 
         ImGui::BeginVertical("Input execution pins");
         for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution &&  pin.IsInput) DrawPin(pin);
+        for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution &&  pin.IsInput) DrawPin(pin);
         ImGui::EndVertical();
 
         ImGui::BeginVertical("Input execution labels");
-        for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && pin.IsInput) ImGui::Text(pin.Label.c_str());
+        for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && pin.IsInput) DrawPinLabel(pin);
+        for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution && pin.IsInput) DrawPinLabel(pin);
         ImGui::EndVertical();
 
         ImGui::Spring(0.5f);
@@ -74,11 +113,13 @@ void EditorNode::Render()
         ImGui::Spring(1.0f);
 
 		ImGui::BeginVertical("Output execution labels");
-		for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && !pin.IsInput) ImGui::Text(pin.Label.c_str());
+		for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPinLabel(pin);
+		for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPinLabel(pin);
 		ImGui::EndVertical();
 
         ImGui::BeginVertical("Output execution pins");
 		for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPin(pin);
+		for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPin(pin);
         ImGui::EndVertical();
 
         ImGui::EndHorizontal();
@@ -93,10 +134,12 @@ void EditorNode::Render()
 
         ImGui::BeginVertical("Input pins");
 		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPin(pin);
+		for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPin(pin);
         ImGui::EndVertical();
 
 		ImGui::BeginVertical("Input labels");
-		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && pin.IsInput) ImGui::Text(pin.Label.c_str());
+		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPinLabel(pin);
+		for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPinLabel(pin);
 		ImGui::EndVertical();
 
         ImGui::BeginVertical("Render content");
@@ -106,11 +149,13 @@ void EditorNode::Render()
         ImGui::Spring(1);
 
 		ImGui::BeginVertical("Output labels");
-		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && !pin.IsInput) ImGui::Text(pin.Label.c_str());
+		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPinLabel(pin);
+		for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPinLabel(pin);
 		ImGui::EndVertical();
 
         ImGui::BeginVertical("Output pins");
         for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPin(pin);
+        for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPin(pin);
         ImGui::EndVertical();
 
         ImGui::EndHorizontal();
@@ -126,6 +171,12 @@ void EditorNode::Render()
 void EditorNode::RenderContent()
 {
     ImGui::Dummy(ImVec2{ 25, 25 });
+}
+
+unsigned EditorNode::AddCustomPin(const EditorNodePin& pin)
+{
+	m_CustomPins.push_back(pin);
+	return m_CustomPins.size() - 1;
 }
 
 unsigned EditorNode::AddPin(const EditorNodePin& pin)
@@ -150,40 +201,37 @@ void FloatNEditorNode::RenderContent()
     }
 }
 
-void ImGuiInputText(const char* label, std::string& text)
-{
-	constexpr unsigned BUF_SIZE = 50;
-	char buf[BUF_SIZE];
-	strcpy_s(buf, text.c_str());
-
-	ImGui::SetNextItemWidth(150.0f);
-	if (ImGui::InputText(label, buf, BUF_SIZE))
-	{
-		text = std::string{ buf };
-	}
-}
-
 void BinaryOperatorEditorNode::RenderContent()
 {
-    std::string opStr{ m_Op };
-
-    static const std::vector<std::string> operators = { "+", "-", "*", "/" };
-
-    ImGui::SetNextItemWidth(50.0f);
-    if (ImGui::BeginCombo("Op", opStr.c_str()))
+    if (ImGui::Button(m_Op.c_str()))
     {
-        for (const std::string& opSelection : operators)
-        {
-            bool isSelected = false;
-            ImGui::Selectable(opSelection.c_str(), &isSelected);
-            if (isSelected)
-            {
-                m_Op = opSelection[0];
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
+        m_ShowSelectionBox = true;
     }
+}
+
+void BinaryOperatorEditorNode::RenderPopups()
+{
+	static const std::vector<std::string> arithmeticOperators = { "+", "-", "*", "/" };
+    static const std::vector<std::string> comparisonOperators = { "==", "!=", ">", "<", ">=", "<=" };
+    static const std::vector<std::string> logicOperators = { "AND", "OR", "XOR" };
+
+    const std::vector<std::string>* operators = nullptr;
+    switch (m_OpType)
+    {
+    case BinaryOperatorType::Arithemtic:
+        operators = &arithmeticOperators;
+        break;
+    case BinaryOperatorType::Logic:
+        operators = &logicOperators;
+        break;
+    case BinaryOperatorType::Comparison:
+        operators = &comparisonOperators;
+        break;
+    default:
+        operators = &arithmeticOperators;
+        NOT_IMPLEMENTED;
+    }
+	ImGuiComboBox(m_SelectionBoxID, m_Op, m_ShowSelectionBox, *operators);
 }
 
 void AsignVariableEditorNode::RenderContent()
@@ -194,7 +242,7 @@ void AsignVariableEditorNode::RenderContent()
 
 void VariableEditorNode::RenderContent()
 {
-    ImGuiInputText("Name", m_VariableName);
+    ImGuiInputText("", m_VariableName);
 }
 
 void CreateTextureEditorNode::RenderContent()
@@ -222,6 +270,7 @@ void NameAndPathExecutionEditorNode::RenderContent()
         {
         case EditorNodeType::LoadTexture: fileOpened = FileDialog::OpenTextureFile(texPath); break;
         case EditorNodeType::LoadShader: fileOpened = FileDialog::OpenShaderFile(texPath); break;
+        case EditorNodeType::LoadMesh: fileOpened = FileDialog::OpenSceneFile(texPath); break;
         default: NOT_IMPLEMENTED;
         }
 
@@ -231,4 +280,80 @@ void NameAndPathExecutionEditorNode::RenderContent()
 		}
 	}
 	ImGui::Text(m_Path.c_str());
+}
+
+void BindTableEditorNode::RenderContent()
+{
+    ImGui::Text("Binding name");
+    ImGuiInputText("", m_InputName);
+    ImGui::Dummy({ 10.0f, 10.0f });
+
+    bool canAdd = true;
+    if (m_InputName.empty())
+    {
+        canAdd = false;
+    }
+
+    if (canAdd)
+    {
+        for (const auto& customPin : GetCustomPins())
+        {
+            if (customPin.Label == m_InputName)
+            {
+                canAdd = false;
+                break;
+            }
+        }
+    }
+
+    if (!canAdd)
+    {
+		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+    }
+
+    EditorNodePin pinToAdd;
+    if (ImGui::Button("Add texture")) pinToAdd = EditorNodePin::CreateInputPin(m_InputName, PinType::Texture);
+    // if (ImGui::Button("Add buffer")) pinToAdd = EditorNodePin::CreateInputPin(m_InputName, PinType::Buffer);
+
+	if (!canAdd)
+	{
+		ImGui::PopItemFlag();
+		ImGui::PopStyleVar();
+	}
+
+    if (pinToAdd.Type != PinType::Invalid)
+    {
+        ASSERT(canAdd);
+        m_InputName = "";
+        AddCustomPin(pinToAdd);
+    }
+}
+
+void GetMeshEditorNode::RenderContent()
+{
+    Super::RenderContent();
+
+    ImGui::Checkbox("Positions", &m_PositionBit);
+    ImGui::Checkbox("Texcoords", &m_TexcoordBit);
+    ImGui::Checkbox("Normals", &m_NormalBit);
+    ImGui::Checkbox("Tangents", &m_TangentBit);
+}
+
+
+
+void GetCubeMeshEditorNode::RenderContent()
+{
+    static bool b[4] = {true, false, false, false};
+
+    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+
+	ImGui::Checkbox("Positions", &b[0]);
+	ImGui::Checkbox("Texcoords", &b[1]);
+	ImGui::Checkbox("Normals", &b[2]);
+	ImGui::Checkbox("Tangents", &b[3]);
+
+	ImGui::PopItemFlag();
+	ImGui::PopStyleVar();
 }

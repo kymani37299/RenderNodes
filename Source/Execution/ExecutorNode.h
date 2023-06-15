@@ -176,10 +176,11 @@ private:
 class DrawMeshExecutorNode : public ExecutorNode
 {
 public:
-	DrawMeshExecutorNode(TextureValueNode* framebufferNode, ShaderValueNode* shaderNode, MeshValueNode* meshNode):
+	DrawMeshExecutorNode(TextureValueNode* framebufferNode, ShaderValueNode* shaderNode, MeshValueNode* meshNode, BindTableValueNode* bindTable):
 		m_FramebufferNode(framebufferNode),
 		m_ShaderNode(shaderNode),
-		m_MeshNode(meshNode) {}
+		m_MeshNode(meshNode),
+		m_BindTable(bindTable) {}
 
 	~DrawMeshExecutorNode();
 
@@ -190,4 +191,18 @@ private:
 	Ptr<TextureValueNode> m_FramebufferNode;
 	Ptr<ShaderValueNode> m_ShaderNode;
 	Ptr<MeshValueNode> m_MeshNode;
+	Ptr<BindTableValueNode> m_BindTable;
+};
+
+class LoadMeshExecutorNode : public ExecutorNode
+{
+public:
+	LoadMeshExecutorNode(const std::string& meshName, const std::string& meshPath) :
+		m_MeshKey(Hash::Crc32(meshName)),
+		m_MeshPath(meshPath) {}
+
+	void Execute(ExecuteContext& context) override;
+private:
+	uint32_t m_MeshKey = 0;
+	std::string m_MeshPath;
 };

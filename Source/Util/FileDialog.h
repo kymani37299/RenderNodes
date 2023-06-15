@@ -10,6 +10,7 @@ namespace FileDialog
 	bool OpenRenderNodeFile(std::string& path);
 	bool OpenTextureFile(std::string& path);
 	bool OpenShaderFile(std::string& path);
+	bool OpenSceneFile(std::string& path);
 
 	bool SaveRenderNodeFile(std::string& path);
 }

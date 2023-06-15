@@ -43,8 +43,8 @@ void InitStaticResources(ExecuteContext& context)
 	};
 
 	Mesh* cubeMesh = new Mesh{};
-	cubeMesh->VertexBuffer = Buffer::Create(BufferType::Vertex, cubeVertices.size() * sizeof(float), sizeof(float), BF_None, cubeVertices.data());
-	cubeMesh->IndexBuffer = Buffer::Create(BufferType::Index, cubeIndices.size() * sizeof(unsigned), sizeof(unsigned), BF_None, cubeIndices.data());
+	cubeMesh->Positions = Buffer::Create(BufferType::Vertex, cubeVertices.size() * sizeof(float), sizeof(float), BF_None, cubeVertices.data());
+	cubeMesh->Indices = Buffer::Create(BufferType::Index, cubeIndices.size() * sizeof(unsigned), sizeof(unsigned), BF_None, cubeIndices.data());
 	cubeMesh->NumPrimitives = cubeIndices.size();
 
 	context.RenderResources.Meshes.push_back(Ptr<Mesh>(cubeMesh));

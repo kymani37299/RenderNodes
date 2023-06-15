@@ -96,6 +96,9 @@
     <ClCompile Include="Source\NodeGraph\PinEvaluator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\SceneLoading.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h">
@@ -210,6 +213,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\NodeGraph\PinEvaluator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\SceneLoading.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

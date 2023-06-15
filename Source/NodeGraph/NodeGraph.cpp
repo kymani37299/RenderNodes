@@ -17,6 +17,23 @@ void NodeGraph::AddNode(EditorNode* node)
 
 void NodeGraph::AddLink(const EditorNodeLink& link)
 {
+    for (const auto& it : m_Links)
+    {
+        const auto& l = it.second;
+        const auto& endPin = GetPinByID(link.End);
+        if (endPin.Type != PinType::Execution && l.End == link.End)
+        {
+            m_Links.erase(it.first);
+            break;
+        }
+
+        const auto& startPin = GetPinByID(link.Start);
+        if (startPin.Type == PinType::Execution && l.Start == link.Start)
+        {
+            m_Links.erase(it.first);
+            break;
+        }
+    }
     m_Links[link.ID] = link;
 }
 
@@ -75,6 +92,10 @@ EditorNodePin NodeGraph::GetPinByID(PinID pinID) const
         {
             if (pin.ID == pinID) return pin;
         }
+		for (const auto& pin : node->GetCustomPins())
+		{
+			if (pin.ID == pinID) return pin;
+		}
 	}
 	ASSERT_M(0, "Pin not found!");
     return EditorNodePin{};
@@ -89,6 +110,10 @@ EditorNode* NodeGraph::GetPinOwner(PinID pinID) const
         {
             if (pinID == pin.ID) return node.get();
         }
+		for (const auto& pin : node->GetCustomPins())
+		{
+			if (pinID == pin.ID) return node.get();
+		}
     }
     return nullptr;
 }

@@ -57,7 +57,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;PROJECT_DIR="$(ProjectDir.Replace('\', '/'))";_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb_image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb_image\;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;$(SolutionDir)\External\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -75,7 +75,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;PROJECT_DIR="$(ProjectDir.Replace('\', '/'))";NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb_image\;$(SolutionDir)\Source;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\External\GLAD\include;$(SolutionDir)\External\ScopeGuard;$(SolutionDir)\External\ImGUI\;$(SolutionDir)\External\ImGUI-Nodes\;$(SolutionDir)\External\GLFW\include;$(SolutionDir)\External\stb_image\;$(SolutionDir)\External\glm\include;$(SolutionDir)\External\NativeFileDialog\src;$(SolutionDir)\External\NativeFileDialog\src\include;$(SolutionDir)\External\cgltf;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -112,6 +112,7 @@
     <ClCompile Include="Source\NodeGraph\NodeGraphSerializer.cpp" />
     <ClCompile Include="Source\NodeGraph\PinEvaluator.cpp" />
     <ClCompile Include="Source\Render\Buffer.cpp" />
+    <ClCompile Include="Source\Render\SceneLoading.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Util\FileDialog.cpp" />
@@ -151,6 +152,7 @@
     <ClInclude Include="Source\IDGen.h" />
     <ClInclude Include="Source\NodeGraph\PinEvaluator.h" />
     <ClInclude Include="Source\Render\Buffer.h" />
+    <ClInclude Include="Source\Render\SceneLoading.h" />
     <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Util\FileDialog.h" />

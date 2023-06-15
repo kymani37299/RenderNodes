@@ -87,4 +87,10 @@ namespace FileDialog
 	{
 		return OpenFile(path, { { "GLSL shader", "glsl"} });
 	}
+
+	bool OpenSceneFile(std::string& path)
+	{
+		return OpenFile(path, { { "GLTF scene", "gltf"} });
+	}
+
 }

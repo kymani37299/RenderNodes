@@ -68,6 +68,7 @@ public:
 		AsignVariableEditorNode(nodeType, pinType) {}
 };
 
+using AsignBoolEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignBool, PinType::Bool>;
 using AsignFloatEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat, PinType::Float>;
 using AsignFloat2EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat2, PinType::Float2>;
 using AsignFloat3EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat3, PinType::Float3>;
@@ -173,6 +174,14 @@ public:
 		NameAndPathExecutionEditorNode("Load shader", EditorNodeType::LoadShader) {}
 };
 
+class LoadMeshEditorNode : public NameAndPathExecutionEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	LoadMeshEditorNode() :
+		NameAndPathExecutionEditorNode("Load mesh", EditorNodeType::LoadMesh) {}
+};
+
 class ClearRenderTargetEditorNode : public ExecutionEditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
@@ -218,14 +227,18 @@ public:
 		m_FramebufferPin = AddPin(EditorNodePin::CreateInputPin("Framebuffer", PinType::Texture));
 		m_ShaderPin = AddPin(EditorNodePin::CreateInputPin("Shader", PinType::Shader));
 		m_MeshPin = AddPin(EditorNodePin::CreateInputPin("Mesh", PinType::Mesh));
+		m_BindTablePin = AddPin(EditorNodePin::CreateInputPin("BindTable", PinType::BindTable));
 	}
 
 	const EditorNodePin& GetFrameBufferPin() const { return GetPins()[m_FramebufferPin]; }
 	const EditorNodePin& GetMeshPin() const { return GetPins()[m_MeshPin]; }
 	const EditorNodePin& GetShaderPin() const { return GetPins()[m_ShaderPin]; }
+	const EditorNodePin& GetBindTablePin() const { return GetPins()[m_BindTablePin]; }
 
 private:
 	unsigned m_FramebufferPin;
 	unsigned m_ShaderPin;
 	unsigned m_MeshPin;
+
+	unsigned m_BindTablePin;
 };

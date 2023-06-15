@@ -13,9 +13,9 @@ static EditorNodePin GetOutputPinIfInput(const NodeGraph& nodeGraph, EditorNodeP
 
 BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 {
-	ASSERT(pin.Type == PinType::Bool);
-
 	pin = GetOutputPinIfInput(m_NodeGraph, pin);
+	ASSERT(pin.Type == PinType::Bool);
+	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Bool pin input missing link!");
@@ -26,6 +26,9 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 	switch (node->GetType())
 	{
 	case EditorNodeType::Bool: return EvaluateBool(static_cast<BoolEditorNode*>(node));
+	case EditorNodeType::VarBool: return EvaluateVarBool(static_cast<VarBoolEditorNode*>(node));
+	case EditorNodeType::BoolBinaryOperator: return EvaluateBoolBinaryOperator(static_cast<BoolBinaryOperatorEditorNode*>(node));
+	case EditorNodeType::FloatComparisonOperator: return EvaluateFloatComparisonOperator(static_cast<FloatComparisonOperatorEditorNode*>(node));
 	default:
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBoolPin] internal error!");
@@ -33,11 +36,30 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 	return new ConstantValueNode<bool>(false);
 }
 
+BoolValueNode* PinEvaluator::EvaluateVarBool(VarBoolEditorNode* node)
+{
+	return new VariableValueNode<bool>(node->GetVaraibleName());
+}
+
+BoolValueNode* PinEvaluator::EvaluateBoolBinaryOperator(BoolBinaryOperatorEditorNode* node)
+{
+	BoolValueNode* a = EvaluateBool(node->GetAPin());
+	BoolValueNode* b = EvaluateBool(node->GetBPin());
+	return new BoolBinaryOperatorValueNode(a, b, node->GetOp());
+}
+
+BoolValueNode* PinEvaluator::EvaluateFloatComparisonOperator(FloatComparisonOperatorEditorNode* node)
+{
+	FloatValueNode* a = EvaluateFloat(node->GetAPin());
+	FloatValueNode* b = EvaluateFloat(node->GetBPin());
+	return new ComparisonValueNode<float>{ a, b, node->GetOp() };
+}
+
 FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 {
-	ASSERT(pin.Type == PinType::Float);
-
 	pin = GetOutputPinIfInput(m_NodeGraph, pin);
+	ASSERT(pin.Type == PinType::Float);
+	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float pin input missing link!");
@@ -51,6 +73,9 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 	case EditorNodeType::Float: return EvaluateFloat(static_cast<FloatEditorNode*>(node));
 	case EditorNodeType::FloatBinaryOperator: return EvaluateFloatBinaryOperator(static_cast<FloatBinaryOperatorEditorNode*>(node));
 	case EditorNodeType::VarFloat: return EvaluateVarFloat(static_cast<VarFloatEditorNode*>(node));
+	case EditorNodeType::SplitFloat2: return EvaluateSplitFloat2(static_cast<SplitFloat2EditorNode*>(node), pin);
+	case EditorNodeType::SplitFloat3: return EvaluateSplitFloat3(static_cast<SplitFloat3EditorNode*>(node), pin);
+	case EditorNodeType::SplitFloat4: return EvaluateSplitFloat4(static_cast<SplitFloat4EditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
@@ -60,81 +85,108 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 
 Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 {
+	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	ASSERT(pin.Type == PinType::Float2);
 
-	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float2 pin input missing link!");
-		return new ConstantValueNode<glm::vec2>({});
+		return new ConstantValueNode<Float2>({});
 	}
 
 	EditorNode* node = m_NodeGraph.GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
 	case EditorNodeType::Float2: return EvaluateFloat2(static_cast<Float2EditorNode*>(node));
+	case EditorNodeType::CreateFloat2: return EvaluateCreateFloat2(static_cast<CreateFloat2EditorNode*>(node));
 	case EditorNodeType::VarFloat2: return EvaluateVarFloat2(static_cast<VarFloat2EditorNode*>(node));
 	case EditorNodeType::Float2BinaryOperator: return EvaluateFloat2BinaryOperator(static_cast<Float2BinaryOperatorEditorNode*>(node));
 	default:
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
-	return new ConstantValueNode<glm::vec2>({});
+	return new ConstantValueNode<Float2>({});
+}
+
+Float2ValueNode* PinEvaluator::EvaluateCreateFloat2(CreateFloat2EditorNode* node)
+{
+	ValueNode<float>* x = EvaluateFloat(node->GetInputPin(0));
+	ValueNode<float>* y = EvaluateFloat(node->GetInputPin(1));
+	return new CreateVectorValueNode<Float2, float, 2>({ x,y });
 }
 
 Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 {
-	ASSERT(pin.Type == PinType::Float3);
-
 	pin = GetOutputPinIfInput(m_NodeGraph, pin);
+	ASSERT(pin.Type == PinType::Float3);
+	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float3 pin input missing link!");
-		return new ConstantValueNode<glm::vec3>({});
+		return new ConstantValueNode<Float3>({});
 	}
 
 	EditorNode* node = m_NodeGraph.GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
 	case EditorNodeType::Float3: return EvaluateFloat3(static_cast<Float3EditorNode*>(node));
+	case EditorNodeType::CreateFloat3: return EvaluateCreateFloat3(static_cast<CreateFloat3EditorNode*>(node));
 	case EditorNodeType::VarFloat3: return EvaluateVarFloat3(static_cast<VarFloat3EditorNode*>(node));
 	case EditorNodeType::Float3BinaryOperator: return EvaluateFloat3BinaryOperator(static_cast<Float3BinaryOperatorEditorNode*>(node));
 	default:
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
-	return new ConstantValueNode<glm::vec3>({});
+	return new ConstantValueNode<Float3>({});
+}
+
+Float3ValueNode* PinEvaluator::EvaluateCreateFloat3(CreateFloat3EditorNode* node)
+{
+	ValueNode<float>* x = EvaluateFloat(node->GetInputPin(0));
+	ValueNode<float>* y = EvaluateFloat(node->GetInputPin(1));
+	ValueNode<float>* z = EvaluateFloat(node->GetInputPin(2));
+	return new CreateVectorValueNode<Float3, float, 3>({ x,y, z });
 }
 
 Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 {
-	ASSERT(pin.Type == PinType::Float4);
-
 	pin = GetOutputPinIfInput(m_NodeGraph, pin);
+	ASSERT(pin.Type == PinType::Float4);
+	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float4 pin input missing link!");
-		return new ConstantValueNode<glm::vec4>({});
+		return new ConstantValueNode<Float4>({});
 	}
 
 	EditorNode* node = m_NodeGraph.GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
 	case EditorNodeType::Float4: return EvaluateFloat4(static_cast<Float4EditorNode*>(node));
+	case EditorNodeType::CreateFloat4: return EvaluateCreateFloat4(static_cast<CreateFloat4EditorNode*>(node));
 	case EditorNodeType::VarFloat4: return EvaluateVarFloat4(static_cast<VarFloat4EditorNode*>(node));
 	case EditorNodeType::Float4BinaryOperator: return EvaluateFloat4BinaryOperator(static_cast<Float4BinaryOperatorEditorNode*>(node));
 	default:
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
-	return new ConstantValueNode<glm::vec4>({});
+	return new ConstantValueNode<Float4>({});
+}
+
+Float4ValueNode* PinEvaluator::EvaluateCreateFloat4(CreateFloat4EditorNode* node)
+{
+	ValueNode<float>* x = EvaluateFloat(node->GetInputPin(0));
+	ValueNode<float>* y = EvaluateFloat(node->GetInputPin(1));
+	ValueNode<float>* z = EvaluateFloat(node->GetInputPin(2));
+	ValueNode<float>* w = EvaluateFloat(node->GetInputPin(3));
+	return new CreateVectorValueNode<Float4, float, 4>({ x, y, z, w });
 }
 
 TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 {
+	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	ASSERT(pin.Type == PinType::Texture);
 
-	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Texture pin input not linked!");
@@ -154,9 +206,9 @@ TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 
 BufferValueNode* PinEvaluator::EvaluateBuffer(EditorNodePin pin)
 {
+	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	ASSERT(pin.Type == PinType::Buffer);
 
-	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Buffer pin input not linked!");
@@ -175,9 +227,9 @@ BufferValueNode* PinEvaluator::EvaluateBuffer(EditorNodePin pin)
 
 MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 {
+	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	ASSERT(pin.Type == PinType::Mesh);
 
-	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Mesh pin input not linked!");
@@ -187,7 +239,9 @@ MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 	EditorNode* node = m_NodeGraph.GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
+	case EditorNodeType::GetMesh: return EvaluateGetMesh(static_cast<GetMeshEditorNode*>(node));
 	case EditorNodeType::GetCubeMesh: return EvaluateGetCubeMesh(static_cast<GetCubeMeshEditorNode*>(node));
+
 	default:
 		NOT_IMPLEMENTED;
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
@@ -197,9 +251,9 @@ MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 
 ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 {
+	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	ASSERT(pin.Type == PinType::Shader);
 
-	pin = GetOutputPinIfInput(m_NodeGraph, pin);
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Shader pin input not linked!");
@@ -212,95 +266,181 @@ ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 	case EditorNodeType::GetShader: return EvaluateGetShader(static_cast<GetShaderEditorNode*>(node));
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateShader] internal error!");
 	}
 	return new ConstantValueNode<Shader*>(nullptr);
 }
 
-BoolValueNode* PinEvaluator::EvaluateBool(BoolEditorNode* boolNode)
+BindTableValueNode* PinEvaluator::EvaluateBindTable(EditorNodePin pin)
 {
-	return new ConstantValueNode<bool>(boolNode->GetValue());
+	pin = GetOutputPinIfInput(m_NodeGraph, pin);
+	ASSERT(pin.Type == PinType::BindTable);
+
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("BindTable pin input not linked!");
+		return new ConstantValueNode<BindTable*>(nullptr);
+	}
+
+	EditorNode* node = m_NodeGraph.GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::BindTable: return EvaluateBindTable(static_cast<BindTableEditorNode*>(node));
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBindTable] internal error!");
+	}
+	return new ConstantValueNode<BindTable*>(nullptr);
 }
 
-FloatValueNode* PinEvaluator::EvaluateFloat(FloatEditorNode* floatNode)
+BoolValueNode* PinEvaluator::EvaluateBool(BoolEditorNode* node)
 {
-	return new ConstantValueNode<float>(floatNode->GetFloat());
+	return new ConstantValueNode<bool>(node->GetValue());
 }
 
-FloatValueNode* PinEvaluator::EvaluateVarFloat(VarFloatEditorNode* floatNode)
+FloatValueNode* PinEvaluator::EvaluateFloat(FloatEditorNode* node)
 {
-	return new VariableValueNode<float>(floatNode->GetVaraibleName());
+	return new ConstantValueNode<float>(node->GetFloat());
 }
 
-FloatValueNode* PinEvaluator::EvaluateFloatBinaryOperator(FloatBinaryOperatorEditorNode* floatOpNode)
+FloatValueNode* PinEvaluator::EvaluateVarFloat(VarFloatEditorNode* node)
 {
-	FloatValueNode* a = EvaluateFloat(floatOpNode->GetAPin());
-	FloatValueNode* b = EvaluateFloat(floatOpNode->GetBPin());
-	return new BinaryOperatorValueNode<float>{ a, b, floatOpNode->GetOp() };
+	return new VariableValueNode<float>(node->GetVaraibleName());
 }
 
-Float2ValueNode* PinEvaluator::EvaluateFloat2(Float2EditorNode* floatNode)
+FloatValueNode* PinEvaluator::EvaluateSplitFloat2(SplitFloat2EditorNode* node, const EditorNodePin& pin)
 {
-	return new ConstantValueNode<glm::vec2>(floatNode->GetFloat2());
+	ASSERT(pin.Type == PinType::Float);
+	ASSERT(m_NodeGraph.GetPinOwner(pin.ID) == node);
+
+	ValueNode<Float2>* vec = EvaluateFloat2(node->GetInputVectorPin());
+	const unsigned vecIndex = node->GetOutputPinIndex(pin.ID);
+	return new SplitVectorValueNode<Float2, float>(vec, vecIndex);
 }
 
-Float2ValueNode* PinEvaluator::EvaluateVarFloat2(VarFloat2EditorNode* floatNode)
+FloatValueNode* PinEvaluator::EvaluateSplitFloat3(SplitFloat3EditorNode* node, const EditorNodePin& pin)
 {
-	return new VariableValueNode<glm::vec2>(floatNode->GetVaraibleName());
+	ASSERT(pin.Type == PinType::Float);
+	ASSERT(m_NodeGraph.GetPinOwner(pin.ID) == node);
+
+	ValueNode<Float3>* vec = EvaluateFloat3(node->GetInputVectorPin());
+	const unsigned vecIndex = node->GetOutputPinIndex(pin.ID);
+	return new SplitVectorValueNode<Float3, float>(vec, vecIndex);
 }
 
-Float2ValueNode* PinEvaluator::EvaluateFloat2BinaryOperator(Float2BinaryOperatorEditorNode* floatOpNode)
+FloatValueNode* PinEvaluator::EvaluateSplitFloat4(SplitFloat4EditorNode* node, const EditorNodePin& pin)
 {
-	Float2ValueNode* a = EvaluateFloat2(floatOpNode->GetAPin());
-	Float2ValueNode* b = EvaluateFloat2(floatOpNode->GetBPin());
-	return new BinaryOperatorValueNode<glm::vec2>{ a, b, floatOpNode->GetOp() };
+	ASSERT(pin.Type == PinType::Float);
+	ASSERT(m_NodeGraph.GetPinOwner(pin.ID) == node);
+
+	ValueNode<Float4>* vec = EvaluateFloat4(node->GetInputVectorPin());
+	const unsigned vecIndex = node->GetOutputPinIndex(pin.ID);
+	return new SplitVectorValueNode<Float4, float>(vec, vecIndex);
 }
 
-Float3ValueNode* PinEvaluator::EvaluateFloat3(Float3EditorNode* floatNode)
+FloatValueNode* PinEvaluator::EvaluateFloatBinaryOperator(FloatBinaryOperatorEditorNode* node)
 {
-	return new ConstantValueNode<glm::vec3>(floatNode->GetFloat3());
+	FloatValueNode* a = EvaluateFloat(node->GetAPin());
+	FloatValueNode* b = EvaluateFloat(node->GetBPin());
+	return new BinaryArithmeticOperatorValueNode<float>{ a, b, node->GetOp()[0] };
 }
 
-Float3ValueNode* PinEvaluator::EvaluateVarFloat3(VarFloat3EditorNode* floatNode)
+Float2ValueNode* PinEvaluator::EvaluateFloat2(Float2EditorNode* node)
 {
-	return new VariableValueNode<glm::vec3>(floatNode->GetVaraibleName());
+	return new ConstantValueNode<Float2>(node->GetFloat2());
 }
 
-Float3ValueNode* PinEvaluator::EvaluateFloat3BinaryOperator(Float3BinaryOperatorEditorNode* floatOpNode)
+Float2ValueNode* PinEvaluator::EvaluateVarFloat2(VarFloat2EditorNode* node)
 {
-	Float3ValueNode* a = EvaluateFloat3(floatOpNode->GetAPin());
-	Float3ValueNode* b = EvaluateFloat3(floatOpNode->GetBPin());
-	return new BinaryOperatorValueNode<glm::vec3>{ a, b, floatOpNode->GetOp() };
+	return new VariableValueNode<Float2>(node->GetVaraibleName());
 }
 
-Float4ValueNode* PinEvaluator::EvaluateFloat4(Float4EditorNode* floatNode)
+Float2ValueNode* PinEvaluator::EvaluateFloat2BinaryOperator(Float2BinaryOperatorEditorNode* node)
 {
-	return new ConstantValueNode<glm::vec4>(floatNode->GetFloat4());
+	Float2ValueNode* a = EvaluateFloat2(node->GetAPin());
+	Float2ValueNode* b = EvaluateFloat2(node->GetBPin());
+	return new BinaryArithmeticOperatorValueNode<Float2>{ a, b, node->GetOp()[0]};
 }
 
-Float4ValueNode* PinEvaluator::EvaluateVarFloat4(VarFloat4EditorNode* floatNode)
+Float3ValueNode* PinEvaluator::EvaluateFloat3(Float3EditorNode* node)
 {
-	return new VariableValueNode<glm::vec4>(floatNode->GetVaraibleName());
+	return new ConstantValueNode<Float3>(node->GetFloat3());
 }
 
-Float4ValueNode* PinEvaluator::EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* floatOpNode)
+Float3ValueNode* PinEvaluator::EvaluateVarFloat3(VarFloat3EditorNode* node)
 {
-	Float4ValueNode* a = EvaluateFloat4(floatOpNode->GetAPin());
-	Float4ValueNode* b = EvaluateFloat4(floatOpNode->GetBPin());
-	return new BinaryOperatorValueNode<glm::vec4>{ a, b, floatOpNode->GetOp() };
+	return new VariableValueNode<Float3>(node->GetVaraibleName());
 }
 
-TextureValueNode* PinEvaluator::EvaluateGetTexture(GetTextureEditorNode* getTextureNode)
+Float3ValueNode* PinEvaluator::EvaluateFloat3BinaryOperator(Float3BinaryOperatorEditorNode* node)
 {
-	return new VariableValueNode<Texture*>(getTextureNode->GetVaraibleName());
+	Float3ValueNode* a = EvaluateFloat3(node->GetAPin());
+	Float3ValueNode* b = EvaluateFloat3(node->GetBPin());
+	return new BinaryArithmeticOperatorValueNode<Float3>{ a, b, node->GetOp()[0]};
 }
 
-MeshValueNode* PinEvaluator::EvaluateGetCubeMesh(GetCubeMeshEditorNode* getCubeMeshNode)
+Float4ValueNode* PinEvaluator::EvaluateFloat4(Float4EditorNode* node)
 {
-	return new StaticResourceNode<Mesh*, ExecutorStaticResource::CubeMesh>();
+	return new ConstantValueNode<Float4>(node->GetFloat4());
 }
 
-ShaderValueNode* PinEvaluator::EvaluateGetShader(GetShaderEditorNode* getShaderNode)
+Float4ValueNode* PinEvaluator::EvaluateVarFloat4(VarFloat4EditorNode* node)
 {
-	return new VariableValueNode<Shader*>(getShaderNode->GetVaraibleName());
+	return new VariableValueNode<Float4>(node->GetVaraibleName());
+}
+
+Float4ValueNode* PinEvaluator::EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* node)
+{
+	Float4ValueNode* a = EvaluateFloat4(node->GetAPin());
+	Float4ValueNode* b = EvaluateFloat4(node->GetBPin());
+	return new BinaryArithmeticOperatorValueNode<Float4>{ a, b, node->GetOp()[0] };
+}
+
+TextureValueNode* PinEvaluator::EvaluateGetTexture(GetTextureEditorNode* node)
+{
+	return new VariableValueNode<Texture*>(node->GetVaraibleName());
+}
+
+MeshValueNode* PinEvaluator::EvaluateGetCubeMesh(GetCubeMeshEditorNode* node)
+{
+	ValueNodeExtraInfo extraInfo;
+	extraInfo.MeshVertexBits.Position = true;
+	extraInfo.MeshVertexBits.Texcoord = false;
+	extraInfo.MeshVertexBits.Normal = false;
+	extraInfo.MeshVertexBits.Tangent = false;
+	return new StaticResourceNode<Mesh*, ExecutorStaticResource::CubeMesh>(extraInfo);
+}
+
+MeshValueNode* PinEvaluator::EvaluateGetMesh(GetMeshEditorNode* node)
+{
+	ValueNodeExtraInfo extraInfo;
+	extraInfo.MeshVertexBits.Position = node->GetPositionBit();
+	extraInfo.MeshVertexBits.Texcoord = node->GetTexcoordBit();
+	extraInfo.MeshVertexBits.Normal = node->GetNormalBit();
+	extraInfo.MeshVertexBits.Tangent = node->GetTangentBit();
+	return new VariableValueNode<Mesh*>(node->GetVaraibleName(), extraInfo);
+}
+
+ShaderValueNode* PinEvaluator::EvaluateGetShader(GetShaderEditorNode* node)
+{
+	return new VariableValueNode<Shader*>(node->GetVaraibleName());
+}
+
+BindTableValueNode* PinEvaluator::EvaluateBindTable(BindTableEditorNode* node)
+{
+	BindTable* bindTable = new BindTable{};
+	for (const auto& pin : node->GetCustomPins())
+	{
+		ASSERT(pin.IsInput);
+		switch (pin.Type)
+		{
+		case PinType::Texture:
+			bindTable->Textures.push_back(BindTable::Binding<Texture*>{ pin.Label, Ptr<TextureValueNode>(EvaluateTexture(m_NodeGraph.GetPinByID(pin.ID))) });
+			break;
+		default:
+			NOT_IMPLEMENTED;
+			m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBindTable] internal error!");
+		}
+	}
+	return new ConstantPtrValueNode<BindTable>{ bindTable };
 }

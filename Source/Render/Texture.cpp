@@ -2,7 +2,7 @@
 
 #include "../Common.h"
 
-Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags, unsigned char* textureData)
+Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags, const void* textureData)
 {
 	Texture* texture = new Texture{};
 	texture->Width = width;
@@ -19,7 +19,7 @@ Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags, un
 
 	glGenTextures(1, &texture->TextureHandle);
 	glBindTexture(GL_TEXTURE_2D, texture->TextureHandle);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, textureData);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, textureData);
 
 	// Probably need some sampler struct
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);

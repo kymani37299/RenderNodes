@@ -27,7 +27,7 @@ static GLenum MacroToShaderType(const std::string macro)
 {
 	if (macro.find("#start VERTEX") != std::string::npos) return GL_VERTEX_SHADER;
 	if (macro.find("#start FRAGMENT") != std::string::npos) return GL_FRAGMENT_SHADER;
-	// if (macro.find("#start COMPUTE") != std::string::npos) return GL_COMPUTE_SHADER;
+	if (macro.find("#start COMPUTE") != std::string::npos) return GL_COMPUTE_SHADER;
 	if (macro.find("#start GEOMETRY") != std::string::npos) return GL_GEOMETRY_SHADER;
 	return 0;
 }
@@ -40,8 +40,8 @@ std::string GetTag(GLenum type)
 		return "[VS]";
 	case GL_FRAGMENT_SHADER:
 		return "[FS]";
-	// case GL_COMPUTE_SHADER:
-	// 	return "[CS]";
+	case GL_COMPUTE_SHADER:
+	 	return "[CS]";
 	case GL_GEOMETRY_SHADER:
 		return "[GS]";
 	default:

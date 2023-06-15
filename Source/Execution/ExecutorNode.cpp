@@ -1,11 +1,9 @@
 #include "ExecutorNode.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
 #include "../Common.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
+#include "../Render/SceneLoading.h"
 
 namespace ExecutionPrivate
 {
@@ -23,6 +21,97 @@ namespace ExecutionPrivate
 	}
 }
 
+namespace
+{
+	unsigned CreateVAO(Mesh* mesh, const ValueNodeExtraInfo& extraInfo)
+	{
+		unsigned vao;
+		GL_CALL(glGenVertexArrays(1, &vao));
+		GL_CALL(glBindVertexArray(vao));
+
+		unsigned nextAttribArray = 0;
+		unsigned nextOffset = 0;
+
+		const auto& vertexBits = extraInfo.MeshVertexBits;
+
+		if (vertexBits.Position)
+		{
+			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Positions->Handle));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
+			nextOffset += 3 * sizeof(float);
+		}
+
+		if (vertexBits.Texcoord)
+		{
+			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Texcoords->Handle));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
+			nextOffset += 2 * sizeof(float);
+		}
+
+		if (vertexBits.Normal)
+		{
+			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Normals->Handle));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
+			nextOffset += 3 * sizeof(float);
+		}
+
+		if (vertexBits.Tangent)
+		{
+			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Tangents->Handle));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
+			nextOffset += 4 * sizeof(float);
+		}
+
+		return vao;
+	}
+
+	bool GetUniformIndex(Shader* shader, const std::string& name, unsigned& uniformIndex)
+	{
+		uniformIndex = glGetUniformLocation(shader->Handle, name.c_str());
+		return uniformIndex != -1;
+	}
+
+	bool TableBind(ExecuteContext& context, Shader* shader, BindTable* bindTable)
+	{
+		if (!bindTable) return false;
+
+		for (unsigned i = 0; i < bindTable->Textures.size(); i++)
+		{
+			const auto& binding = bindTable->Textures[i];
+			Texture* texture = binding.Value.get() ? binding.Value->GetValue(context) : (Texture*) nullptr;
+			if (!texture) return false;
+
+			unsigned textureSlot;
+			if (GetUniformIndex(shader, binding.Name, textureSlot))
+			{
+				GL_CALL(glActiveTexture(GL_TEXTURE0 + textureSlot));
+				GL_CALL(glBindTexture(GL_TEXTURE_2D, texture->TextureHandle));
+			}
+		}
+		return true;
+	}
+
+	void TableUnbind(Shader* shader, BindTable* bindTable)
+	{
+		if (!bindTable) return;
+
+		for (unsigned i = 0; i < bindTable->Textures.size(); i++)
+		{
+			const auto& binding = bindTable->Textures[i];
+			unsigned textureSlot;
+			if (GetUniformIndex(shader, binding.Name, textureSlot))
+			{
+				GL_CALL(glActiveTexture(GL_TEXTURE0 + textureSlot));
+				GL_CALL(glBindTexture(GL_TEXTURE_2D, 0));
+			}
+		}
+	}
+}
+
 using namespace ExecutionPrivate;
 
 void IfExecutorNode::Execute(ExecuteContext& context)
@@ -30,17 +119,17 @@ void IfExecutorNode::Execute(ExecuteContext& context)
 	m_PassedCondition = m_Condition->GetValue(context);
 }
 
-std::string ToString(const glm::vec2& value)
+std::string ToString(const Float2& value)
 {
 	return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ")";
 }
 
-std::string ToString(const glm::vec3& value)
+std::string ToString(const Float3& value)
 {
 	return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ",  " + std::to_string(value.z) + ")";
 }
 
-std::string ToString(const glm::vec4& value)
+std::string ToString(const Float4& value)
 {
 	return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ",  " + std::to_string(value.z) + ",  " + std::to_string(value.w) + ")";
 }
@@ -55,7 +144,7 @@ void PrintExecutorNode::Execute(ExecuteContext& context)
 
 void ClearRenderTargetExecutorNode::Execute(ExecuteContext& context)
 {
-	const glm::vec4 clearColor = m_ClearColorNode->GetValue(context);
+	const Float4 clearColor = m_ClearColorNode->GetValue(context);
 	const Texture* texture = m_TextureNode->GetValue(context);
 	Warning(texture, "ClearRenderTargetExecutorNode", "Input texture is null");
 
@@ -86,23 +175,8 @@ static T* AddToPtrVector(std::vector<Ptr<T>>& ptrVector, Ptr<T>&& ptrValue)
 
 void LoadTextureExecutorNode::Execute(ExecuteContext& context)
 {
-	static unsigned char INVALID_TEXTURE_COLOR[] = { 0xff, 0x00, 0x33, 0xff };
-
-	int width, height, bpp;
-	stbi_set_flip_vertically_on_load(true);
-	stbi_uc* data = stbi_load(m_TexturePath.c_str(), &width, &height, &bpp, 3);
-	if (!data)
-	{
-		Warning(false, "LoadTextureExecutorNode", "Failed to load texture");
-		data = INVALID_TEXTURE_COLOR;
-		width = 1;
-		height = 1;
-		// bpp = 4; ?
-	}
-
-	context.Variables.Textures[m_TextureKey] = AddToPtrVector(context.RenderResources.Textures, Texture::Create(width, height, TF_None, data));
-
-	stbi_image_free(data);
+	SceneLoading::Loader l{};
+	context.Variables.Textures[m_TextureKey] = AddToPtrVector(context.RenderResources.Textures, l.LoadTexture(m_TexturePath, Float4{ 1.0, 0.0f, 0.25f, 1.0f }));
 }
 
 void LoadShaderExecutorNode::Execute(ExecuteContext& context)
@@ -154,25 +228,67 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 		return;
 	}
 
-	if (!m_VAO)
-	{
-		GL_CALL(glGenVertexArrays(1, &m_VAO));
-		GL_CALL(glBindVertexArray(m_VAO));
-		GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->VertexBuffer->Handle));
-		GL_CALL(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0));
-		GL_CALL(glEnableVertexAttribArray(0));
-	}
+	if (!m_VAO) m_VAO = CreateVAO(mesh, m_MeshNode->GetExtraInfo());
 
+	// Framebuffer
 	GL_CALL(glViewport(0, 0, framebuffer->Width, framebuffer->Height));
 	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->FrameBufferHandle));
+
+	// Shader
 	GL_CALL(glUseProgram(shader->Handle));
+
+	// Mesh
 	GL_CALL(glBindVertexArray(m_VAO));
-	GL_CALL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->IndexBuffer->Handle));
+	GL_CALL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->Indices->Handle));
+
+	// Bindings
+	BindTable* bindTable = nullptr;
+	if (m_BindTable) bindTable = m_BindTable->GetValue(context);
+	
+	if (!TableBind(context, shader, bindTable))
+	{
+		Failure("DrawMeshExecutorNode", "Failed to bind BindTable!");
+		context.Failure = true;
+	}
 
 	GL_CALL(glDrawElements(GL_TRIANGLES, mesh->NumPrimitives, GL_UNSIGNED_INT, 0));
 
-	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
-	GL_CALL(glUseProgram(0));
+	// ~Bindings
+	TableUnbind(shader, bindTable);
+
+	// ~Mesh
 	GL_CALL(glBindVertexArray(0));
 	GL_CALL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+	// ~Shader
+	GL_CALL(glUseProgram(0));
+	
+	// ~Framebuffer
+	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+}
+
+void LoadMeshExecutorNode::Execute(ExecuteContext& context)
+{
+	SceneLoading::Loader l{};
+	Ptr<SceneLoading::Scene> scene = l.Load(m_MeshPath);
+
+	if (scene->Objects.empty() || l.HasErrors())
+	{
+		l.PrintErrors();
+		Failure("LoadMeshExecutorNode", "Failed to load scene");
+		context.Failure = true;
+		return;
+	}
+
+	auto& objectMesh = scene->Objects[0].Mesh;
+
+	Mesh* mesh = new Mesh{};
+	mesh->NumPrimitives = objectMesh.PrimitiveCount;
+	mesh->Positions = std::move(objectMesh.Positions);
+	mesh->Texcoords = std::move(objectMesh.Texcoords);
+	mesh->Normals = std::move(objectMesh.Normals);
+	mesh->Tangents = std::move(objectMesh.Tangents);
+	mesh->Indices = std::move(objectMesh.Indices);
+
+	context.Variables.Meshes[m_MeshKey] = AddToPtrVector(context.RenderResources.Meshes, Ptr<Mesh>(mesh));
 }

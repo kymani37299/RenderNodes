@@ -7,7 +7,7 @@ GLenum GetGLBufferType(BufferType type)
 	case BufferType::Vertex: return GL_ARRAY_BUFFER;
 	case BufferType::Index: return GL_ELEMENT_ARRAY_BUFFER;
 	case BufferType::Uniform: return GL_UNIFORM_BUFFER;
-	// case BufferType::Storage: return GL_SHADER_STORAGE_BUFFER;
+	case BufferType::Storage: return GL_SHADER_STORAGE_BUFFER;
 	case BufferType::Invalid:
 	default:
 		NOT_IMPLEMENTED;

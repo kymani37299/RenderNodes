@@ -37,6 +37,7 @@ private:
 	ExecutorNode* CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode);
 	ExecutorNode* CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode);
 	ExecutorNode* CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode);
+	ExecutorNode* CompileLoadMeshNode(LoadMeshEditorNode* loadMeshNode);
 
 private:
 	Ptr<PinEvaluator> m_PinEvaluator = nullptr;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Common.h"
-#include "IDGen.h"
+#include "../IDGen.h"
 
 #include <string>
 #include <fstream>
@@ -20,7 +20,7 @@ struct EditorNodePin;
 
 class NodeGraphSerializer
 {
-	static constexpr unsigned VERSION = 1;
+	static constexpr unsigned VERSION = 2;
 
 public:
 	void Serialize(const std::string& path, const NodeGraph& nodeGraph);
@@ -35,8 +35,7 @@ private:
 	// Writes
 	void WriteNodeList();
 	void WriteLinkList();
-	void WritePinList(const std::vector<EditorNodePin>& pins);
-
+	
 	// Reads
 	void ReadNodeList();
 	void ReadLinkList();
@@ -48,9 +47,6 @@ private:
 	void ReadFloatNode(FloatNEditorNode* floatNode);
 	void ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOpNode);
 	void ReadNamePathPathNode(NameAndPathExecutionEditorNode* nameAndPathNode);
-
-	// Tmp hack since nodes will self initialize some data
-	void ClearNode(EditorNode* node);
 
 private:
 	template<typename T>
@@ -71,7 +67,7 @@ private:
 
 private:
 	bool m_UseTokens = false;
-	unsigned m_Version = 1;
+	unsigned m_Version = VERSION;
 
 	const NodeGraph* m_NodeReadGraph = nullptr;
 	NodeGraph* m_NodeWriteGraph = nullptr;
