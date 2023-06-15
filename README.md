@@ -1,6 +1,7 @@
 # RenderNodes
 
-<img src="Images/EditorScreenshot.png" width="1024" height="595">
+<img src="Images/Image1.png" width="1024" height="578">
+<img src="Images/Image1.png" width="1024" height="577">
 
 Node editor for rendering engine
 Still in very early stage.
