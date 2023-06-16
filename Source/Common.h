@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_node_editor.h>
+#include <imgui_internal.h>
 #include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>

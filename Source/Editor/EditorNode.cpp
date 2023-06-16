@@ -6,8 +6,6 @@
 #include "../Util/FileDialog.h"
 #include "RenderPipelineEditor.h"
 
-#include <imgui_internal.h>
-
 static void DrawPin(const EditorNodePin& pin)
 {
     ImNode::BeginPin(pin.ID, pin.IsInput ? ImNode::PinKind::Input : ImNode::PinKind::Output);
@@ -34,24 +32,6 @@ static void ImGuiInputText(const char* label, std::string& text)
 	if (ImGui::InputText(label, buf, BUF_SIZE))
 	{
 		text = std::string{ buf };
-	}
-}
-
-static void ImGuiComboBox(const std::string& id, std::string& value, bool& shown, const std::vector<std::string>& values)
-{
-	if (shown) ImGui::OpenPopup(id.c_str());
-
-	if (ImGui::BeginPopup(id.c_str()))
-	{
-		for (const std::string& v : values)
-		{
-			if (ImGui::MenuItem(v.c_str()))
-			{
-                shown = false;
-                value = v;
-			}
-		}
-		ImGui::EndPopup();
 	}
 }
 
@@ -82,6 +62,31 @@ EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
     m_ID(IDGen::Generate()),
     m_Type(nodeType)
 { }
+
+void EditorNode::RemovePin(PinID pinID)
+{
+	for (unsigned i = 0; i < m_Pins.size(); i++)
+	{
+		const auto& pin = m_Pins[i];
+		if (pin.ID == pinID)
+		{
+			m_Pins.erase(m_Pins.begin() + i);
+			return;
+		}
+	}
+
+	for (unsigned i = 0; i < m_CustomPins.size(); i++)
+	{
+		const auto& pin = m_CustomPins[i];
+		if (pin.ID == pinID)
+		{
+			m_CustomPins.erase(m_CustomPins.begin() + i);
+			return;
+		}
+	}
+
+	ASSERT(0);
+}
 
 void EditorNode::Render()
 {
@@ -205,33 +210,13 @@ void BinaryOperatorEditorNode::RenderContent()
 {
     if (ImGui::Button(m_Op.c_str()))
     {
-        m_ShowSelectionBox = true;
+        m_OperatorSelector.Open();
     }
 }
 
 void BinaryOperatorEditorNode::RenderPopups()
 {
-	static const std::vector<std::string> arithmeticOperators = { "+", "-", "*", "/" };
-    static const std::vector<std::string> comparisonOperators = { "==", "!=", ">", "<", ">=", "<=" };
-    static const std::vector<std::string> logicOperators = { "AND", "OR", "XOR" };
-
-    const std::vector<std::string>* operators = nullptr;
-    switch (m_OpType)
-    {
-    case BinaryOperatorType::Arithemtic:
-        operators = &arithmeticOperators;
-        break;
-    case BinaryOperatorType::Logic:
-        operators = &logicOperators;
-        break;
-    case BinaryOperatorType::Comparison:
-        operators = &comparisonOperators;
-        break;
-    default:
-        operators = &arithmeticOperators;
-        NOT_IMPLEMENTED;
-    }
-	ImGuiComboBox(m_SelectionBoxID, m_Op, m_ShowSelectionBox, *operators);
+    m_OperatorSelector.Draw();
 }
 
 void AsignVariableEditorNode::RenderContent()
@@ -306,6 +291,11 @@ void BindTableEditorNode::RenderContent()
         }
     }
 
+	if (ImGui::Button(m_TypeValue.c_str()))
+	{
+        m_TypeSelection.Open();
+	}
+
     if (!canAdd)
     {
 		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
@@ -313,21 +303,30 @@ void BindTableEditorNode::RenderContent()
     }
 
     EditorNodePin pinToAdd;
-    if (ImGui::Button("Add texture")) pinToAdd = EditorNodePin::CreateInputPin(m_InputName, PinType::Texture);
-    // if (ImGui::Button("Add buffer")) pinToAdd = EditorNodePin::CreateInputPin(m_InputName, PinType::Buffer);
+    if (ImGui::Button("Add binding"))
+    {
+        PinType pinType = PinType::Texture;
+
+        if (m_TypeValue == "Texture") pinType = PinType::Texture;
+        else if (m_TypeValue == "Float") pinType = PinType::Float;
+        else if (m_TypeValue == "Float2") pinType = PinType::Float2;
+        else if (m_TypeValue == "Float3") pinType = PinType::Float3;
+        else if (m_TypeValue == "Float4") pinType = PinType::Float4;
+        else NOT_IMPLEMENTED;
+
+        AddCustomPin(EditorNodePin::CreateInputPin(m_InputName, pinType));
+    }
 
 	if (!canAdd)
 	{
 		ImGui::PopItemFlag();
 		ImGui::PopStyleVar();
 	}
+}
 
-    if (pinToAdd.Type != PinType::Invalid)
-    {
-        ASSERT(canAdd);
-        m_InputName = "";
-        AddCustomPin(pinToAdd);
-    }
+void BindTableEditorNode::RenderPopups()
+{
+    m_TypeSelection.Draw();
 }
 
 void GetMeshEditorNode::RenderContent()

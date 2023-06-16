@@ -1,4 +1,6 @@
-#start VERTEX
+#version 430
+
+#ifdef VERTEX
 
 layout (location = 0) in vec3 aPos;
   
@@ -10,7 +12,9 @@ void main()
     vertexColor = vec4(0.5, 0.0, 0.0, 1.0);
 }
 
-#start FRAGMENT
+#endif // VERTEX
+
+#ifdef FRAGMENT
 
 out vec4 FragColor;
   
@@ -20,3 +24,5 @@ void main()
 {
     FragColor = vertexColor;
 } 
+
+#endif // FRAGMENT

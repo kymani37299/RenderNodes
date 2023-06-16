@@ -1,14 +1,14 @@
 #pragma once
 
-#include "../Common.h"
-#include "../IDGen.h"
-
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <inttypes.h>
 #include <typeindex>
 #include <typeinfo>
+
+#include "../Common.h"
+#include "../IDGen.h"
 
 // DO NOT CHANGE ORDER OF VALUES
 // IT WILL AFFECT HOW WE LOAD OLD SAVE FILES
@@ -169,6 +169,8 @@ public:
     EditorNodeType GetType() const { return m_Type; }
     const std::vector<EditorNodePin>& GetPins() const { return m_Pins; }
     const std::vector<EditorNodePin>& GetCustomPins() const { return m_CustomPins; }
+
+    void RemovePin(PinID pinID);
 
     void Render();
     virtual void RenderPopups() {}

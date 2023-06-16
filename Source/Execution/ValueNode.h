@@ -47,8 +47,11 @@ struct BindTable
 		std::string Name;
 		Ptr<ValueNode<T>> Value;
 	};
-
 	std::vector<Binding<Texture*>> Textures;
+	std::vector<Binding<float>> Floats;
+	std::vector<Binding<Float2>> Float2s;
+	std::vector<Binding<Float3>> Float3s;
+	std::vector<Binding<Float4>> Float4s;
 };
 using BindTableValueNode = ValueNode<BindTable*>;
 

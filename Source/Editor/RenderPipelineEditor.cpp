@@ -48,6 +48,11 @@ void RenderPipelineEditor::Load(NodeGraph* nodeGraph)
     m_EditorContext = ImNode::CreateEditor(&config);
 
     m_NodeGraph = Ptr<NodeGraph>(nodeGraph);
+
+    m_NewNodeMenu = Ptr<NewNodeContextMenu>(new NewNodeContextMenu{ "New node menu", *nodeGraph });
+    m_NodeMenu = Ptr<NodeContextMenu>(new NodeContextMenu{ "Node menu", *nodeGraph });
+    m_LinkMenu = Ptr<LinkContextMenu>(new LinkContextMenu{ "Link menu", *nodeGraph });
+    m_PinMenu = Ptr<PinContextMenu>(new PinContextMenu{ "Pin menu", *nodeGraph });
 }
 
 void RenderPipelineEditor::UpdateEditor()
@@ -92,11 +97,7 @@ void RenderPipelineEditor::UpdateEditor()
         {
             if (ImNode::AcceptNewItem())
             {
-                m_NewNodePinID = pin.Get();
-
-                ImNode::Suspend();
-                ImGui::OpenPopup("New Node Context Menu");
-                ImNode::Resume();
+                m_NewNodeMenu->Open(pin.Get());
             }
         }
     }
@@ -127,16 +128,10 @@ void RenderPipelineEditor::UpdateEditor()
     }
     ImNode::EndDelete();
 
-    ImNode::Suspend();
-    if (ImNode::ShowNodeContextMenu(&m_ContextNodeID)) ImGui::OpenPopup("Node Context Menu");
-    else if (ImNode::ShowPinContextMenu(&m_ContextPinID)) ImGui::OpenPopup("Pin Context Menu");
-    else if (ImNode::ShowLinkContextMenu(&m_ContextLinkID)) ImGui::OpenPopup("Link Context Menu");
-    else if (ImNode::ShowBackgroundContextMenu())
-    {
-        ImGui::OpenPopup("New Node Context Menu");
-        m_ContextLinkID = 0;
-    }
-    ImNode::Resume();
+    if (ImNode::ShowNodeContextMenu(&node)) m_NodeMenu->Open(node.Get());
+    else if (ImNode::ShowPinContextMenu(&pin)) m_PinMenu->Open(pin.Get());
+    else if (ImNode::ShowLinkContextMenu(&link)) m_LinkMenu->Open(link.Get());
+    else if (ImNode::ShowBackgroundContextMenu()) m_NewNodeMenu->Open(0);
 }
 
 void RenderPipelineEditor::RenderEditor()
@@ -154,179 +149,12 @@ void RenderPipelineEditor::RenderEditor()
     m_NodeGraph->ForEachLink(renderLink);
 }
 
-template<typename T>
-static bool IsCompatible(const EditorNodePin& nodePin)
-{
-    if (nodePin.Type == PinType::Invalid)
-        return true;
-
-    EditorNode* node = EditorNode::GetClassRepresent<T>();
-	EditorNodePin targetPin;
-	for (const auto& pin : node->GetPins())
-	{
-		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
-		{
-			targetPin = pin;
-			break;
-		}
-	}
-    return targetPin.Type != PinType::Invalid;
-}
-
 void RenderPipelineEditor::RenderContextMenus()
 {
-    ImNode::Suspend();
-
-    if (ImGui::BeginPopup("New Node Context Menu"))
-    {
-        EditorNode* newNode = nullptr;
-
-        EditorNodePin nodePin;
-        if (m_NewNodePinID) 
-            nodePin = m_NodeGraph->GetPinByID(m_NewNodePinID);
-
-#define ADD_NODE(Text, NodeType)  if (IsCompatible<NodeType>(nodePin) && ImGui::MenuItem(Text)) newNode = new NodeType()
-
-        if (ImGui::BeginMenu("Constants"))
-		{
-            ADD_NODE("Bool", BoolEditorNode);
-            ADD_NODE("Float", FloatEditorNode);
-            ADD_NODE("Float2", Float2EditorNode);
-            ADD_NODE("Float3", Float3EditorNode);
-            ADD_NODE("Float4", Float4EditorNode);
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Assign variable"))
-        {
-            ADD_NODE("Bool", AsignBoolEditorNode);
-            ADD_NODE("Float", AsignFloatEditorNode);
-            ADD_NODE("Float2", AsignFloat2EditorNode);
-            ADD_NODE("Float3", AsignFloat3EditorNode);
-            ADD_NODE("Float4", AsignFloat4EditorNode);
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Get variable"))
-		{
-            ADD_NODE("Bool", VarBoolEditorNode);
-            ADD_NODE("Float", VarFloatEditorNode);
-            ADD_NODE("Float2", VarFloat2EditorNode);
-            ADD_NODE("Float3", VarFloat3EditorNode);
-            ADD_NODE("Float4", VarFloat4EditorNode);
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Operator"))
-        {
-            ADD_NODE("Bool", BoolBinaryOperatorEditorNode);
-            ADD_NODE("Float", FloatBinaryOperatorEditorNode);
-            ADD_NODE("Float2", Float2BinaryOperatorEditorNode);
-            ADD_NODE("Float3", Float3BinaryOperatorEditorNode);
-            ADD_NODE("Float4", Float4BinaryOperatorEditorNode);
-            ImGui::EndMenu();
-        }
-		if (ImGui::BeginMenu("Compare"))
-		{
-			ADD_NODE("Float", FloatComparisonOperatorEditorNode);
-			ImGui::EndMenu();
-		}
-
-        if (ImGui::BeginMenu("Create"))
-        {
-            ADD_NODE("Texture", CreateTextureEditorNode);
-            ADD_NODE("Float2", CreateFloat2EditorNode);
-            ADD_NODE("Float3", CreateFloat3EditorNode);
-            ADD_NODE("Float4", CreateFloat4EditorNode);
-            ImGui::EndMenu();
-        }
-
-		if (ImGui::BeginMenu("Split"))
-		{
-			ADD_NODE("Float2", SplitFloat2EditorNode);
-			ADD_NODE("Float3", SplitFloat3EditorNode);
-			ADD_NODE("Float4", SplitFloat4EditorNode);
-			ImGui::EndMenu();
-		}
-
-        if (ImGui::BeginMenu("Load"))
-        {
-            ADD_NODE("Texture", LoadTextureEditorNode);
-            ADD_NODE("Shader", LoadShaderEditorNode);
-            ADD_NODE("Mesh", LoadMeshEditorNode);
-            ImGui::EndMenu();
-        }
-
-		if (ImGui::BeginMenu("Get"))
-		{
-            ADD_NODE("Texture", GetTextureEditorNode);
-            ADD_NODE("Shader", GetShaderEditorNode);
-            ADD_NODE("Mesh", GetMeshEditorNode);
-            ADD_NODE("Cube mesh", GetCubeMeshEditorNode);
-			ImGui::EndMenu();
-		}
-
-        if (ImGui::BeginMenu("Render"))
-        {
-            ADD_NODE("Clear framebuffer", ClearRenderTargetEditorNode);
-            ADD_NODE("Present texture", PresentTextureEditorNode);
-            ADD_NODE("Draw mesh", DrawMeshEditorNode);
-            ImGui::EndMenu();
-        }
-
-        ADD_NODE("BindTable", BindTableEditorNode);
-        ADD_NODE("If condition", IfEditorNode);
-        ADD_NODE("Print", PrintEditorNode);
-
-        if (newNode)
-        {
-            m_NodeGraph->AddNode(newNode);
-            ImNode::SetNodePosition(newNode->GetID(), ImNode::ScreenToCanvas(ImGui::GetMousePos()));
-
-            if (m_NewNodePinID)
-            {
-                const auto nodePin = m_NodeGraph->GetPinByID(m_NewNodePinID);
-                EditorNodePin targetPin;
-                for (const auto& pin : newNode->GetPins())
-                {
-                    if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
-                    {
-                        targetPin = pin;
-                        break;
-                    }
-                }
-
-                if (targetPin.Type != PinType::Invalid)
-                {
-                    const PinID startPin = nodePin.IsInput ? targetPin.ID : nodePin.ID;
-                    const PinID endPin = nodePin.IsInput ? nodePin.ID : targetPin.ID;
-                    m_NodeGraph->AddLink({ IDGen::Generate(), startPin, endPin });
-                }
-            }
-
-			// TODO: This is also not good solution, we will keep the node context if the user cancels the new node operation
-			m_NewNodePinID = 0;
-        }
-
-        ImGui::EndPopup();
-    }
-
-    if (ImGui::BeginPopup("Node Context Menu"))
-    {
-        ImGui::Text("Node context - TODO");
-        ImGui::EndPopup();
-    }
-
-	if (ImGui::BeginPopup("Pin Context Menu"))
-	{
-		ImGui::Text("Pin context - TODO");
-        ImGui::EndPopup();
-	}
-
-	if (ImGui::BeginPopup("Link Context Menu"))
-	{
-		ImGui::Text("Link context - TODO");
-        ImGui::EndPopup();
-	}
-
-    ImNode::Resume();
+    m_NewNodeMenu->Draw();
+    m_NodeMenu->Draw();
+    m_LinkMenu->Draw();
+    m_PinMenu->Draw();
 }
 
 void RenderPipelineEditor::RenderNodePopups()

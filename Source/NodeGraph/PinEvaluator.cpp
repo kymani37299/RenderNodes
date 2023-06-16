@@ -435,7 +435,19 @@ BindTableValueNode* PinEvaluator::EvaluateBindTable(BindTableEditorNode* node)
 		switch (pin.Type)
 		{
 		case PinType::Texture:
-			bindTable->Textures.push_back(BindTable::Binding<Texture*>{ pin.Label, Ptr<TextureValueNode>(EvaluateTexture(m_NodeGraph.GetPinByID(pin.ID))) });
+			bindTable->Textures.push_back(BindTable::Binding<Texture*>{ pin.Label, Ptr<TextureValueNode>(EvaluateTexture(pin)) });
+			break;
+		case PinType::Float:
+			bindTable->Floats.push_back(BindTable::Binding<float>{pin.Label, Ptr<FloatValueNode>(EvaluateFloat(pin))});
+			break;
+		case PinType::Float2:
+			bindTable->Float2s.push_back(BindTable::Binding<Float2>{pin.Label, Ptr<Float2ValueNode>(EvaluateFloat2(pin))});
+			break;
+		case PinType::Float3:
+			bindTable->Float3s.push_back(BindTable::Binding<Float3>{pin.Label, Ptr<Float3ValueNode>(EvaluateFloat3(pin))});
+			break;
+		case PinType::Float4:
+			bindTable->Float4s.push_back(BindTable::Binding<Float4>{pin.Label, Ptr<Float4ValueNode>(EvaluateFloat4(pin))});
 			break;
 		default:
 			NOT_IMPLEMENTED;

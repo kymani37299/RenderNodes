@@ -4,6 +4,7 @@
 
 #include "../Common.h"
 #include "../NodeGraph/NodeGraph.h"
+#include "Drawing/EditorContextMenu.h"
 
 class RenderPipelineEditor
 {
@@ -32,12 +33,10 @@ private:
 private:
     ImNode::EditorContext* m_EditorContext = nullptr;
 
-    // Probably can be deleted
-    ImNode::NodeId m_ContextNodeID;
-    ImNode::PinId m_ContextPinID;
-    ImNode::LinkId m_ContextLinkID;
-
-    PinID m_NewNodePinID = 0;
+    Ptr<NewNodeContextMenu> m_NewNodeMenu;
+    Ptr<NodeContextMenu> m_NodeMenu;
+    Ptr<LinkContextMenu> m_LinkMenu;
+    Ptr<PinContextMenu> m_PinMenu;
 
     Ptr<NodeGraph> m_NodeGraph;
 };

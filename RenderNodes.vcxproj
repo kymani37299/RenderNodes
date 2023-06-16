@@ -102,6 +102,7 @@
     <ClCompile Include="External\ImGUI\imgui_widgets.cpp" />
     <ClCompile Include="External\NativeFileDialog\src\nfd_win.cpp" />
     <ClCompile Include="Source\App.cpp" />
+    <ClCompile Include="Source\Editor\Drawing\EditorContextMenu.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
     <ClCompile Include="Source\Editor\RenderPipelineEditor.cpp" />
@@ -138,6 +139,7 @@
     <ClInclude Include="External\ScopeGuard\ScopeGuard.h" />
     <ClInclude Include="Source\App.h" />
     <ClInclude Include="Source\Common.h" />
+    <ClInclude Include="Source\Editor\Drawing\EditorContextMenu.h" />
     <ClInclude Include="Source\Editor\EditorNode.h" />
     <ClInclude Include="Source\Editor\EvaluationEditorNode.h" />
     <ClInclude Include="Source\Editor\ExecutorEditorNode.h" />

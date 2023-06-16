@@ -1,5 +1,7 @@
 #include "ExecutorNode.h"
 
+#include <glm/gtc/type_ptr.hpp>
+
 #include "../Common.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
@@ -16,10 +18,17 @@ namespace ExecutionPrivate
 	{
 		if (!condition)
 		{
-			std::cout << "[" << nodeName << "] " << msg << std::endl;
+			std::cout << "[WARN] " << "[" << nodeName << "] " << msg << std::endl;
 		}
 	}
+
+	void Warning(const std::string& nodeName, const std::string& msg)
+	{
+		Warning(false, nodeName, msg);
+	}
 }
+
+using namespace ExecutionPrivate;
 
 namespace
 {
@@ -75,15 +84,17 @@ namespace
 		return uniformIndex != -1;
 	}
 
-	bool TableBind(ExecuteContext& context, Shader* shader, BindTable* bindTable)
+	void TableBind(ExecuteContext& context, Shader* shader, BindTable* bindTable)
 	{
-		if (!bindTable) return false;
-
-		for (unsigned i = 0; i < bindTable->Textures.size(); i++)
+		if (!bindTable)
 		{
-			const auto& binding = bindTable->Textures[i];
+			return;
+		}
+
+		for(const auto& binding : bindTable->Textures)
+		{
 			Texture* texture = binding.Value.get() ? binding.Value->GetValue(context) : (Texture*) nullptr;
-			if (!texture) return false;
+			if (!texture) continue;
 
 			unsigned textureSlot;
 			if (GetUniformIndex(shader, binding.Name, textureSlot))
@@ -91,8 +102,71 @@ namespace
 				GL_CALL(glActiveTexture(GL_TEXTURE0 + textureSlot));
 				GL_CALL(glBindTexture(GL_TEXTURE_2D, texture->TextureHandle));
 			}
+			else
+			{
+				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+			}
 		}
-		return true;
+
+		for (const auto& binding : bindTable->Floats)
+		{
+			const float value = binding.Value.get() ? binding.Value->GetValue(context) : 0.0f;
+
+			unsigned uniformSlot;
+			if (GetUniformIndex(shader, binding.Name, uniformSlot))
+			{
+				GL_CALL(glUniform1f(uniformSlot, value));
+			}
+			else
+			{
+				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+			}
+		}
+
+		for (const auto& binding : bindTable->Float2s)
+		{
+			const Float2 value = binding.Value.get() ? binding.Value->GetValue(context) : Float2{};
+
+			unsigned uniformSlot;
+			if (GetUniformIndex(shader, binding.Name, uniformSlot))
+			{
+				GL_CALL(glUniform2fv(uniformSlot, 1, glm::value_ptr(value)));
+			}
+			else
+			{
+				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+			}
+		}
+
+		for (const auto& binding : bindTable->Float3s)
+		{
+			const Float3 value = binding.Value.get() ? binding.Value->GetValue(context) : Float3{};
+
+			unsigned uniformSlot;
+			if (GetUniformIndex(shader, binding.Name, uniformSlot))
+			{
+				GL_CALL(glUniform3fv(uniformSlot, 1, glm::value_ptr(value)));
+			}
+			else
+			{
+				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+			}
+		}
+
+		for (const auto& binding : bindTable->Float4s)
+		{
+			const Float4 value = binding.Value.get() ? binding.Value->GetValue(context) : Float4{};
+
+			unsigned uniformSlot;
+			if (GetUniformIndex(shader, binding.Name, uniformSlot))
+			{
+				GL_CALL(glUniform4fv(uniformSlot, 1, glm::value_ptr(value)));
+			}
+			else
+			{
+				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+			}
+		}
 	}
 
 	void TableUnbind(Shader* shader, BindTable* bindTable)
@@ -111,8 +185,6 @@ namespace
 		}
 	}
 }
-
-using namespace ExecutionPrivate;
 
 void IfExecutorNode::Execute(ExecuteContext& context)
 {
@@ -244,12 +316,7 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 	// Bindings
 	BindTable* bindTable = nullptr;
 	if (m_BindTable) bindTable = m_BindTable->GetValue(context);
-	
-	if (!TableBind(context, shader, bindTable))
-	{
-		Failure("DrawMeshExecutorNode", "Failed to bind BindTable!");
-		context.Failure = true;
-	}
+	TableBind(context, shader, bindTable);
 
 	GL_CALL(glDrawElements(GL_TRIANGLES, mesh->NumPrimitives, GL_UNSIGNED_INT, 0));
 

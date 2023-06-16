@@ -17,11 +17,15 @@ public:
 
     void RemoveNode(NodeID nodeID);
     void RemoveLink(LinkID linkID);
+    void RemovePin(PinID pinID);
 
 	EditorNodePin GetPinByID(PinID pinID) const;
+    EditorNode* GetPinOwner(PinID pinID) const;
+    bool IsCustomPin(PinID pinID) const;
+
     PinID GetInputPinFromOutput(PinID outputPinID) const;
     PinID GetOutputPinForInput(PinID inputPinID) const;
-    EditorNode* GetPinOwner(PinID pinID) const;
+
 
     OnStartEditorNode* GetOnStartNode() const;
     OnUpdateEditorNode* GetOnUpdateNode() const;

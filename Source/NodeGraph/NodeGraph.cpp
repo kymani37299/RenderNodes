@@ -61,6 +61,24 @@ void NodeGraph::RemoveLink(LinkID linkID)
     m_Links.erase(linkID);
 }
 
+void NodeGraph::RemovePin(PinID pinID)
+{
+    // Also remove all links that were attached to this pin
+	std::vector<LinkID> linksToRemove;
+	for (const auto& it : m_Links)
+	{
+		const auto& link = it.second;
+		if (link.Start == pinID || link.End == pinID)
+			linksToRemove.push_back(link.ID);
+	}
+
+	for (const LinkID& linkID : linksToRemove)
+		RemoveLink(linkID);
+
+    EditorNode* node = GetPinOwner(pinID);
+    node->RemovePin(pinID);
+}
+
 PinID NodeGraph::GetInputPinFromOutput(PinID outputPinID) const
 {
     for (const auto& it : m_Links)
@@ -116,6 +134,19 @@ EditorNode* NodeGraph::GetPinOwner(PinID pinID) const
 		}
     }
     return nullptr;
+}
+
+bool NodeGraph::IsCustomPin(PinID pinID) const
+{
+    for (const auto& it : m_Nodes)
+    {
+        const auto& node = it.second;
+        for (const auto& pin : node->GetCustomPins())
+        {
+            if (pinID == pin.ID) return true;
+        }
+    }
+    return false;
 }
 
 OnStartEditorNode* NodeGraph::GetOnStartNode() const

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EditorNode.h"
+#include "Drawing/EditorContextMenu.h"
 
 class EvaluationEditorNode : public EditorNode
 {
@@ -189,12 +190,31 @@ class BinaryOperatorEditorNode : public EvaluationEditorNode
 		}
 		return "";
 	}
+
+	static const std::vector<std::string> GetOperatorOptions(BinaryOperatorType opType)
+	{
+		static const std::vector<std::string> noOperators = {};
+		static const std::vector<std::string> arithmeticOperators = { "+", "-", "*", "/" };
+		static const std::vector<std::string> comparisonOperators = { "==", "!=", ">", "<", ">=", "<=" };
+		static const std::vector<std::string> logicOperators = { "AND", "OR", "XOR" };
+
+		const std::vector<std::string>* operators = nullptr;
+		switch (opType)
+		{
+		case BinaryOperatorType::Arithemtic: return arithmeticOperators;
+		case BinaryOperatorType::Logic: return logicOperators;
+		case BinaryOperatorType::Comparison: return comparisonOperators;
+		default:
+			NOT_IMPLEMENTED;
+		}
+		return noOperators;
+	}
+
 public:
 	BinaryOperatorEditorNode(EditorNodeType nodeType, BinaryOperatorType opType, PinType pinType, PinType outputPinType):
 		EvaluationEditorNode(ToString(pinType) + " operator", nodeType),
-		m_OpType(opType),
-		m_Op(GetDefaultOperation(opType)),
-		m_SelectionBoxID("Binary operator " + std::to_string(GetID()))
+		m_OperatorSelector("Binary operator " + std::to_string(GetID()), m_Op, GetOperatorOptions(opType)),
+		m_Op(GetDefaultOperation(opType))
 	{
 		m_Apin = AddPin(EditorNodePin::CreateInputPin("A", pinType));
 		m_Bpin = AddPin(EditorNodePin::CreateInputPin("B", pinType));
@@ -215,11 +235,8 @@ private:
 	unsigned m_Apin;
 	unsigned m_Bpin;
 
-	BinaryOperatorType m_OpType;
+	EditorComboBox m_OperatorSelector;
 	std::string m_Op;
-
-	std::string m_SelectionBoxID;
-	bool m_ShowSelectionBox = false;
 };
 
 template<EditorNodeType nodeType, BinaryOperatorType opType, PinType pinType, PinType outputPinType>
@@ -298,14 +315,21 @@ class BindTableEditorNode : public EvaluationEditorNode
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 	BindTableEditorNode():
-		EvaluationEditorNode("Bind table", EditorNodeType::BindTable)
+		EvaluationEditorNode("Bind table", EditorNodeType::BindTable),
+		m_TypeSelection("Bind table type selector " + std::to_string(GetID()), m_TypeValue, { "Texture", "Float", "Float2", "Float3", "Float4" })
+
 	{
 		AddPin(EditorNodePin::CreateOutputPin("Table", PinType::BindTable));
 	}
+
+	virtual void RenderPopups() override;
 
 protected:
 	virtual void RenderContent() override;
 
 private:
+	EditorComboBox m_TypeSelection;
+	std::string m_TypeValue = "Texture";
+	
 	std::string m_InputName;
 };

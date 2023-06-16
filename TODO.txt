@@ -1,0 +1,27 @@
+Bugs:
+- Vertex normals and UVs are incorrect
+
+Editor functionality:
+- Copy paste nodes
+- Run on the side and runtime edit of the nodes
+- Variable selector
+
+Editor appearence:
+- Bool node too red ?
+
+Node:
+- Agregate (function)
+- Loop nodes
+- ForEach SceneObject in Scene
+
+Render:
+
+Execution:
+- Clear console on start
+- Do not print continiously same warning messages
+
+Code:
+- Move ImGuiInputText into Drawing
+
+Examples:
+- Cleanup tests

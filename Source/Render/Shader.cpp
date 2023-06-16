@@ -83,94 +83,103 @@ static void ReplaceAll(std::string& str, const std::string& from, const std::str
 	}
 }
 
-static std::string GetPathWitoutFile(const std::string& path)
+static void DecomposePath(const std::string& path, std::string& pathRoot, std::string& fileName)
 {
-	return path.substr(0, 1 + path.find_last_of("\\/"));
+	pathRoot = path.substr(0, 1 + path.find_last_of("\\/"));
+	fileName = path.substr(path.find_last_of("/\\") + 1);
 }
 
-Ptr<Shader> Shader::Compile(const std::string& path)
+static bool ReadShaderFile(std::string& outputCode, const std::string& includeRoot, const std::string includePath)
 {
-	const std::string includeRoot = GetPathWitoutFile(path);
-
-	std::string code = "";
-	GLenum type = 0;
-	
 	std::vector<std::string> shaderContent;
-
-	if (!ReadFile(path, shaderContent))
+	if (!ReadFile(includeRoot + includePath, shaderContent))
 	{
-		return nullptr;
+		std::cout << "[Shader compiler] Failed to load shader file: " << includeRoot << includePath << std::endl;
+		return false;
 	}
 
-	std::set<std::string> loadedFiles = {};
-
-	std::vector<unsigned> shaderModules;
-	for (size_t i = 0; i < shaderContent.size(); i++)
+	for (const std::string& line : shaderContent)
 	{
-		std::string& line = shaderContent[i];
-
-		GLenum next_type = MacroToShaderType(line);
-		if (next_type != 0)
-		{
-			if (!code.empty())
-			{
-				unsigned shaderModule = CompileShader(type, code.c_str());
-				if (shaderModule == 0) return nullptr;
-				shaderModules.push_back(shaderModule);
-			}
-			code = "#version 430\n";
-			type = next_type;
-			continue;
-		}
-
-		if (type == 0) continue; // TODO: Add common code
-
+		// Include directive
 		if (line.find("#include") != std::string::npos)
 		{
+			// TODO: Rework finding file name in path
 			std::string fileName = line;
 			ReplaceAll(fileName, "#include", "");
 			ReplaceAll(fileName, " ", "");
 			ReplaceAll(fileName, "\"", "");
 
-			if (loadedFiles.count(fileName)) continue;
-			loadedFiles.insert(fileName);
-
-			std::vector<std::string> _c;
-			if (!ReadFile(includeRoot + fileName, _c))
-			{
-				std::cout << "[Shader compilation error] " << GetTag(type) << " " << "Failed to include " << fileName <<  " in " << path << std::endl;
-			}
-			shaderContent.insert((shaderContent.begin() + (i + 1)), _c.begin(), _c.end());
+			if (!ReadShaderFile(outputCode, includeRoot, fileName))
+				return false;
+		}
+		else if (line.find("#version") != std::string::npos) // TODO: Read version from here
+		{
+			continue;
 		}
 		else
 		{
-			code.append(line + "\n");
+			outputCode.append(line + "\n");
 		}
 	}
+	return true;
+}
 
-	unsigned shaderModule = CompileShader(type, code.c_str());
-	if (shaderModule == 0) return nullptr;
-	shaderModules.push_back(shaderModule);
+Ptr<Shader> Shader::Compile(const std::string& path)
+{
+	std::string includeRoot, shaderFile;
+	DecomposePath(path, includeRoot, shaderFile);
 
-	if (shaderModules.size() == 0) return nullptr;
+	std::string shaderCode;
+	if (!ReadShaderFile(shaderCode, includeRoot, shaderFile))
+	{
+		std::cout << "[Shader compiler error] failed to compile shader" << std::endl;
+		return nullptr;
+	}
+
+	const std::string vertexCode = "#version 430\n#define VERTEX\n" + shaderCode;
+	unsigned vsModule = CompileShader(GL_VERTEX_SHADER, vertexCode.c_str());
+
+	const std::string fragmentCode = "#version 430\n#define FRAGMENT\n" + shaderCode;
+	unsigned fsModule = CompileShader(GL_FRAGMENT_SHADER, fragmentCode.c_str());
+
+	if (!vsModule || !fsModule)
+	{
+		std::cout << "[Shader compiler error] failed to compile shader" << std::endl;
+		return nullptr;
+	}
 
 	Shader* shader = new Shader{};
 	GL_CALL(shader->Handle = glCreateProgram());
-
-	for (unsigned sm : shaderModules) { GL_CALL(glAttachShader(shader->Handle, sm)); }
+	GL_CALL(glAttachShader(shader->Handle, vsModule));
+	GL_CALL(glAttachShader(shader->Handle, fsModule));
 	GL_CALL(glLinkProgram(shader->Handle));
 
 	GLint validLinking;
 	GL_CALL(glGetProgramiv(shader->Handle, GL_LINK_STATUS, (int*)&validLinking));
+	if (!validLinking)
+	{
+		std::cout << "[Shader compiler error] failed to link shader" << std::endl;
+		return nullptr;
+	}
+
+	GLint validShader;
 	GL_CALL(glValidateProgram(shader->Handle));
+	GL_CALL(glGetProgramiv(shader->Handle, GL_VALIDATE_STATUS, (int*)&validShader));
+	if (!validShader)
+	{
+		std::cout << "[Shader compiler error] Shader not valid" << std::endl;
+		return nullptr;
+	}
 
 #ifdef _DEBUG
-	for (unsigned sm : shaderModules) { GL_CALL(glDetachShader(shader->Handle, sm)); }
+	GL_CALL(glDetachShader(shader->Handle, vsModule));
+	GL_CALL(glDetachShader(shader->Handle, fsModule));
 #else
-	for (unsigned sm : shaderModules) { GL_CALL(glDeleteShader(sm)); }
+	GL_CALL(glDeleteShader(vsModule));
+	GL_CALL(glDeleteShader(fsModule));
 #endif
 
-	return Ptr<Shader>(shader);
+	return Ptr<Shader>{shader};
 }
 
 Shader::~Shader()
