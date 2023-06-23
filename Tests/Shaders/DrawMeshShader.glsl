@@ -9,7 +9,6 @@ layout (location = 2) in vec3 in_Normal;
 out vec2 out_UV;
 out vec3 out_Normal;
 
-uniform float Scale;
 uniform float Angle;
 
 mat4 rotationMatrix(vec3 axis, float angle)
@@ -27,8 +26,7 @@ mat4 rotationMatrix(vec3 axis, float angle)
 
 void main()
 {
-    vec3 scaledPosition = in_Pos * Scale;
-    gl_Position = vec4(scaledPosition, 1.0f) * rotationMatrix(vec3(0.0f, 1.0f, 0.0f), Angle);
+    gl_Position = vec4(in_Pos * 0.1, 1.0f) * rotationMatrix(vec3(0.0f, 1.0f, 0.0f), Angle);
     out_UV = in_UV;
     out_Normal = in_Normal;
 }
@@ -46,7 +44,7 @@ uniform sampler2D Albedo;
 
 void main()
 {
-    FragColor = vec4(out_UV, 0.0f ,1.0f);
+    FragColor = texture(Albedo, out_UV);
 } 
 
 #endif // FRAGMENT

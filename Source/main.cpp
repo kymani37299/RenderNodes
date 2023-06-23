@@ -2,7 +2,7 @@
 
 int main()
 {
-	App app;
-	app.Run();
+	App::Get()->Run();
+	App::Destroy();
 	return 0;
 }

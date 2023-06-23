@@ -4,6 +4,7 @@
 
 #include "../Common.h"
 #include "../Util/FileDialog.h"
+#include "Drawing/EditorWidgets.h"
 #include "RenderPipelineEditor.h"
 
 static void DrawPin(const EditorNodePin& pin)
@@ -20,19 +21,6 @@ static void DrawPinLabel(const EditorNodePin& pin)
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)GetPinColor(pin.Type));
     ImGui::Text(pin.Label.c_str());
     ImGui::PopStyleColor();
-}
-
-static void ImGuiInputText(const char* label, std::string& text)
-{
-	constexpr unsigned BUF_SIZE = 50;
-	char buf[BUF_SIZE];
-	strcpy_s(buf, text.c_str());
-
-	ImGui::SetNextItemWidth(150.0f);
-	if (ImGui::InputText(label, buf, BUF_SIZE))
-	{
-		text = std::string{ buf };
-	}
 }
 
 EditorNodePin EditorNodePin::CreateInputPin(const std::string& label, PinType type)
@@ -65,6 +53,8 @@ EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
 
 void EditorNode::RemovePin(PinID pinID)
 {
+    // TODO: We also need to remove all links that are with this pin
+
 	for (unsigned i = 0; i < m_Pins.size(); i++)
 	{
 		const auto& pin = m_Pins[i];
@@ -195,6 +185,11 @@ void BoolEditorNode::RenderContent()
     ImGui::Checkbox("", &m_Value);
 }
 
+void StringEditorNode::RenderContent()
+{
+    EditorWidgets::InputText("Value", m_Value);
+}
+
 void FloatNEditorNode::RenderContent()
 {
     const std::string valueNames[] = { "X", "Y", "Z", "W" };
@@ -208,45 +203,29 @@ void FloatNEditorNode::RenderContent()
 
 void BinaryOperatorEditorNode::RenderContent()
 {
-    if (ImGui::Button(m_Op.c_str()))
-    {
-        m_OperatorSelector.Open();
-    }
+    m_OperatorSelector.DrawBox();
 }
 
 void BinaryOperatorEditorNode::RenderPopups()
 {
-    m_OperatorSelector.Draw();
-}
-
-void AsignVariableEditorNode::RenderContent()
-{
-	ExecutionEditorNode::RenderContent();
-    ImGuiInputText("Name", m_Name);
-}
-
-void VariableEditorNode::RenderContent()
-{
-    ImGuiInputText("", m_VariableName);
+    m_OperatorSelector.DrawSelectionMenu();
 }
 
 void CreateTextureEditorNode::RenderContent()
 {
     ExecutionEditorNode::RenderContent();
 
-    ImGuiInputText("Name", m_Name);
-
     ImGui::SetNextItemWidth(50.0f);
     ImGui::DragInt("Width", &m_Width, 1, 1);
     ImGui::SetNextItemWidth(50.0f);
     ImGui::DragInt("Height", &m_Height, 1, 1);
     ImGui::Checkbox("FrameBuffer", &m_Framebuffer);
+    ImGui::Checkbox("DepthStencil", &m_DepthStencil);
 }
 
 void NameAndPathExecutionEditorNode::RenderContent()
 {
 	ExecutionEditorNode::RenderContent();
-	ImGuiInputText("Name", m_Name);
 	if (ImGui::Button("Select file"))
 	{
 		std::string texPath;
@@ -270,7 +249,7 @@ void NameAndPathExecutionEditorNode::RenderContent()
 void BindTableEditorNode::RenderContent()
 {
     ImGui::Text("Binding name");
-    ImGuiInputText("", m_InputName);
+    EditorWidgets::InputText("", m_InputName);
     ImGui::Dummy({ 10.0f, 10.0f });
 
     bool canAdd = true;
@@ -291,10 +270,7 @@ void BindTableEditorNode::RenderContent()
         }
     }
 
-	if (ImGui::Button(m_TypeValue.c_str()))
-	{
-        m_TypeSelection.Open();
-	}
+    m_TypeSelection.DrawBox();
 
     if (!canAdd)
     {
@@ -326,7 +302,7 @@ void BindTableEditorNode::RenderContent()
 
 void BindTableEditorNode::RenderPopups()
 {
-    m_TypeSelection.Draw();
+    m_TypeSelection.DrawSelectionMenu();
 }
 
 void GetMeshEditorNode::RenderContent()
@@ -338,8 +314,6 @@ void GetMeshEditorNode::RenderContent()
     ImGui::Checkbox("Normals", &m_NormalBit);
     ImGui::Checkbox("Tangents", &m_TangentBit);
 }
-
-
 
 void GetCubeMeshEditorNode::RenderContent()
 {
@@ -355,4 +329,92 @@ void GetCubeMeshEditorNode::RenderContent()
 
 	ImGui::PopItemFlag();
 	ImGui::PopStyleVar();
+}
+
+void RenderStateEditorNode::RenderPopups()
+{
+    m_DepthTestModeCB.DrawSelectionMenu();
+}
+
+void RenderStateEditorNode::RenderContent()
+{
+    ImGui::Checkbox("Depth write", &m_DepthWrite);
+
+    ImGui::Text("Depth test");
+    ImGui::SameLine();
+    
+    m_DepthTestModeCB.DrawBox();
+}
+
+void PinEditorNode::RenderContent()
+{
+    EditorWidgets::InputText("Name", m_Name);
+}
+
+CustomEditorNode::CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph) :
+	ExecutionEditorNode(name, EditorNodeType::Custom, true, true),
+    m_Name(name),
+	m_NodeGraph(nodeGraph),
+    m_ParentGraph(parentGraph)
+{
+    RegeneratePins();
+}
+
+void CustomEditorNode::RegeneratePins()
+{
+    // Detect pins to add
+    std::vector<PinEditorNode*> pinsToAdd{};
+    const auto fn = [this, &pinsToAdd](EditorNode* node)
+    {
+        if (node->GetType() == EditorNodeType::Pin)
+        {
+            PinEditorNode* pinNode = static_cast<PinEditorNode*>(node);
+            if (m_NodePinMap.find(pinNode->GetID()) == m_NodePinMap.end())
+            {
+                pinsToAdd.push_back(pinNode);
+            }
+        }
+    };
+    m_NodeGraph->ForEachNode(fn);
+
+    // Detect pins to delete
+    std::vector <std::pair<NodeID, PinID>> toDelete{};
+    for (const auto& it : m_NodePinMap)
+    {
+        const NodeID nodeID = it.first;
+        const PinID pinID = it.second;
+        if (!m_NodeGraph->ContainsNode(nodeID))
+        {
+            toDelete.push_back(std::make_pair(nodeID, pinID));
+        }
+	}
+
+    // Delete pins
+    for (const auto& it : toDelete)
+    {
+        const NodeID nodeID = it.first;
+        const PinID pinID = it.second;
+
+        if (m_ParentGraph)
+            m_ParentGraph->RemovePin(pinID);
+        else
+            RemovePin(pinID);
+
+        m_NodePinMap.erase(nodeID);
+        m_PinNodeMap.erase(pinID);
+    }
+
+    // Add new pins
+    for (const auto pinNode : pinsToAdd)
+    {
+        const EditorNodePin& pin = pinNode->GetPin();
+
+		EditorNodePin pinToAdd;
+		if (pin.IsInput) pinToAdd = EditorNodePin::CreateOutputPin(pinNode->GetName(), pin.Type);
+		else pinToAdd = EditorNodePin::CreateInputPin(pinNode->GetName(), pin.Type);
+
+		AddCustomPin(pinToAdd);
+		m_PinNodeMap[pinToAdd.ID] = pinNode->GetID();
+		m_NodePinMap[pinNode->GetID()] = pinToAdd.ID;
+    }
 }

@@ -103,12 +103,14 @@
     <ClCompile Include="External\NativeFileDialog\src\nfd_win.cpp" />
     <ClCompile Include="Source\App.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorContextMenu.cpp" />
+    <ClCompile Include="Source\Editor\Drawing\EditorWidgets.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
     <ClCompile Include="Source\Editor\RenderPipelineEditor.cpp" />
     <ClCompile Include="Source\Execution\ExecutorNode.cpp" />
     <ClCompile Include="Source\Execution\RenderPipelineExecutor.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\NodeGraph\NodeGraphCommands.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphCompiler.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphSerializer.cpp" />
     <ClCompile Include="Source\NodeGraph\PinEvaluator.cpp" />
@@ -140,6 +142,7 @@
     <ClInclude Include="Source\App.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorContextMenu.h" />
+    <ClInclude Include="Source\Editor\Drawing\EditorWidgets.h" />
     <ClInclude Include="Source\Editor\EditorNode.h" />
     <ClInclude Include="Source\Editor\EvaluationEditorNode.h" />
     <ClInclude Include="Source\Editor\ExecutorEditorNode.h" />
@@ -149,7 +152,9 @@
     <ClInclude Include="Source\Editor\RenderPipelineEditor.h" />
     <ClInclude Include="Source\Execution\ExecutorNode.h" />
     <ClInclude Include="Source\Execution\RenderPipelineExecutor.h" />
+    <ClInclude Include="Source\NodeGraph\NodeGraphCommands.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraphCompiler.h" />
+    <ClInclude Include="Source\NodeGraph\NodeGraphContext.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h" />
     <ClInclude Include="Source\IDGen.h" />
     <ClInclude Include="Source\NodeGraph\PinEvaluator.h" />

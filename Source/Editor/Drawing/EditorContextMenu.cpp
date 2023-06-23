@@ -1,7 +1,9 @@
 #include "EditorContextMenu.h"
 
 #include "../../Common.h"
+#include "../../App.h"
 #include "../../NodeGraph/NodeGraph.h"
+#include "../../NodeGraph/NodeGraphCommands.h"
 
 void EditorContextMenu::Draw()
 {
@@ -22,6 +24,19 @@ void EditorContextMenu::Draw()
 	ImNode::Resume();
 }
 
+void EditorComboBox::DrawBox()
+{
+	if (ImGui::Button(m_ValueRef.c_str()))
+	{
+		EditorContextMenu::Open();
+	}
+}
+
+void EditorComboBox::DrawSelectionMenu()
+{
+	EditorContextMenu::Draw();
+}
+
 void EditorComboBox::DrawContent()
 {
 	for (const std::string& value : m_Values)
@@ -33,8 +48,35 @@ void EditorComboBox::DrawContent()
 	}
 }
 
+static bool IsCustomNodeCompatible(const CustomEditorNode* node, const EditorNodePin& nodePin)
+{
+	if (nodePin.Type == PinType::Invalid)
+		return true;
+
+	EditorNodePin targetPin;
+	for (const auto& pin : node->GetPins())
+	{
+		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		{
+			targetPin = pin;
+			break;
+		}
+	}
+
+	for (const auto& pin : node->GetCustomPins())
+	{
+		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		{
+			targetPin = pin;
+			break;
+		}
+	}
+
+	return targetPin.Type != PinType::Invalid;
+}
+
 template<typename T>
-static bool IsCompatible(const EditorNodePin& nodePin)
+static bool IsCompatible_Impl(const EditorNodePin& nodePin)
 {
 	if (nodePin.Type == PinType::Invalid)
 		return true;
@@ -49,154 +91,254 @@ static bool IsCompatible(const EditorNodePin& nodePin)
 			break;
 		}
 	}
+
+	for (const auto& pin : node->GetCustomPins())
+	{
+		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		{
+			targetPin = pin;
+			break;
+		}
+	}
+
 	return targetPin.Type != PinType::Invalid;
 }
-#define ADD_NODE(Text, NodeType)  if (IsCompatible<NodeType>(nodePin) && ImGui::MenuItem(Text)) newNode = new NodeType()
+
+// Variadic template function, working thanks to u/IyeOnline https://www.reddit.com/r/cpp_questions/comments/14c4cxw/variadic_template_function_question/
+template<typename... Args>
+static bool IsCompatible(const EditorNodePin& nodePin)
+{
+	return (IsCompatible_Impl<Args>(nodePin) || ...);
+}
+
+#define BEGIN_MENU(Text, ...) if(IsCompatible<__VA_ARGS__>(nodePin) && ImGui::BeginMenu(Text))
+#define MENU_ITEM(Text, NodeType)  if (IsCompatible<NodeType>(nodePin) && ImGui::MenuItem(Text)) newNode = new NodeType()
+#define END_MENU() ImGui::EndMenu()
 
 void NewNodeContextMenu::DrawContent()
 {
 	EditorNode* newNode = nullptr;
-
+	
 	EditorNodePin nodePin;
-	if (m_DraggedPin) nodePin = m_NodeGraph.GetPinByID(m_DraggedPin);
+	if (m_DraggedPin) nodePin = m_CommandExecutor->GetNodeGraph()->GetPinByID(m_DraggedPin);
 
-	if (ImGui::BeginMenu("Constants"))
+	if (nodePin.Type == PinType::Invalid)
 	{
-		ADD_NODE("Bool", BoolEditorNode);
-		ADD_NODE("Float", FloatEditorNode);
-		ADD_NODE("Float2", Float2EditorNode);
-		ADD_NODE("Float3", Float3EditorNode);
-		ADD_NODE("Float4", Float4EditorNode);
-		ImGui::EndMenu();
-	}
-	if (ImGui::BeginMenu("Assign variable"))
-	{
-		ADD_NODE("Bool", AsignBoolEditorNode);
-		ADD_NODE("Float", AsignFloatEditorNode);
-		ADD_NODE("Float2", AsignFloat2EditorNode);
-		ADD_NODE("Float3", AsignFloat3EditorNode);
-		ADD_NODE("Float4", AsignFloat4EditorNode);
-		ImGui::EndMenu();
-	}
-	if (ImGui::BeginMenu("Get variable"))
-	{
-		ADD_NODE("Bool", VarBoolEditorNode);
-		ADD_NODE("Float", VarFloatEditorNode);
-		ADD_NODE("Float2", VarFloat2EditorNode);
-		ADD_NODE("Float3", VarFloat3EditorNode);
-		ADD_NODE("Float4", VarFloat4EditorNode);
-		ImGui::EndMenu();
-	}
-	if (ImGui::BeginMenu("Operator"))
-	{
-		ADD_NODE("Bool", BoolBinaryOperatorEditorNode);
-		ADD_NODE("Float", FloatBinaryOperatorEditorNode);
-		ADD_NODE("Float2", Float2BinaryOperatorEditorNode);
-		ADD_NODE("Float3", Float3BinaryOperatorEditorNode);
-		ADD_NODE("Float4", Float4BinaryOperatorEditorNode);
-		ImGui::EndMenu();
-	}
-	if (ImGui::BeginMenu("Compare"))
-	{
-		ADD_NODE("Float", FloatComparisonOperatorEditorNode);
-		ImGui::EndMenu();
+		const auto& copiedNodes = m_CommandExecutor->GetContext().CopiedNodes;
+		if (!copiedNodes.empty())
+		{
+			if (ImGui::MenuItem("Paste nodes"))
+			{
+				m_CommandExecutor->ExecuteCommand(new PasteNodesNodeGraphCommand{});
+			}
+			ImGui::Dummy({ 10, 10 });
+		}
 	}
 
-	if (ImGui::BeginMenu("Create"))
+	if (m_CustomNodeEditor)
 	{
-		ADD_NODE("Texture", CreateTextureEditorNode);
-		ADD_NODE("Float2", CreateFloat2EditorNode);
-		ADD_NODE("Float3", CreateFloat3EditorNode);
-		ADD_NODE("Float4", CreateFloat4EditorNode);
-		ImGui::EndMenu();
+		const auto pinsMenu = [this, &newNode, &nodePin](bool isInput)
+		{
+			bool excludeExecutionPin = false;
+			if (!isInput)
+			{
+				const auto fn = [&excludeExecutionPin](EditorNode* node)
+				{
+					if (node->GetType() == EditorNodeType::Pin)
+					{
+						PinEditorNode* pinNode = static_cast<PinEditorNode*>(node);
+						if (!pinNode->GetPin().IsInput && pinNode->GetPin().Type == PinType::Execution)
+							excludeExecutionPin = true;
+					}
+				};
+				m_CommandExecutor->GetNodeGraph()->ForEachNode(fn);
+			}
+
+			for (unsigned i = 1; i < EnumToInt(PinType::Count); i++)
+			{
+				const PinType pinType = IntToEnum<PinType>(i);
+				if (excludeExecutionPin && pinType == PinType::Execution)
+					continue;
+
+				if (nodePin.Type != PinType::Invalid && pinType != nodePin.Type)
+					continue;
+
+				const std::string menuLabel = ToString(pinType);
+				if (ImGui::MenuItem(menuLabel.c_str())) newNode = new PinEditorNode{ isInput, pinType };
+			}
+		};
+
+		if ((nodePin.Type == PinType::Invalid || nodePin.IsInput) && ImGui::BeginMenu("Input Pins"))
+		{
+			pinsMenu(false);
+			ImGui::EndMenu();
+		}
+
+		if ((nodePin.Type == PinType::Invalid || !nodePin.IsInput) && ImGui::BeginMenu("Output Pins"))
+		{
+			pinsMenu(true);
+			ImGui::EndMenu();
+		}
 	}
 
-	if (ImGui::BeginMenu("Split"))
+	BEGIN_MENU("Constants", BoolEditorNode, StringEditorNode, FloatEditorNode, Float2EditorNode, Float3EditorNode, Float4EditorNode)
 	{
-		ADD_NODE("Float2", SplitFloat2EditorNode);
-		ADD_NODE("Float3", SplitFloat3EditorNode);
-		ADD_NODE("Float4", SplitFloat4EditorNode);
-		ImGui::EndMenu();
+		MENU_ITEM("Bool", BoolEditorNode);
+		MENU_ITEM("String", StringEditorNode);
+		MENU_ITEM("Float", FloatEditorNode);
+		MENU_ITEM("Float2", Float2EditorNode);
+		MENU_ITEM("Float3", Float3EditorNode);
+		MENU_ITEM("Float4", Float4EditorNode);
+		END_MENU();
 	}
 
-	if (ImGui::BeginMenu("Load"))
+	BEGIN_MENU("Assign variable", AsignBoolEditorNode, AsignFloatEditorNode, AsignFloat2EditorNode, AsignFloat3EditorNode, AsignFloat4EditorNode)
 	{
-		ADD_NODE("Texture", LoadTextureEditorNode);
-		ADD_NODE("Shader", LoadShaderEditorNode);
-		ADD_NODE("Mesh", LoadMeshEditorNode);
-		ImGui::EndMenu();
+		MENU_ITEM("Bool", AsignBoolEditorNode);
+		MENU_ITEM("Float", AsignFloatEditorNode);
+		MENU_ITEM("Float2", AsignFloat2EditorNode);
+		MENU_ITEM("Float3", AsignFloat3EditorNode);
+		MENU_ITEM("Float4", AsignFloat4EditorNode);
+		END_MENU();
 	}
 
-	if (ImGui::BeginMenu("Get"))
+	BEGIN_MENU("Get variable", VarBoolEditorNode, VarFloatEditorNode, VarFloat2EditorNode, VarFloat3EditorNode, VarFloat4EditorNode)
 	{
-		ADD_NODE("Texture", GetTextureEditorNode);
-		ADD_NODE("Shader", GetShaderEditorNode);
-		ADD_NODE("Mesh", GetMeshEditorNode);
-		ADD_NODE("Cube mesh", GetCubeMeshEditorNode);
-		ImGui::EndMenu();
+		MENU_ITEM("Bool", VarBoolEditorNode);
+		MENU_ITEM("Float", VarFloatEditorNode);
+		MENU_ITEM("Float2", VarFloat2EditorNode);
+		MENU_ITEM("Float3", VarFloat3EditorNode);
+		MENU_ITEM("Float4", VarFloat4EditorNode);
+		END_MENU();
 	}
 
-	if (ImGui::BeginMenu("Render"))
+	BEGIN_MENU("Operator", BoolBinaryOperatorEditorNode, FloatBinaryOperatorEditorNode, Float2BinaryOperatorEditorNode, Float3BinaryOperatorEditorNode, Float4BinaryOperatorEditorNode)
 	{
-		ADD_NODE("Clear framebuffer", ClearRenderTargetEditorNode);
-		ADD_NODE("Present texture", PresentTextureEditorNode);
-		ADD_NODE("Draw mesh", DrawMeshEditorNode);
-		ImGui::EndMenu();
+		MENU_ITEM("Bool", BoolBinaryOperatorEditorNode);
+		MENU_ITEM("Float", FloatBinaryOperatorEditorNode);
+		MENU_ITEM("Float2", Float2BinaryOperatorEditorNode);
+		MENU_ITEM("Float3", Float3BinaryOperatorEditorNode);
+		MENU_ITEM("Float4", Float4BinaryOperatorEditorNode);
+		END_MENU();
 	}
 
-	ADD_NODE("BindTable", BindTableEditorNode);
-	ADD_NODE("If condition", IfEditorNode);
-	ADD_NODE("Print", PrintEditorNode);
+	BEGIN_MENU("Compare", FloatComparisonOperatorEditorNode)
+	{
+		MENU_ITEM("Float", FloatComparisonOperatorEditorNode);
+		END_MENU();
+	}
+
+
+	BEGIN_MENU("Create", CreateTextureEditorNode, CreateFloat2EditorNode, CreateFloat3EditorNode, CreateFloat4EditorNode)
+	{
+		MENU_ITEM("Texture", CreateTextureEditorNode);
+		MENU_ITEM("Float2", CreateFloat2EditorNode);
+		MENU_ITEM("Float3", CreateFloat3EditorNode);
+		MENU_ITEM("Float4", CreateFloat4EditorNode);
+		END_MENU();
+	}
+
+	BEGIN_MENU("Split", SplitFloat2EditorNode, SplitFloat3EditorNode, SplitFloat4EditorNode)
+	{
+		MENU_ITEM("Float2", SplitFloat2EditorNode);
+		MENU_ITEM("Float3", SplitFloat3EditorNode);
+		MENU_ITEM("Float4", SplitFloat4EditorNode);
+		END_MENU();
+	}
+
+	BEGIN_MENU("Load", LoadTextureEditorNode, LoadShaderEditorNode, LoadMeshEditorNode)
+	{
+		MENU_ITEM("Texture", LoadTextureEditorNode);
+		MENU_ITEM("Shader", LoadShaderEditorNode);
+		MENU_ITEM("Mesh", LoadMeshEditorNode);
+		END_MENU();
+	}
+
+	BEGIN_MENU("Get", GetTextureEditorNode, GetShaderEditorNode, GetMeshEditorNode, GetCubeMeshEditorNode)
+	{
+		MENU_ITEM("Texture", GetTextureEditorNode);
+		MENU_ITEM("Shader", GetShaderEditorNode);
+		MENU_ITEM("Mesh", GetMeshEditorNode);
+		MENU_ITEM("Cube mesh", GetCubeMeshEditorNode);
+		END_MENU();
+	}
+
+	BEGIN_MENU("Render", ClearRenderTargetEditorNode, PresentTextureEditorNode, DrawMeshEditorNode)
+	{
+		MENU_ITEM("Clear framebuffer", ClearRenderTargetEditorNode);
+		MENU_ITEM("Present texture", PresentTextureEditorNode);
+		MENU_ITEM("Draw mesh", DrawMeshEditorNode);
+		END_MENU();
+	}
+
+	MENU_ITEM("BindTable", BindTableEditorNode);
+	MENU_ITEM("RenderState", RenderStateEditorNode);
+	MENU_ITEM("If condition", IfEditorNode);
+	MENU_ITEM("Print", PrintEditorNode);
+
+	const auto& customNodes = *App::Get()->GetCustomNodes();
+	if (!customNodes.empty())
+	{
+		if (ImGui::BeginMenu("Custom"))
+		{
+			for (const auto& customNode : customNodes)
+			{
+				if (IsCustomNodeCompatible(customNode.get(), nodePin) && ImGui::MenuItem(customNode->GetName().c_str())) newNode = customNode->Instance(m_CommandExecutor->GetNodeGraph());
+			}
+
+			ImGui::EndMenu();
+		}
+	}
 
 	if (newNode)
 	{
-		m_NodeGraph.AddNode(newNode);
-		ImNode::SetNodePosition(newNode->GetID(), ImNode::ScreenToCanvas(ImGui::GetMousePos()));
-
-		if (nodePin.Type != PinType::Invalid)
-		{
-			EditorNodePin targetPin;
-			for (const auto& pin : newNode->GetPins())
-			{
-				if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
-				{
-					targetPin = pin;
-					break;
-				}
-			}
-
-			if (targetPin.Type != PinType::Invalid)
-			{
-				const PinID startPin = nodePin.IsInput ? targetPin.ID : nodePin.ID;
-				const PinID endPin = nodePin.IsInput ? nodePin.ID : targetPin.ID;
-				m_NodeGraph.AddLink({ IDGen::Generate(), startPin, endPin });
-			}
-		}
+		const auto nodePos = ImNode::ScreenToCanvas(ImGui::GetMousePos());
+		m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ newNode, {nodePos.x, nodePos.y}, m_DraggedPin });
 	}
 }
 
 void NodeContextMenu::DrawContent()
 {
 	ASSERT(m_NodeID);
-	if (ImGui::MenuItem("Delete")) m_NodeGraph.RemoveNode(m_NodeID);
+
+	ImNode::SelectNode(m_NodeID, true);
+
+	EditorNode* node = m_CommandExecutor->GetNodeGraph()->GetNodeByID(m_NodeID);
+	if (node->GetType() == EditorNodeType::Custom)
+	{
+		if (ImGui::MenuItem("Open"))
+		{
+			App::Get()->OpenCustomNode(static_cast<CustomEditorNode*>(node));
+		}
+	}
+
+	if (ImGui::MenuItem("Copy"))
+	{
+		m_CommandExecutor->ExecuteCommand(new CopySelectedNodesNodeGraphCommand{});
+	}
+
+	if (ImGui::MenuItem("Delete"))
+	{
+		m_CommandExecutor->ExecuteCommand(new RemoveSelectedNodesNodeGraphCommand{});
+	}
 }
 
 void LinkContextMenu::DrawContent()
 {
 	ASSERT(m_LinkID);
-	if (ImGui::MenuItem("Delete")) m_NodeGraph.RemoveLink(m_LinkID);
+	if (ImGui::MenuItem("Delete")) m_CommandExecutor->ExecuteCommand(new RemoveLinkNodeGraphCommand{ m_LinkID });
 }
 
 void PinContextMenu::DrawContent()
 {
 	ASSERT(m_PinID);
-	const bool isCustomPin = m_NodeGraph.IsCustomPin(m_PinID);
+	const bool isCustomPin = m_CommandExecutor->GetNodeGraph()->IsCustomPin(m_PinID);
 	if (!isCustomPin)
 	{
 		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
 		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
 	}
-	if (ImGui::MenuItem("Delete")) m_NodeGraph.RemovePin(m_PinID);
+	if (ImGui::MenuItem("Delete")) m_CommandExecutor->ExecuteCommand(new RemovePinNodeGraphCommand{ m_PinID });
 	if (!isCustomPin)
 	{
 		ImGui::PopItemFlag();

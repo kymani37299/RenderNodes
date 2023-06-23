@@ -15,16 +15,17 @@ class VariableEditorNode;
 class FloatNEditorNode;
 class BinaryOperatorEditorNode;
 class NameAndPathExecutionEditorNode;
+class CustomEditorNode;
 struct EditorNodeLink;
 struct EditorNodePin;
 
 class NodeGraphSerializer
 {
-	static constexpr unsigned VERSION = 2;
+	static constexpr unsigned VERSION = 6;
 
 public:
 	void Serialize(const std::string& path, const NodeGraph& nodeGraph);
-	UniqueID Deserialize(const std::string& path, NodeGraph& nodeGraph);
+	UniqueID Deserialize(const std::string& path, NodeGraph& nodeGraph, std::vector<CustomEditorNode*>& customNodes);
 
 	// Hack since I need to use it in lambda
 public:
@@ -33,17 +34,24 @@ public:
 	
 private:
 	// Writes
-	void WriteNodeList();
-	void WriteLinkList();
-	
+	void WriteNodeGraph(const NodeGraph& nodeGraph);
+	void WriteNodeList(const NodeGraph& nodeGraph);
+	void WriteLinkList(const NodeGraph& nodeGraph);
+	void WriteNodePositions(const NodeGraph& nodeGraph);
+	void WriteCustomNodeList();
+	void WriteCustomNode(CustomEditorNode* node);
+
 	// Reads
-	void ReadNodeList();
-	void ReadLinkList();
+	void ReadNodeGraph(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes);
+	void ReadNodeList(NodeGraph& nodeGraph);
+	void ReadNodePositions(NodeGraph& nodeGraph);
+	std::vector<CustomEditorNode*> ReadCustomNodeList();
+	void ResolveCustomNodes(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes);
+	void ReadLinkList(NodeGraph& nodeGraph);
 	EditorNode* ReadNode();
 	EditorNodeLink ReadLink();
+	CustomEditorNode* ReadCustomNode(const std::vector<CustomEditorNode*>& customNodes);
 	
-	void ReadAsignVariableNode(AsignVariableEditorNode* asignNode);
-	void ReadVariableNode(VariableEditorNode* varNode);
 	void ReadFloatNode(FloatNEditorNode* floatNode);
 	void ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOpNode);
 	void ReadNamePathPathNode(NameAndPathExecutionEditorNode* nameAndPathNode);
@@ -68,9 +76,6 @@ private:
 private:
 	bool m_UseTokens = false;
 	unsigned m_Version = VERSION;
-
-	const NodeGraph* m_NodeReadGraph = nullptr;
-	NodeGraph* m_NodeWriteGraph = nullptr;
 
 	std::ifstream m_Input;
 	std::ofstream m_Output;

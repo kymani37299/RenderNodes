@@ -30,6 +30,7 @@ protected:
 };
 
 using BoolValueNode = ValueNode<bool>;
+using StringValueNode = ValueNode<std::string>;
 using FloatValueNode = ValueNode<float>;
 using Float2ValueNode = ValueNode<Float2>;
 using Float3ValueNode = ValueNode<Float3>;
@@ -54,6 +55,13 @@ struct BindTable
 	std::vector<Binding<Float4>> Float4s;
 };
 using BindTableValueNode = ValueNode<BindTable*>;
+
+struct RenderState
+{
+	bool DepthWrite = false;
+	GLenum DepthTest = GL_ALWAYS;
+};
+using RenderStateValueNode = ValueNode<RenderState>;
 
 template<typename T>
 class ConstantValueNode : public ValueNode<T>
@@ -211,27 +219,37 @@ template<typename T>
 class VariableValueNode : public ValueNode<T>
 {
 public:
-	VariableValueNode(const std::string& varName, const ValueNodeExtraInfo& extraInfo):
+	VariableValueNode(StringValueNode* nameNode, const ValueNodeExtraInfo& extraInfo):
 		ValueNode<T>(extraInfo),
-		m_VarKey(Hash::Crc32(varName)) {}
+		m_NameNode(nameNode) {}
 
-	VariableValueNode(const std::string& varName) :
-		m_VarKey(Hash::Crc32(varName)) {}
+	VariableValueNode(StringValueNode* nameNode) :
+		m_NameNode(nameNode) {}
 
 	virtual T GetValue(ExecuteContext& context) const override
 	{
+		if (!m_NameNode)
+		{
+			ExecutionPrivate::Failure("VariableValueNode", "Variable name not defined");
+			context.Failure = true;
+			return T{};
+		}
+
+		const std::string name = m_NameNode->GetValue(context);
+		const unsigned varKey = Hash::Crc32(name);
+
 		auto& variableMap = context.Variables.GetMapFromType<T>();
-		if (variableMap.find(m_VarKey) == variableMap.end())
+		if (variableMap.find(varKey) == variableMap.end())
 		{
 			ExecutionPrivate::Failure("VariableValueNode", "Variable not declared");
 			context.Failure = true;
 			return T{};
 		}
-		return variableMap[m_VarKey];
+		return variableMap[varKey];
 	}
 
 private:
-	uint32_t m_VarKey;
+	Ptr<StringValueNode> m_NameNode;
 };
 
 template<typename T, typename U, unsigned vecSize>

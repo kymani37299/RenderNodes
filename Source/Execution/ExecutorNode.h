@@ -100,37 +100,50 @@ template<typename T>
 class AsignVariableExecutorNode : public ExecutorNode
 {
 public:
-	AsignVariableExecutorNode(const std::string& variableName, ValueNode<T>* value):
-		m_VariableKey(Hash::Crc32(variableName)),
+	AsignVariableExecutorNode(StringValueNode* nameNode, ValueNode<T>* value):
+		m_NameNode(nameNode),
 		m_InitialValueNode(value) {}
 
 	void Execute(ExecuteContext& context) override
 	{
+		if (!m_NameNode)
+		{
+			ExecutionPrivate::Failure("AsignVariableExecutorNode", "Variable name not defined");
+			context.Failure = true;
+			return;
+		}
+
+		const std::string name = m_NameNode->GetValue(context);
+		const unsigned varKey = Hash::Crc32(name);
+
 		auto& variableMap = context.Variables.GetMapFromType<T>();
-		variableMap[m_VariableKey] = m_InitialValueNode->GetValue(context);
+		variableMap[varKey] = m_InitialValueNode->GetValue(context);
 	}
 
 private:
-	uint32_t m_VariableKey;
+	Ptr<StringValueNode> m_NameNode;
 	Ptr<ValueNode<T>> m_InitialValueNode;
 };
 
 class CreateTextureExecutorNode : public ExecutorNode
 {
 public:
-	CreateTextureExecutorNode(const std::string& textureName, int width, int height, bool isFramebuffer):
-		m_TextureKey(Hash::Crc32(textureName)),
+	CreateTextureExecutorNode(StringValueNode* nameNode, int width, int height, bool isFramebuffer, bool isDepthStencil):
+		m_NameNode(nameNode),
 		m_Width(width),
 		m_Height(height),
-		m_IsFramebuffer(isFramebuffer) {}
+		m_IsFramebuffer(isFramebuffer),
+		m_IsDepthStencil(isDepthStencil) {}
 
 	void Execute(ExecuteContext& context) override;
 
 private:
-	uint32_t m_TextureKey;
+	Ptr<StringValueNode> m_NameNode;
+
 	int m_Width;
 	int m_Height;
 	bool m_IsFramebuffer;
+	bool m_IsDepthStencil;
 };
 
 class PresentTextureExecutorNode : public ExecutorNode
@@ -149,38 +162,39 @@ private:
 class LoadTextureExecutorNode : public ExecutorNode
 {
 public:
-	LoadTextureExecutorNode(const std::string& texutreName, const std::string& texturePath) :
-		m_TextureKey(Hash::Crc32(texutreName)),
+	LoadTextureExecutorNode(StringValueNode* nameNode, const std::string& texturePath) :
+		m_NameNode(nameNode),
 		m_TexturePath(texturePath) {}
 
 	void Execute(ExecuteContext& context) override;
 
 private:
-	uint32_t m_TextureKey = 0;
+	Ptr<StringValueNode> m_NameNode;
 	std::string m_TexturePath;
 };
 
 class LoadShaderExecutorNode : public ExecutorNode
 {
 public:
-	LoadShaderExecutorNode(const std::string& shaderName, const std::string& shaderPath) :
-		m_ShaderKey(Hash::Crc32(shaderName)),
+	LoadShaderExecutorNode(StringValueNode* nameNode, const std::string& shaderPath) :
+		m_NameNode(nameNode),
 		m_ShaderPath(shaderPath) {}
 
 	void Execute(ExecuteContext& context) override;
 private:
-	uint32_t m_ShaderKey = 0;
+	Ptr<StringValueNode> m_NameNode;
 	std::string m_ShaderPath;
 };
 
 class DrawMeshExecutorNode : public ExecutorNode
 {
 public:
-	DrawMeshExecutorNode(TextureValueNode* framebufferNode, ShaderValueNode* shaderNode, MeshValueNode* meshNode, BindTableValueNode* bindTable):
+	DrawMeshExecutorNode(TextureValueNode* framebufferNode, ShaderValueNode* shaderNode, MeshValueNode* meshNode, BindTableValueNode* bindTable, RenderStateValueNode* renderState):
 		m_FramebufferNode(framebufferNode),
 		m_ShaderNode(shaderNode),
 		m_MeshNode(meshNode),
-		m_BindTable(bindTable) {}
+		m_BindTable(bindTable),
+		m_RenderState(renderState) {}
 
 	~DrawMeshExecutorNode();
 
@@ -192,17 +206,18 @@ private:
 	Ptr<ShaderValueNode> m_ShaderNode;
 	Ptr<MeshValueNode> m_MeshNode;
 	Ptr<BindTableValueNode> m_BindTable;
+	Ptr<RenderStateValueNode> m_RenderState;
 };
 
 class LoadMeshExecutorNode : public ExecutorNode
 {
 public:
-	LoadMeshExecutorNode(const std::string& meshName, const std::string& meshPath) :
-		m_MeshKey(Hash::Crc32(meshName)),
+	LoadMeshExecutorNode(StringValueNode* nameNode, const std::string& meshPath) :
+		m_NameNode(nameNode),
 		m_MeshPath(meshPath) {}
 
 	void Execute(ExecuteContext& context) override;
 private:
-	uint32_t m_MeshKey = 0;
+	Ptr<StringValueNode> m_NameNode;
 	std::string m_MeshPath;
 };

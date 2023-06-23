@@ -70,7 +70,7 @@ void RenderPipelineExecutor::OnUpdate(float dt)
 	if (m_Context.Failure) return;
 
 	ExecutorNode* node = m_Pipeline.OnUpdateNode;
-	const std::string dtVar = "dt";
+	const std::string dtVar = "DT";
 	m_Context.Variables.GetMapFromType<float>()[Hash::Crc32(dtVar)] = dt;
 	while (node)
 	{

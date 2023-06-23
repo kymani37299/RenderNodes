@@ -20,6 +20,13 @@ public:
 		AddPin(EditorNodePin::CreateOutputPin("", PinType::Bool));
 	}
 
+	EditorNode* Clone() const override
+	{
+		BoolEditorNode* node = new BoolEditorNode();
+		node->m_Value = m_Value;
+		return node;
+	}
+
 	bool GetValue() const { return m_Value; }
 
 protected:
@@ -27,6 +34,32 @@ protected:
 
 private:
 	bool m_Value = false;
+};
+
+class StringEditorNode : public EvaluationEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	StringEditorNode() :
+		EvaluationEditorNode("String", EditorNodeType::String)
+	{
+		AddPin(EditorNodePin::CreateOutputPin("", PinType::String));
+	}
+
+	EditorNode* Clone() const override
+	{
+		StringEditorNode* node = new StringEditorNode();
+		node->m_Value = m_Value;
+		return node;
+	}
+
+	const std::string& GetValue() const { return m_Value; }
+
+protected:
+	virtual void RenderContent() override;
+
+private:
+	std::string m_Value;
 };
 
 class FloatNEditorNode : public EvaluationEditorNode
@@ -53,18 +86,28 @@ protected:
 
 private:
 	unsigned m_NumValues;
+
+protected: // Should be private
 	float m_Values[4];
 };
 
 template<EditorNodeType nodeType, PinType pinType, unsigned numFloats>
 class FloatNEditorNodeT : public FloatNEditorNode
 {
+	static_assert(numFloats <= 4 && numFloats > 0);
+
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 	FloatNEditorNodeT() :
 		FloatNEditorNode(numFloats, nodeType, pinType) {}
 
-	static_assert(numFloats <= 4 && numFloats > 0);
+	EditorNode* Clone() const override
+	{
+		FloatNEditorNodeT* node = new FloatNEditorNodeT<nodeType, pinType, numFloats>();
+		for (unsigned i = 0; i < 4; i++)
+			node->m_Values[i] = m_Values[i];
+		return node;
+	}
 };
 
 class SplitVectorEditorNode : public EvaluationEditorNode
@@ -93,6 +136,7 @@ public:
 	}
 
 	const EditorNodePin& GetInputVectorPin() const { return GetPins()[m_InputVectorPin]; }
+
 private:
 	unsigned m_NumOutputs;
 	unsigned m_InputVectorPin;
@@ -102,13 +146,18 @@ private:
 template<EditorNodeType nodeType, PinType inputPinType, PinType outputPinType, unsigned numOutputs>
 class SplitVectorEditorNodeT : public SplitVectorEditorNode
 {
+	static_assert(numOutputs <= 4 && numOutputs > 0);
+
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 	SplitVectorEditorNodeT() :
 		SplitVectorEditorNode(nodeType, inputPinType, outputPinType, numOutputs)
 	{ }
 
-	static_assert(numOutputs <= 4 && numOutputs > 0);
+	EditorNode* Clone() const override
+	{
+		return new SplitVectorEditorNodeT<nodeType, inputPinType, outputPinType, numOutputs>();
+	}
 };
 
 class CreateVectorEditorNode : public EvaluationEditorNode
@@ -139,6 +188,11 @@ public:
 	CreateVectorEditorNodeT() :
 		CreateVectorEditorNode(nodeType, inputPinType, outputPinType, numInputs) {}
 
+	EditorNode* Clone() const override
+	{
+		return new CreateVectorEditorNodeT<nodeType, inputPinType, outputPinType, numInputs>();
+	}
+
 	static_assert(numInputs <= 4 && numInputs > 0);
 };
 
@@ -150,15 +204,13 @@ public:
 		EvaluationEditorNode("Get " + ToString(outputType), nodeType)
 	{
 		AddPin(EditorNodePin::CreateOutputPin(ToString(outputType), outputType));
+		m_NamePin = AddPin(EditorNodePin::CreateInputPin("Name", PinType::String));
 	}
 
-	const std::string& GetVaraibleName() const { return m_VariableName; }
-
-protected:
-	virtual void RenderContent() override;
+	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }
 
 private:
-	std::string m_VariableName;
+	unsigned m_NamePin;
 };
 
 template<EditorNodeType nodeType, PinType outputType>
@@ -167,6 +219,12 @@ class VariableEditorNodeT : public VariableEditorNode
 public:
 	VariableEditorNodeT() :
 		VariableEditorNode(nodeType, outputType) {}
+
+	// Check other inherited classes if changing this method
+	EditorNode* Clone() const override
+	{
+		return new VariableEditorNodeT<nodeType, outputType>();
+	}
 };
 
 enum class BinaryOperatorType
@@ -236,6 +294,8 @@ private:
 	unsigned m_Bpin;
 
 	EditorComboBox m_OperatorSelector;
+
+protected: // Should be private
 	std::string m_Op;
 };
 
@@ -246,6 +306,13 @@ class BinaryOperatorEditorNodeT : public BinaryOperatorEditorNode
 public:
 	BinaryOperatorEditorNodeT() :
 		BinaryOperatorEditorNode(nodeType, opType, pinType, outputPinType) {}
+
+	EditorNode* Clone() const override
+	{
+		BinaryOperatorEditorNodeT* node = new BinaryOperatorEditorNodeT<nodeType, opType, pinType, outputPinType>();
+		node->m_Op = m_Op;
+		return node;
+	}
 };
 
 using VarBoolEditorNode = VariableEditorNodeT<EditorNodeType::VarBool, PinType::Bool>;
@@ -273,7 +340,7 @@ using CreateFloat4EditorNode = CreateVectorEditorNodeT<EditorNodeType::CreateFlo
 using SplitFloat4EditorNode = SplitVectorEditorNodeT<EditorNodeType::SplitFloat4, PinType::Float4, PinType::Float, 4>;
 using VarFloat4EditorNode = VariableEditorNodeT<EditorNodeType::VarFloat4, PinType::Float4>;
 using Float4BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::Float4BinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float4, PinType::Float4>;
-#
+
 using GetTextureEditorNode = VariableEditorNodeT<EditorNodeType::GetTexture, PinType::Texture>;
 using GetShaderEditorNode = VariableEditorNodeT<EditorNodeType::GetShader, PinType::Shader>;
 
@@ -288,6 +355,16 @@ public:
 	bool GetTexcoordBit() const { return m_TexcoordBit; }
 	bool GetNormalBit() const { return m_NormalBit; }
 	bool GetTangentBit() const { return m_TangentBit; }
+
+	EditorNode* Clone() const override
+	{
+		GetMeshEditorNode* node = new GetMeshEditorNode();
+		node->m_PositionBit = m_PositionBit;
+		node->m_TexcoordBit = m_TexcoordBit;
+		node->m_NormalBit = m_NormalBit;
+		node->m_TangentBit = m_TangentBit;
+		return node;
+	}
 
 protected:
 	void RenderContent() override;
@@ -306,6 +383,11 @@ public:
 		AddPin(EditorNodePin::CreateOutputPin("", PinType::Mesh));
 	}
 
+	EditorNode* Clone() const override
+	{
+		return new GetCubeMeshEditorNode();
+	}
+
 protected:
 	void RenderContent() override;
 };
@@ -322,6 +404,17 @@ public:
 		AddPin(EditorNodePin::CreateOutputPin("Table", PinType::BindTable));
 	}
 
+	EditorNode* Clone() const override
+	{
+		BindTableEditorNode* node = new BindTableEditorNode();
+		for (const EditorNodePin& customPin : GetCustomPins())
+		{
+			ASSERT(customPin.IsInput);
+			node->AddCustomPin(EditorNodePin::CreateInputPin(customPin.Label, customPin.Type));
+		}
+		return node;
+	}
+
 	virtual void RenderPopups() override;
 
 protected:
@@ -332,4 +425,38 @@ private:
 	std::string m_TypeValue = "Texture";
 	
 	std::string m_InputName;
+};
+
+class RenderStateEditorNode : public EvaluationEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	RenderStateEditorNode() :
+		EvaluationEditorNode("Render state", EditorNodeType::RenderState),
+		m_DepthTestModeCB("Depth test mode cb " + std::to_string(GetID()), m_DepthTestMode, { "Always", "Never", "Less", "Equal", "LessEqual", "Greater", "GreaterEqual", "NotEqual" })
+	{
+		AddPin(EditorNodePin::CreateOutputPin("Render State", PinType::RenderState));
+	}
+
+	EditorNode* Clone() const override
+	{
+		RenderStateEditorNode* node = new RenderStateEditorNode{};
+		node->m_DepthWrite = m_DepthWrite;
+		node->m_DepthTestMode = m_DepthTestMode;
+		return node;
+	}
+
+	virtual void RenderPopups() override;
+
+	bool IsDepthWrite() const { return m_DepthWrite; }
+	const std::string& GetDepthTestMode() const { return m_DepthTestMode; }
+
+protected:
+	virtual void RenderContent() override;
+
+private:
+	bool m_DepthWrite = false;
+
+	EditorComboBox m_DepthTestModeCB;
+	std::string m_DepthTestMode = "Always";
 };

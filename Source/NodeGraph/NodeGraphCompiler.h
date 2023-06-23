@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <stack>
 
 #include "../Editor/EditorNode.h"
 #include "../Editor/ExecutorEditorNode.h"
@@ -20,8 +21,6 @@ public:
 	const std::vector<std::string> GetErrorMessages() const { return m_ErrorMessages; }
 
 private:
-
-
 	ExecutionEditorNode* GetNextExecutorNode(ExecutionEditorNode* executorNode);
 
 	ExecutorNode* Compile(ExecutionEditorNode* executorNode);
@@ -40,8 +39,10 @@ private:
 	ExecutorNode* CompileLoadMeshNode(LoadMeshEditorNode* loadMeshNode);
 
 private:
-	Ptr<PinEvaluator> m_PinEvaluator = nullptr;
-	const NodeGraph* m_CurrentGraph = nullptr;
+	const NodeGraph* GetNodeGraph() const { return m_ContextStack.top().Graph; }
+	CustomEditorNode* GetParentNode() const { return m_ContextStack.top().Parent; }
 
+private:
+	NodeGraphCompilerContextStack m_ContextStack;
 	std::vector<std::string> m_ErrorMessages;
 };

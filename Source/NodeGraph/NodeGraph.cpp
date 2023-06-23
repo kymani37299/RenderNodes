@@ -15,6 +15,27 @@ void NodeGraph::AddNode(EditorNode* node)
     m_Nodes[node->GetID()] = Ptr<EditorNode>(node);
 }
 
+void NodeGraph::ReplaceNode(NodeID nodeID, EditorNode* node)
+{
+    ASSERT(node->GetID() == nodeID);
+    ASSERT(m_Nodes.find(nodeID) != m_Nodes.end());
+    m_Nodes[node->GetID()] = Ptr<EditorNode>(node);
+}
+
+void NodeGraph::ReplacePinLinks(PinID oldPin, PinID newPin)
+{
+    for (auto& it : m_Links)
+    {
+        auto& l = it.second;
+
+        if (l.Start == oldPin)
+            l.Start = newPin;
+
+        if (l.End == oldPin)
+            l.End = newPin;
+    }
+}
+
 void NodeGraph::AddLink(const EditorNodeLink& link)
 {
     for (const auto& it : m_Links)
@@ -54,6 +75,7 @@ void NodeGraph::RemoveNode(NodeID nodeID)
         RemoveLink(linkID);
 
     m_Nodes.erase(nodeID);
+    m_NodePositions.erase(nodeID);
 }
 
 void NodeGraph::RemoveLink(LinkID linkID)
@@ -77,6 +99,23 @@ void NodeGraph::RemovePin(PinID pinID)
 
     EditorNode* node = GetPinOwner(pinID);
     node->RemovePin(pinID);
+}
+
+bool NodeGraph::ContainsNode(NodeID nodeID) const
+{
+    return m_Nodes.find(nodeID) != m_Nodes.end();
+}
+
+EditorNode* NodeGraph::GetNodeByID(NodeID nodeID) const
+{
+    ASSERT(ContainsNode(nodeID));
+    return m_Nodes.at(nodeID).get();
+}
+
+EditorNodeLink NodeGraph::GetLinkByID(LinkID linkID) const
+{
+    ASSERT(m_Links.find(linkID) != m_Links.end());
+    return m_Links.at(linkID);
 }
 
 PinID NodeGraph::GetInputPinFromOutput(PinID outputPinID) const
@@ -175,4 +214,16 @@ OnUpdateEditorNode* NodeGraph::GetOnUpdateNode() const
     }
     ASSERT_M(0, "Unable to find on update node");
     return nullptr;
+}
+
+void NodeGraph::RefreshCustomNodes()
+{
+    for (const auto& it : m_Nodes)
+    {
+        if (it.second->GetType() == EditorNodeType::Custom)
+        {
+            CustomEditorNode* node = static_cast<CustomEditorNode*>(it.second.get());
+            node->RegeneratePins();
+        }
+    }
 }

@@ -2,10 +2,13 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 
+#include "../../Common.h"
 #include "../../IDGen.h"
 
-class NodeGraph;
+class NodeGraphCommandExecutor;
+class CustomEditorNode;
 
 class EditorContextMenu
 {
@@ -36,6 +39,12 @@ public:
 		m_ValueRef(valueRef),
 		m_Values(values) {}
 
+	void Draw() = delete;
+	void Open() = delete;
+
+	void DrawBox();
+	void DrawSelectionMenu();
+
 protected:
 	void DrawContent() override;
 
@@ -47,9 +56,10 @@ private:
 class NewNodeContextMenu : public EditorContextMenu
 {
 public:
-	NewNodeContextMenu(const std::string& id, NodeGraph& nodeGraph) :
+	NewNodeContextMenu(const std::string& id, NodeGraphCommandExecutor* commandExecutor, bool customNodeEditor):
 		EditorContextMenu(id),
-		m_NodeGraph(nodeGraph)
+		m_CommandExecutor(commandExecutor),
+		m_CustomNodeEditor(customNodeEditor)
 	{}
 
 	void Open() = delete;
@@ -63,16 +73,19 @@ protected:
 	void DrawContent() override;
 
 private:
-	NodeGraph& m_NodeGraph;
+	bool m_CustomNodeEditor;
+	NodeGraphCommandExecutor* m_CommandExecutor;
 	PinID m_DraggedPin = 0;
 };
 
 class NodeContextMenu : public EditorContextMenu
 {
 public:
-	NodeContextMenu(const std::string& id, NodeGraph& nodeGraph) :
+	NodeContextMenu(const std::string& id, NodeGraphCommandExecutor* commandExecutor) :
 		EditorContextMenu(id),
-		m_NodeGraph(nodeGraph) {}
+		m_CommandExecutor(commandExecutor)
+	{
+	}
 
 	void Open() = delete;
 	void Open(NodeID nodeID)
@@ -85,16 +98,16 @@ protected:
 	void DrawContent() override;
 
 private:
-	NodeGraph& m_NodeGraph;
+	NodeGraphCommandExecutor* m_CommandExecutor;
 	NodeID m_NodeID = 0;
 };
 
 class LinkContextMenu : public EditorContextMenu
 {
 public:
-	LinkContextMenu(const std::string& id, NodeGraph& nodeGraph) :
+	LinkContextMenu(const std::string& id, NodeGraphCommandExecutor* commandExecutor) :
 		EditorContextMenu(id),
-		m_NodeGraph(nodeGraph) {}
+		m_CommandExecutor(commandExecutor) {}
 
 	void Open() = delete;
 	void Open(LinkID linkID)
@@ -107,16 +120,16 @@ protected:
 	void DrawContent() override;
 
 private:
-	NodeGraph& m_NodeGraph;
+	NodeGraphCommandExecutor* m_CommandExecutor;
 	LinkID m_LinkID = 0;
 };
 
 class PinContextMenu : public EditorContextMenu
 {
 public:
-	PinContextMenu(const std::string& id, NodeGraph& nodeGraph) :
+	PinContextMenu(const std::string& id, NodeGraphCommandExecutor* commandExecutor) :
 		EditorContextMenu(id),
-		m_NodeGraph(nodeGraph) {}
+		m_CommandExecutor(commandExecutor) {}
 
 	void Open() = delete;
 	void Open(PinID pinID)
@@ -129,6 +142,6 @@ protected:
 	void DrawContent() override;
 
 private:
-	NodeGraph& m_NodeGraph;
+	NodeGraphCommandExecutor* m_CommandExecutor;
 	PinID m_PinID = 0;
 };

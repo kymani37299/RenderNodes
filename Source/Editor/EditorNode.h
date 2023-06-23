@@ -60,6 +60,11 @@ enum class EditorNodeType
     BoolBinaryOperator,
     VarBool,
     AsignBool,
+    RenderState,
+    String,
+    Pin,
+    Custom,
+    UnresolvedCustom,
 };
 
 // DO NOT CHANGE ORDER OF VALUES
@@ -80,6 +85,10 @@ enum class PinType
     Mesh,
     Shader,
     BindTable,
+    RenderState,
+    String,
+
+    Count
 };
 
 static const std::string ToString(PinType pinType)
@@ -98,6 +107,8 @@ static const std::string ToString(PinType pinType)
     case PinType::Mesh: return "Mesh";
     case PinType::Shader: return "Shader";
     case PinType::BindTable: return "BindTable";
+    case PinType::RenderState: return "RenderState";
+    case PinType::String: return "String";
     default: NOT_IMPLEMENTED;
     }
     return "<unknown>";
@@ -109,7 +120,7 @@ static ImColor GetPinColor(PinType type)
     {
     case PinType::Invalid: return ImColor(1.0f, 0.0f, 0.0f, 1.0f);
     case PinType::Execution: return ImColor(1.0f, 1.0f, 1.0f, 1.0f);
-    case PinType::Bool: return ImColor(239, 35, 60);
+    case PinType::Bool: return ImColor(179, 112, 176);
     case PinType::Float: 
     case PinType::Float2:
     case PinType::Float3:
@@ -119,6 +130,8 @@ static ImColor GetPinColor(PinType type)
     case PinType::Mesh: return ImColor(145, 142, 244);
     case PinType::Shader: return ImColor(184, 77, 0);
     case PinType::BindTable: return ImColor(206, 171, 177);
+    case PinType::RenderState: return ImColor(165, 190, 0);
+    case PinType::String: return ImColor(192, 110, 82);
     default:
         NOT_IMPLEMENTED;
         break;
@@ -164,6 +177,8 @@ public:
 
 public:
     EditorNode(const std::string& label, EditorNodeType nodeType);
+    
+    virtual EditorNode* Clone() const = 0;
 
     NodeID GetID() const { return m_ID; }
     EditorNodeType GetType() const { return m_Type; }
@@ -175,10 +190,11 @@ public:
     void Render();
     virtual void RenderPopups() {}
 
+    unsigned AddCustomPin(const EditorNodePin& pin);
+
 protected:
     virtual void RenderContent();
 
-    unsigned AddCustomPin(const EditorNodePin& pin);
     unsigned AddPin(const EditorNodePin& pin);
 
 private:

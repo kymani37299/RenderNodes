@@ -2,12 +2,13 @@
 
 #include <sstream>
 
+#include "../App.h"
 #include "../Common.h"
 #include "../NodeGraph/NodeGraph.h"
 #include "../Editor/RenderPipelineEditor.h"
 
 // #define ENABLE_TOKEN_VERIFICATION
-#define ASSERT_ON_LOAD_FAILED
+// #define ASSERT_ON_LOAD_FAILED
 
 #ifdef ASSERT_ON_LOAD_FAILED
 #define LOAD_ASSERT() ASSERT(0)
@@ -15,6 +16,8 @@
 #define LOAD_ASSERT() {}
 #endif // ASSERT_ON_LOAD_FAILED
 
+static const std::string BEGIN_NODE_GRAPH_TOKEN = "BEGIN_NODE_GRAPH";
+static const std::string END_NODE_GRAPH_TOKEN = "END_NODE_GRAPH";
 static const std::string BEGIN_NODE_LIST_TOKEN = "BEGIN_NODE_LIST";
 static const std::string END_NODE_LIST_TOKEN = "END_NODE_LIST";
 static const std::string BEGIN_LINK_LIST_TOKEN = "BEGIN_LINK_LIST";
@@ -25,10 +28,11 @@ static const std::string BEGIN_LINK_TOKEN = "BEGIN_LINK";
 static const std::string END_LINK_TOKEN = "END_LINK";
 static const std::string BEGIN_PIN_LIST_TOKEN = "BEGIN_PIN_LIST";
 static const std::string END_PIN_LIST_TOKEN = "END_PIN_LIST";
+static const std::string BEGIN_NODE_POSITIONS_TOKEN = "BEGIN_NODE_POSITIONS";
+static const std::string END_NODE_POSITIONS_TOKEN = "END_NODE_POSITIONS";
 
 void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& nodeGraph)
 {
-	m_NodeReadGraph = &nodeGraph;
 	m_Output.open(path);
 
 #ifdef ENABLE_TOKEN_VERIFICATION
@@ -42,31 +46,36 @@ void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& no
 	WriteAttribute("Version", VERSION);
 	WriteAttribute("UseTokens", m_UseTokens);
 	WriteAttribute("FirstID", IDGen::Generate());
-	WriteNodeList();
-	WriteLinkList();
+
+	WriteCustomNodeList();
+	WriteNodeGraph(nodeGraph);
 
 	m_Output.close();
-
-	m_NodeReadGraph = nullptr;
 }
 
-UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGraph)
+UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGraph, std::vector<CustomEditorNode*>& customNodes)
 {
 	m_OperationSuccess = true;
-	m_NodeWriteGraph = &nodeGraph;
-
+	
 	m_Input = std::ifstream{ path };
 	if (!m_Input.is_open()) return 0;
 
 	m_Version = ReadIntAttr("Version");
+
+	if (m_Version < 4)
+	{
+		m_OperationSuccess = false;
+		std::cout << "Not compatabile with this version of file " << std::endl;
+		return 0;
+	}
+
 	m_UseTokens = ReadIntAttr("UseTokens");
 	unsigned firstID = ReadIntAttr("FirstID");
 
-	ReadNodeList();
-	ReadLinkList();
+	if (m_Version > 4) customNodes = ReadCustomNodeList();
+	ReadNodeGraph(nodeGraph, customNodes);
 
 	m_Input.close();
-	m_NodeWriteGraph = nullptr;
 
 	return m_OperationSuccess ? firstID : 0;
 }
@@ -77,26 +86,77 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 
 #pragma region(WRITING)
 
-void NodeGraphSerializer::WriteNodeList()
+void NodeGraphSerializer::WriteNodeGraph(const NodeGraph& nodeGraph)
+{
+	WriteToken(BEGIN_NODE_GRAPH_TOKEN);
+
+	WriteNodeList(nodeGraph);
+	WriteLinkList(nodeGraph);
+	WriteNodePositions(nodeGraph);
+
+	WriteToken(END_NODE_GRAPH_TOKEN);
+}
+
+void NodeGraphSerializer::WriteNodeList(const NodeGraph& nodeGraph)
 {
 	WriteToken(BEGIN_NODE_LIST_TOKEN);
-	WriteAttribute("Count", m_NodeReadGraph->GetNodeCount());
+	WriteAttribute("Count", nodeGraph.GetNodeCount());
 
 	const auto fn = [this](EditorNode* node) { this->WriteNode(node); };
-	m_NodeReadGraph->ForEachNode(fn);
+	nodeGraph.ForEachNode(fn);
 
 	WriteToken(END_NODE_LIST_TOKEN);
 }
 
-void NodeGraphSerializer::WriteLinkList()
+void NodeGraphSerializer::WriteLinkList(const NodeGraph& nodeGraph)
 {
 	WriteToken(BEGIN_LINK_LIST_TOKEN);
-	WriteAttribute("Count", m_NodeReadGraph->GetLinkCount());
+	WriteAttribute("Count", nodeGraph.GetLinkCount());
 
 	const auto fn = [this](const EditorNodeLink& link) { this->WriteLink(link); };
-	m_NodeReadGraph->ForEachLink(fn);
+	nodeGraph.ForEachLink(fn);
 
 	WriteToken(END_LINK_LIST_TOKEN);
+}
+
+void NodeGraphSerializer::WriteCustomNodeList()
+{
+	const auto& customNodes = *App::Get()->GetCustomNodes();
+
+	WriteToken(BEGIN_NODE_LIST_TOKEN);
+
+	WriteAttribute("Count", customNodes.size());
+	for (const auto& customNode : customNodes)
+		WriteCustomNode(customNode.get());
+
+	WriteToken(END_NODE_LIST_TOKEN);
+}
+
+void NodeGraphSerializer::WriteCustomNode(CustomEditorNode* node)
+{
+	WriteToken(BEGIN_NODE_TOKEN);
+
+	WriteAttribute("Name", node->m_Name);
+	WriteNodeGraph(*node->GetNodeGraph());
+
+	WriteToken(END_NODE_TOKEN);
+}
+
+void NodeGraphSerializer::WriteNodePositions(const NodeGraph& nodeGraph)
+{
+	WriteToken(BEGIN_NODE_POSITIONS_TOKEN);
+
+	WriteAttribute("Count", nodeGraph.GetNodePositions().size());
+	for (const auto& it : nodeGraph.GetNodePositions())
+	{
+		const NodeID& nodeID = it.first;
+		const ImVec2& nodePos = it.second;
+
+		WriteAttribute("ID", nodeID);
+		WriteAttribute("Pos.X", nodePos.x);
+		WriteAttribute("Pos.Y", nodePos.y);
+	}
+	WriteToken(END_NODE_POSITIONS_TOKEN);
 }
 
 #define READ_EDITOR_NODE(Type) Type* readNode = static_cast<Type*>(node)
@@ -116,6 +176,11 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	{
 		READ_EDITOR_NODE(BoolEditorNode);
 		WriteAttribute("Value", readNode->m_Value ? 1 : 0);
+	} break;
+	case EditorNodeType::String:
+	{
+		READ_EDITOR_NODE(StringEditorNode);
+		WriteAttribute("Value", readNode->m_Value);
 	} break;
 	case EditorNodeType::Float:
 	case EditorNodeType::Float2:
@@ -154,18 +219,11 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::SplitFloat4:
 	case EditorNodeType::OnUpdate:
 	case EditorNodeType::OnStart:
-	{
-		READ_EDITOR_NODE(EditorNode);
-	} break;
 	case EditorNodeType::AsignFloat:
 	case EditorNodeType::AsignFloat2:
 	case EditorNodeType::AsignFloat3:
 	case EditorNodeType::AsignFloat4:
 	case EditorNodeType::AsignBool:
-	{
-		READ_EDITOR_NODE(AsignVariableEditorNode);
-		WriteAttribute("Name", readNode->m_Name);
-	} break;
 	case EditorNodeType::VarFloat:
 	case EditorNodeType::VarFloat2:
 	case EditorNodeType::VarFloat3:
@@ -174,13 +232,11 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::GetTexture:
 	case EditorNodeType::GetShader:
 	{
-		READ_EDITOR_NODE(VariableEditorNode);
-		WriteAttribute("Name", readNode->m_VariableName);
+		READ_EDITOR_NODE(EditorNode);
 	} break;
 	case EditorNodeType::GetMesh:
 	{
 		READ_EDITOR_NODE(GetMeshEditorNode);
-		WriteAttribute("Name", readNode->m_VariableName);
 		WriteAttribute("PositionBit", readNode->m_PositionBit ? 1 : 0);
 		WriteAttribute("TexcoordBit", readNode->m_TexcoordBit ? 1 : 0);
 		WriteAttribute("NormalBit", readNode->m_NormalBit ? 1 : 0);
@@ -189,18 +245,48 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::CreateTexture:
 	{
 		READ_EDITOR_NODE(CreateTextureEditorNode);
-		WriteAttribute("Name", readNode->m_Name);
 		WriteAttribute("Width", readNode->m_Width);
 		WriteAttribute("Height", readNode->m_Height);
 		WriteAttribute("IsFramebuffer", readNode->m_Framebuffer);
+		WriteAttribute("IsDepthStencil", readNode->m_DepthStencil);
 	} break;
 	case EditorNodeType::LoadShader:
 	case EditorNodeType::LoadTexture:
 	case EditorNodeType::LoadMesh:
 	{
 		READ_EDITOR_NODE(NameAndPathExecutionEditorNode);
-		WriteAttribute("Name", readNode->m_Name);
 		WriteAttribute("Path", readNode->m_Path);
+	} break;
+	case EditorNodeType::RenderState:
+	{
+		READ_EDITOR_NODE(RenderStateEditorNode);
+		WriteAttribute("DepthWrite", readNode->m_DepthWrite ? 1 : 0);
+		WriteAttribute("DepthTest", readNode->m_DepthTestMode);
+	} break;
+	case EditorNodeType::Pin:
+	{
+		READ_EDITOR_NODE(PinEditorNode);
+		WriteAttribute("IsInput", readNode->GetPin().IsInput);
+		WriteAttribute("PinType", EnumToInt(readNode->GetPin().Type));
+		WriteAttribute("Name", readNode->m_Name);
+	} break;
+	case EditorNodeType::Custom:
+	{
+		READ_EDITOR_NODE(CustomEditorNode);
+
+		unsigned customNodeIndex = -1;
+		const auto& customNodes = *App::Get()->GetCustomNodes();
+		for (unsigned i = 0; i < customNodes.size(); i++)
+		{
+			if (customNodes[i]->GetName() == readNode->GetName())
+			{
+				customNodeIndex = i;
+				break;
+			}
+		}
+		ASSERT(customNodeIndex != -1);
+		
+		WriteAttribute("CustomNodeIndex", customNodeIndex);
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -216,19 +302,16 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	WriteToken(END_PIN_LIST_TOKEN);
 	
 	// Write custom pins
-	if (m_Version > 1)
+	WriteToken(BEGIN_PIN_LIST_TOKEN);
+	WriteAttribute("Count", node->m_CustomPins.size());
+	for (const EditorNodePin& pin : node->m_CustomPins)
 	{
-		WriteToken(BEGIN_PIN_LIST_TOKEN);
-		WriteAttribute("Count", node->m_CustomPins.size());
-		for (const EditorNodePin& pin : node->m_CustomPins)
-		{
-			WriteAttribute("ID", pin.ID);
-			WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
-			WriteAttribute("Type", EnumToInt(pin.Type));
-			WriteAttribute("Label", pin.Label);
-		}
-		WriteToken(END_PIN_LIST_TOKEN);
+		WriteAttribute("ID", pin.ID);
+		WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
+		WriteAttribute("Type", EnumToInt(pin.Type));
+		WriteAttribute("Label", pin.Label);
 	}
+	WriteToken(END_PIN_LIST_TOKEN);
 
 	WriteToken(END_NODE_TOKEN);
 }
@@ -252,7 +335,19 @@ void NodeGraphSerializer::WriteLink(const EditorNodeLink& link)
 
 #pragma region READING
 
-void NodeGraphSerializer::ReadNodeList()
+void NodeGraphSerializer::ReadNodeGraph(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
+{
+	EatToken(BEGIN_NODE_GRAPH_TOKEN);
+
+	ReadNodeList(nodeGraph);
+	ReadLinkList(nodeGraph);
+	ResolveCustomNodes(nodeGraph, customNodes);
+	if (m_Version > 5) ReadNodePositions(nodeGraph);
+
+	EatToken(END_NODE_GRAPH_TOKEN);
+}
+
+void NodeGraphSerializer::ReadNodeList(NodeGraph& nodeGraph)
 {
 	EatToken(BEGIN_NODE_LIST_TOKEN);
 
@@ -260,13 +355,92 @@ void NodeGraphSerializer::ReadNodeList()
 	for (unsigned i = 0; i < nodeCount; i++)
 	{
 		EditorNode* node = ReadNode();
-		m_NodeWriteGraph->AddNode(node);
+		nodeGraph.AddNode(node);
 	}
 
 	EatToken(END_NODE_LIST_TOKEN);
 }
 
-void NodeGraphSerializer::ReadLinkList()
+void NodeGraphSerializer::ReadNodePositions(NodeGraph& nodeGraph)
+{
+	EatToken(BEGIN_NODE_POSITIONS_TOKEN);
+
+	std::unordered_map<NodeID, ImVec2> nodePositions;
+
+	const unsigned n = ReadIntAttr("Count");
+	for (unsigned i = 0; i < n; i++)
+	{
+		const NodeID nodeID = ReadIntAttr("ID");
+		ImVec2 nodePos{};
+		nodePos.x = ReadFloatAttr("Pos.X");
+		nodePos.y = ReadFloatAttr("Pos.Y");
+
+		nodePositions[nodeID] = nodePos;
+	}
+
+	nodeGraph.SetNodePositions(nodePositions);
+
+	EatToken(END_NODE_POSITIONS_TOKEN);
+}
+
+std::vector<CustomEditorNode*> NodeGraphSerializer::ReadCustomNodeList()
+{
+	std::vector<CustomEditorNode*> customNodes;
+
+	EatToken(BEGIN_NODE_LIST_TOKEN);
+
+	const unsigned customNodeCount = ReadIntAttr("Count");
+	for (unsigned i = 0; i < customNodeCount; i++)
+		customNodes.push_back(ReadCustomNode(customNodes));
+
+	EatToken(END_NODE_LIST_TOKEN);
+
+	return customNodes;
+}
+
+void NodeGraphSerializer::ResolveCustomNodes(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
+{
+	// TODO: Make a better solution for this, this will modify save file every time we save
+
+	const auto fn = [this, &customNodes, &nodeGraph](EditorNode* node)
+	{
+		if (node->GetType() == EditorNodeType::UnresolvedCustom)
+		{
+			UnresolvedCustomEditorNode* unresolvedNode = static_cast<UnresolvedCustomEditorNode*>(node);
+			if (unresolvedNode->GetIndex() < customNodes.size())
+			{
+				CustomEditorNode* customNodePrototype = customNodes[unresolvedNode->GetIndex()];
+
+				CustomEditorNode* customNode = static_cast<CustomEditorNode*>(customNodePrototype->Instance(&nodeGraph));
+				customNode->m_ID = unresolvedNode->m_ID;
+				
+				const auto& customNodePins = customNode->GetCustomPins();
+				const auto& unresolvedNodePins = unresolvedNode->GetCustomPins();
+				if (customNodePins.size() == unresolvedNodePins.size())
+				{
+					for (unsigned i = 0; i < customNodePins.size(); i++)
+					{
+						nodeGraph.ReplacePinLinks(unresolvedNodePins[i].ID, customNodePins[i].ID);
+					}
+				}
+				else
+				{
+					LOAD_ASSERT();
+					m_OperationSuccess = false;
+				}
+				nodeGraph.ReplaceNode(unresolvedNode->m_ID, customNode);
+			}
+			else
+			{
+				LOAD_ASSERT();
+				m_OperationSuccess = false;
+			}
+		}
+	};
+	nodeGraph.ForEachNode(fn);
+}
+
+void NodeGraphSerializer::ReadLinkList(NodeGraph& nodeGraph)
 {
 	EatToken(BEGIN_LINK_LIST_TOKEN);
 
@@ -274,13 +448,17 @@ void NodeGraphSerializer::ReadLinkList()
 	for (unsigned i = 0; i < linkCount; i++)
 	{
 		EditorNodeLink link = ReadLink();
-		m_NodeWriteGraph->AddLink(link);
+		nodeGraph.AddLink(link);
 	}
 
 	EatToken(END_LINK_LIST_TOKEN);
 }
 
 #define INIT_NODE(NodeType) NodeType* newNode = new NodeType{}; node = newNode
+#define INIT_SIMPLE_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass);  } break;
+#define INIT_FLOAT_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); const unsigned numFloats = ReadIntAttr("NumFloats"); for (unsigned i = 0; i < numFloats; i++) { newNode->m_Values[i] = ReadFloatAttr("Value" + std::to_string(i)); }  } break;
+#define INIT_BIN_OP_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Op = ReadStrAttr("OP"); } break;
+#define INIT_NAME_AND_PATH_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Path = ReadStrAttr("Path"); } break;
 
 EditorNode* NodeGraphSerializer::ReadNode()
 {
@@ -291,212 +469,95 @@ EditorNode* NodeGraphSerializer::ReadNode()
 	EditorNodeType nodeType = IntToEnum<EditorNodeType>(ReadIntAttr("Type"));
 	switch (nodeType)
 	{
+		INIT_SIMPLE_NODE(CreateFloat2, CreateFloat2EditorNode);
+		INIT_SIMPLE_NODE(CreateFloat3, CreateFloat3EditorNode);
+		INIT_SIMPLE_NODE(CreateFloat4, CreateFloat4EditorNode);
+		INIT_SIMPLE_NODE(SplitFloat2, SplitFloat2EditorNode);
+		INIT_SIMPLE_NODE(SplitFloat3, SplitFloat3EditorNode);
+		INIT_SIMPLE_NODE(SplitFloat4, SplitFloat4EditorNode);
+		INIT_SIMPLE_NODE(If, IfEditorNode);
+		INIT_SIMPLE_NODE(Print, PrintEditorNode);
+		INIT_SIMPLE_NODE(OnUpdate, OnUpdateEditorNode);
+		INIT_SIMPLE_NODE(OnStart, OnStartEditorNode);
+		INIT_SIMPLE_NODE(AsignBool, AsignBoolEditorNode);
+		INIT_SIMPLE_NODE(AsignFloat, AsignFloatEditorNode);
+		INIT_SIMPLE_NODE(AsignFloat2, AsignFloat2EditorNode);
+		INIT_SIMPLE_NODE(AsignFloat3, AsignFloat3EditorNode);
+		INIT_SIMPLE_NODE(AsignFloat4, AsignFloat4EditorNode);
+		INIT_SIMPLE_NODE(VarBool, VarBoolEditorNode);
+		INIT_SIMPLE_NODE(VarFloat, VarFloatEditorNode);
+		INIT_SIMPLE_NODE(VarFloat2, VarFloat2EditorNode);
+		INIT_SIMPLE_NODE(VarFloat3, VarFloat3EditorNode);
+		INIT_SIMPLE_NODE(VarFloat4, VarFloat4EditorNode);
+		INIT_SIMPLE_NODE(GetTexture, GetTextureEditorNode);
+		INIT_SIMPLE_NODE(GetShader, GetShaderEditorNode);
+		INIT_SIMPLE_NODE(GetCubeMesh, GetCubeMeshEditorNode);
+		INIT_SIMPLE_NODE(ClearRenderTarget, ClearRenderTargetEditorNode);
+		INIT_SIMPLE_NODE(DrawMesh, DrawMeshEditorNode);
+		INIT_SIMPLE_NODE(BindTable, BindTableEditorNode);
+		INIT_SIMPLE_NODE(PresentTexture, PresentTextureEditorNode);
+
+		INIT_FLOAT_NODE(Float, FloatEditorNode);
+		INIT_FLOAT_NODE(Float2, Float2EditorNode);
+		INIT_FLOAT_NODE(Float3, Float3EditorNode);
+		INIT_FLOAT_NODE(Float4, Float4EditorNode);
+
+		INIT_BIN_OP_NODE(FloatBinaryOperator, FloatBinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(Float2BinaryOperator, Float2BinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(Float3BinaryOperator, Float3BinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(Float4BinaryOperator, Float4BinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(FloatComparisonOperator, FloatComparisonOperatorEditorNode);
+		INIT_BIN_OP_NODE(BoolBinaryOperator, BoolBinaryOperatorEditorNode);
+
+		INIT_NAME_AND_PATH_NODE(LoadTexture, LoadTextureEditorNode);
+		INIT_NAME_AND_PATH_NODE(LoadShader, LoadShaderEditorNode);
+		INIT_NAME_AND_PATH_NODE(LoadMesh, LoadMeshEditorNode);
+
 	case EditorNodeType::Bool:
 	{
 		INIT_NODE(BoolEditorNode);
 		newNode->m_Value = ReadBoolAttr("Value");
 	} break;
-	case EditorNodeType::Float:
+	case EditorNodeType::String:
 	{
-		INIT_NODE(FloatEditorNode);
-		ReadFloatNode(newNode);
-	} break;
-	case EditorNodeType::Float2:
-	{
-		INIT_NODE(Float2EditorNode);
-		ReadFloatNode(newNode);
-	} break;
-	case EditorNodeType::Float3:
-	{
-		INIT_NODE(Float3EditorNode);
-		ReadFloatNode(newNode);
-	} break;
-	case EditorNodeType::Float4:
-	{
-		INIT_NODE(Float4EditorNode);
-		ReadFloatNode(newNode);
-	} break;
-	case EditorNodeType::CreateFloat2:
-	{
-		INIT_NODE(CreateFloat2EditorNode);
-	} break;
-	case EditorNodeType::CreateFloat3:
-	{
-		INIT_NODE(CreateFloat3EditorNode);
-	} break;
-	case EditorNodeType::CreateFloat4:
-	{
-		INIT_NODE(CreateFloat4EditorNode);
-	} break;
-	case EditorNodeType::SplitFloat2:
-	{
-		INIT_NODE(SplitFloat2EditorNode);
-	} break;
-	case EditorNodeType::SplitFloat3:
-	{
-		INIT_NODE(SplitFloat3EditorNode);
-	} break;
-	case EditorNodeType::SplitFloat4:
-	{
-		INIT_NODE(SplitFloat4EditorNode);
-	} break;
-	case EditorNodeType::FloatBinaryOperator:
-	{
-		INIT_NODE(FloatBinaryOperatorEditorNode);
-		ReadBinaryOperatorNode(newNode);
-	} break;
-	case EditorNodeType::Float2BinaryOperator:
-	{
-		INIT_NODE(Float2BinaryOperatorEditorNode);
-		ReadBinaryOperatorNode(newNode);
-	} break;
-	case EditorNodeType::Float3BinaryOperator:
-	{
-		INIT_NODE(Float3BinaryOperatorEditorNode);
-		ReadBinaryOperatorNode(newNode);
-	} break;
-	case EditorNodeType::Float4BinaryOperator:
-	{
-		INIT_NODE(Float4BinaryOperatorEditorNode);
-		ReadBinaryOperatorNode(newNode);
-	} break;
-	case EditorNodeType::FloatComparisonOperator:
-	{
-		INIT_NODE(FloatComparisonOperatorEditorNode);
-		ReadBinaryOperatorNode(newNode);
-	} break;
-	case EditorNodeType::BoolBinaryOperator:
-	{
-		INIT_NODE(BoolBinaryOperatorEditorNode);
-		ReadBinaryOperatorNode(newNode);
-	} break;
-	case EditorNodeType::If:
-	{
-		INIT_NODE(IfEditorNode);
-	} break;
-	case EditorNodeType::Print:
-	{
-		INIT_NODE(PrintEditorNode);
-	} break;
-	case EditorNodeType::OnUpdate:
-	{
-		INIT_NODE(OnUpdateEditorNode);
-	} break;
-	case EditorNodeType::OnStart:
-	{
-		INIT_NODE(OnStartEditorNode);
-	} break;
-	case EditorNodeType::AsignFloat:
-	{
-		INIT_NODE(AsignFloatEditorNode);
-		ReadAsignVariableNode(newNode);
-	} break;
-	case EditorNodeType::AsignFloat2:
-	{
-		INIT_NODE(AsignFloat2EditorNode);
-		ReadAsignVariableNode(newNode);
-	} break;
-	case EditorNodeType::AsignFloat3:
-	{
-		INIT_NODE(AsignFloat3EditorNode);
-		ReadAsignVariableNode(newNode);
-	} break;
-	case EditorNodeType::AsignFloat4:
-	{
-		INIT_NODE(AsignFloat4EditorNode);
-		ReadAsignVariableNode(newNode);
-	} break;
-	case EditorNodeType::AsignBool:
-	{
-		INIT_NODE(AsignBoolEditorNode);
-		ReadAsignVariableNode(newNode);
-	} break;
-	case EditorNodeType::VarFloat:
-	{
-		INIT_NODE(VarFloatEditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::VarFloat2:
-	{
-		INIT_NODE(VarFloat2EditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::VarFloat3:
-	{
-		INIT_NODE(VarFloat3EditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::VarFloat4:
-	{
-		INIT_NODE(VarFloat4EditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::VarBool:
-	{
-		INIT_NODE(VarBoolEditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::GetTexture:
-	{
-		INIT_NODE(GetTextureEditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::GetShader:
-	{
-		INIT_NODE(GetShaderEditorNode);
-		ReadVariableNode(newNode);
-	} break;
-	case EditorNodeType::ClearRenderTarget:
-	{
-		INIT_NODE(ClearRenderTargetEditorNode);
+		INIT_NODE(StringEditorNode);
+		newNode->m_Value = ReadStrAttr("Value");
 	} break;
 	case EditorNodeType::CreateTexture:
 	{
 		INIT_NODE(CreateTextureEditorNode);
-		newNode->m_Name = ReadStrAttr("Name");
 		newNode->m_Width = ReadIntAttr("Width");
 		newNode->m_Height = ReadIntAttr("Height");
 		newNode->m_Framebuffer = ReadBoolAttr("IsFramebuffer");
-	} break;
-	case EditorNodeType::PresentTexture:
-	{
-		INIT_NODE(PresentTextureEditorNode);
-	} break;
-	case EditorNodeType::LoadTexture:
-	{
-		INIT_NODE(LoadTextureEditorNode);
-		ReadNamePathPathNode(newNode);
-	} break;
-	case EditorNodeType::LoadShader:
-	{
-		INIT_NODE(LoadShaderEditorNode);
-		ReadNamePathPathNode(newNode);
-	} break;
-	case EditorNodeType::GetCubeMesh:
-	{
-		INIT_NODE(GetCubeMeshEditorNode);
-	} break;
-	case EditorNodeType::DrawMesh:
-	{
-		INIT_NODE(DrawMeshEditorNode);
-	} break;
-	case EditorNodeType::BindTable:
-	{
-		INIT_NODE(BindTableEditorNode);
+		if (m_Version > 2) newNode->m_DepthStencil = ReadBoolAttr("IsDepthStencil");
 	} break;
 	case EditorNodeType::GetMesh:
 	{
 		INIT_NODE(GetMeshEditorNode);
-		ReadVariableNode(newNode);
 		newNode->m_PositionBit = ReadBoolAttr("PositionBit");
 		newNode->m_TexcoordBit = ReadBoolAttr("TexcoordBit");
 		newNode->m_NormalBit = ReadBoolAttr("NormalBit");
 		newNode->m_TangentBit = ReadBoolAttr("TangentBit");
 	} break;
-	case EditorNodeType::LoadMesh:
+	case EditorNodeType::RenderState:
 	{
-		INIT_NODE(LoadMeshEditorNode);
-		ReadNamePathPathNode(newNode);
+		INIT_NODE(RenderStateEditorNode);
+		newNode->m_DepthWrite = ReadBoolAttr("DepthWrite");
+		newNode->m_DepthTestMode = ReadStrAttr("DepthTest");
+	} break;
+	case EditorNodeType::Pin:
+	{
+		const bool isInput = ReadBoolAttr("IsInput");
+		const PinType pinType = IntToEnum<PinType>(ReadIntAttr("PinType"));
+		PinEditorNode* newNode = new PinEditorNode{ isInput, pinType };
+		newNode->m_Name = ReadStrAttr("Name");
+
+		node = newNode;
+	} break;
+	case EditorNodeType::Custom:
+	{
+		const unsigned customNodeIndex = ReadIntAttr("CustomNodeIndex");
+		node = new UnresolvedCustomEditorNode(customNodeIndex);
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -504,7 +565,6 @@ EditorNode* NodeGraphSerializer::ReadNode()
 		node = new FloatEditorNode{}; // Just some random node to prevent crash
 	}
 
-	node->m_Type = nodeType;
 	node->m_ID = ReadIntAttr("ID");
 	
 	// Read pins
@@ -525,7 +585,6 @@ EditorNode* NodeGraphSerializer::ReadNode()
 	}
 
 	// Read custom pins
-	if(m_Version > 1)
 	{
 		EatToken(BEGIN_PIN_LIST_TOKEN);
 
@@ -563,14 +622,18 @@ EditorNodeLink NodeGraphSerializer::ReadLink()
 	return link;
 }
 
-void NodeGraphSerializer::ReadAsignVariableNode(AsignVariableEditorNode* asignNode)
+CustomEditorNode* NodeGraphSerializer::ReadCustomNode(const std::vector<CustomEditorNode*>& customNodes)
 {
-	asignNode->m_Name = ReadStrAttr("Name");
-}
+	EatToken(BEGIN_NODE_TOKEN);
 
-void NodeGraphSerializer::ReadVariableNode(VariableEditorNode* varNode)
-{
-	varNode->m_VariableName = ReadStrAttr("Name");
+	const std::string name = ReadStrAttr("Name");
+	
+	NodeGraph* nodeGraph = new NodeGraph{};
+	ReadNodeGraph(*nodeGraph, customNodes);
+
+	EatToken(END_NODE_TOKEN);
+
+	return new CustomEditorNode{ nullptr, name, nodeGraph };
 }
 
 void NodeGraphSerializer::ReadFloatNode(FloatNEditorNode* floatNode)
@@ -589,7 +652,6 @@ void NodeGraphSerializer::ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOp
 
 void NodeGraphSerializer::ReadNamePathPathNode(NameAndPathExecutionEditorNode* nameAndPathNode)
 {
-	nameAndPathNode->m_Name = ReadStrAttr("Name");
 	nameAndPathNode->m_Path = ReadStrAttr("Path");
 }
 

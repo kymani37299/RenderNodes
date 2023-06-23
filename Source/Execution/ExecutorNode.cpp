@@ -184,6 +184,20 @@ namespace
 			}
 		}
 	}
+
+	void RenderStateBind(const RenderState& renderState)
+	{
+		const bool depthTestEnabled = renderState.DepthWrite || renderState.DepthTest != GL_ALWAYS;
+
+		if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
+		else glDisable(GL_DEPTH_TEST);
+
+		if(depthTestEnabled)
+		{
+			glDepthMask(renderState.DepthWrite ? GL_TRUE : GL_FALSE);
+			glDepthFunc(renderState.DepthTest);
+		}
+	}
 }
 
 void IfExecutorNode::Execute(ExecuteContext& context)
@@ -226,7 +240,7 @@ void ClearRenderTargetExecutorNode::Execute(ExecuteContext& context)
 
 		GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, texture->FrameBufferHandle));
 		GL_CALL(glClearColor(clearColor.x, clearColor.y, clearColor.z, clearColor.w));
-		GL_CALL(glClear(GL_COLOR_BUFFER_BIT));
+		GL_CALL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
 		GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	}
 }
@@ -235,6 +249,7 @@ void PresentTextureExecutorNode::Execute(ExecuteContext& context)
 {
 	Texture* texture = m_Texture->GetValue(context);
 	Warning(texture, "PresentTextureExecutorNode", "Input texture is null");
+	Warning(texture->Flags & TF_Framebuffer, "PresentTextureExecutorNode", "Trying to present texture that doesn't have framebuffer enabled");
 	context.RenderTarget = texture;
 }
 
@@ -247,25 +262,51 @@ static T* AddToPtrVector(std::vector<Ptr<T>>& ptrVector, Ptr<T>&& ptrValue)
 
 void LoadTextureExecutorNode::Execute(ExecuteContext& context)
 {
+	if (!m_NameNode)
+	{
+		Failure("LoadTextureExecutorNode", "Failed to load texture");
+		context.Failure = true;
+	}
+
+	const std::string name = m_NameNode->GetValue(context);
+	const unsigned varKey = Hash::Crc32(name);
+
 	SceneLoading::Loader l{};
-	context.Variables.Textures[m_TextureKey] = AddToPtrVector(context.RenderResources.Textures, l.LoadTexture(m_TexturePath, Float4{ 1.0, 0.0f, 0.25f, 1.0f }));
+	context.Variables.Textures[varKey] = AddToPtrVector(context.RenderResources.Textures, l.LoadTexture(m_TexturePath, Float4{ 1.0, 0.0f, 0.25f, 1.0f }));
 }
 
 void LoadShaderExecutorNode::Execute(ExecuteContext& context)
 {
 	Shader* shader = AddToPtrVector(context.RenderResources.Shaders, Shader::Compile(m_ShaderPath));
-	if (!shader)
+	if (!shader || !m_NameNode)
 	{
 		Failure("LoadShaderExecutorNode", "Failed to compile shader");
 		context.Failure = true;
 		return;
 	}
-	context.Variables.Shaders[m_ShaderKey] = shader;
+
+	const std::string name = m_NameNode->GetValue(context);
+	const unsigned varKey = Hash::Crc32(name);
+
+	context.Variables.Shaders[varKey] = shader;
 }
 
 void CreateTextureExecutorNode::Execute(ExecuteContext& context)
 {
-	context.Variables.Textures[m_TextureKey] = AddToPtrVector(context.RenderResources.Textures, Texture::Create(m_Width, m_Height, m_IsFramebuffer ? TF_Framebuffer : TF_None));
+	if (!m_NameNode)
+	{
+		Failure("CreateTextureExecutorNode", "Failed to get texture name");
+		context.Failure = true;
+		return;
+	}
+
+	const std::string name = m_NameNode->GetValue(context);
+	const unsigned varKey = Hash::Crc32(name);
+
+	unsigned textureFlags = TF_None;
+	if (m_IsFramebuffer) textureFlags |= TF_Framebuffer;
+	if (m_IsDepthStencil) textureFlags |= TF_DepthStencil;
+	context.Variables.Textures[varKey] = AddToPtrVector(context.RenderResources.Textures, Texture::Create(m_Width, m_Height, textureFlags));
 }
 
 DrawMeshExecutorNode::~DrawMeshExecutorNode()
@@ -306,6 +347,11 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 	GL_CALL(glViewport(0, 0, framebuffer->Width, framebuffer->Height));
 	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, framebuffer->FrameBufferHandle));
 
+	// Render state
+	RenderState renderState;
+	if (m_RenderState) renderState = m_RenderState->GetValue(context);
+	RenderStateBind(renderState);
+
 	// Shader
 	GL_CALL(glUseProgram(shader->Handle));
 
@@ -339,13 +385,16 @@ void LoadMeshExecutorNode::Execute(ExecuteContext& context)
 	SceneLoading::Loader l{};
 	Ptr<SceneLoading::Scene> scene = l.Load(m_MeshPath);
 
-	if (scene->Objects.empty() || l.HasErrors())
+	if (scene->Objects.empty() || l.HasErrors() || !m_NameNode)
 	{
 		l.PrintErrors();
 		Failure("LoadMeshExecutorNode", "Failed to load scene");
 		context.Failure = true;
 		return;
 	}
+
+	const std::string name = m_NameNode->GetValue(context);
+	const unsigned varKey = Hash::Crc32(name);
 
 	auto& objectMesh = scene->Objects[0].Mesh;
 
@@ -357,5 +406,5 @@ void LoadMeshExecutorNode::Execute(ExecuteContext& context)
 	mesh->Tangents = std::move(objectMesh.Tangents);
 	mesh->Indices = std::move(objectMesh.Indices);
 
-	context.Variables.Meshes[m_MeshKey] = AddToPtrVector(context.RenderResources.Meshes, Ptr<Mesh>(mesh));
+	context.Variables.Meshes[varKey] = AddToPtrVector(context.RenderResources.Meshes, Ptr<Mesh>(mesh));
 }
