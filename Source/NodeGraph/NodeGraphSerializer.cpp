@@ -7,8 +7,8 @@
 #include "../NodeGraph/NodeGraph.h"
 #include "../Editor/RenderPipelineEditor.h"
 
-// #define ENABLE_TOKEN_VERIFICATION
-// #define ASSERT_ON_LOAD_FAILED
+#define ENABLE_TOKEN_VERIFICATION
+#define ASSERT_ON_LOAD_FAILED
 
 #ifdef ASSERT_ON_LOAD_FAILED
 #define LOAD_ASSERT() ASSERT(0)
@@ -62,7 +62,7 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 
 	m_Version = ReadIntAttr("Version");
 
-	if (m_Version < 4)
+	if (m_Version < 7)
 	{
 		m_OperationSuccess = false;
 		std::cout << "Not compatabile with this version of file " << std::endl;
@@ -72,7 +72,7 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 	m_UseTokens = ReadIntAttr("UseTokens");
 	unsigned firstID = ReadIntAttr("FirstID");
 
-	if (m_Version > 4) customNodes = ReadCustomNodeList();
+	customNodes = ReadCustomNodeList();
 	ReadNodeGraph(nodeGraph, customNodes);
 
 	m_Input.close();
@@ -125,9 +125,59 @@ void NodeGraphSerializer::WriteCustomNodeList()
 
 	WriteToken(BEGIN_NODE_LIST_TOKEN);
 
-	WriteAttribute("Count", customNodes.size());
+	std::unordered_map<std::string, std::unordered_set<std::string>> nodeDependencies;
+	std::unordered_set<CustomEditorNode*> nodesToWrite;
 	for (const auto& customNode : customNodes)
-		WriteCustomNode(customNode.get());
+	{
+		const auto fn = [&nodeDependencies, cnName = customNode->GetName()](EditorNode* node) {
+			if (node->GetType() == EditorNodeType::Custom)
+			{
+				CustomEditorNode* cn = static_cast<CustomEditorNode*>(node);
+				nodeDependencies[cnName].insert(cn->GetName());
+			}
+		};
+		customNode->GetNodeGraph()->ForEachNode(fn);
+		nodesToWrite.insert(customNode.get());
+	}
+
+	std::unordered_set<std::string> writtenNodes;
+	WriteAttribute("Count", customNodes.size());
+	while (!nodesToWrite.empty())
+	{
+		CustomEditorNode* nodeToWrite = nullptr;
+		for (const auto& customNode : nodesToWrite)
+		{
+			bool foundMissingDependency = false;
+			for (const auto& nodeDep : nodeDependencies[customNode->GetName()])
+			{
+				if (writtenNodes.count(nodeDep) == 0)
+				{
+					foundMissingDependency = true;
+					break;
+				}
+			}
+
+			if (!foundMissingDependency)
+			{
+				nodeToWrite = customNode;
+				break;
+			}
+		}
+
+		if (nodeToWrite)
+		{
+			WriteCustomNode(nodeToWrite);
+
+			nodesToWrite.erase(nodeToWrite);
+			writtenNodes.insert(nodeToWrite->GetName());
+		}
+		else
+		{
+			LOAD_ASSERT();
+			m_OperationSuccess = false;
+			return;
+		}
+	}
 
 	WriteToken(END_NODE_LIST_TOKEN);
 }
@@ -273,20 +323,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::Custom:
 	{
 		READ_EDITOR_NODE(CustomEditorNode);
-
-		unsigned customNodeIndex = -1;
-		const auto& customNodes = *App::Get()->GetCustomNodes();
-		for (unsigned i = 0; i < customNodes.size(); i++)
-		{
-			if (customNodes[i]->GetName() == readNode->GetName())
-			{
-				customNodeIndex = i;
-				break;
-			}
-		}
-		ASSERT(customNodeIndex != -1);
-		
-		WriteAttribute("CustomNodeIndex", customNodeIndex);
+		WriteAttribute("CustomNodeName", readNode->GetName());
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -310,6 +347,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
 		WriteAttribute("Type", EnumToInt(pin.Type));
 		WriteAttribute("Label", pin.Label);
+		WriteAttribute("LinkedNode", pin.LinkedNode);
 	}
 	WriteToken(END_PIN_LIST_TOKEN);
 
@@ -339,22 +377,21 @@ void NodeGraphSerializer::ReadNodeGraph(NodeGraph& nodeGraph, const std::vector<
 {
 	EatToken(BEGIN_NODE_GRAPH_TOKEN);
 
-	ReadNodeList(nodeGraph);
+	ReadNodeList(nodeGraph, customNodes);
 	ReadLinkList(nodeGraph);
-	ResolveCustomNodes(nodeGraph, customNodes);
-	if (m_Version > 5) ReadNodePositions(nodeGraph);
+	ReadNodePositions(nodeGraph);
 
 	EatToken(END_NODE_GRAPH_TOKEN);
 }
 
-void NodeGraphSerializer::ReadNodeList(NodeGraph& nodeGraph)
+void NodeGraphSerializer::ReadNodeList(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
 {
 	EatToken(BEGIN_NODE_LIST_TOKEN);
 
 	unsigned nodeCount = ReadIntAttr("Count");
 	for (unsigned i = 0; i < nodeCount; i++)
 	{
-		EditorNode* node = ReadNode();
+		EditorNode* node = ReadNode(nodeGraph, customNodes);
 		nodeGraph.AddNode(node);
 	}
 
@@ -398,48 +435,6 @@ std::vector<CustomEditorNode*> NodeGraphSerializer::ReadCustomNodeList()
 	return customNodes;
 }
 
-void NodeGraphSerializer::ResolveCustomNodes(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
-{
-	// TODO: Make a better solution for this, this will modify save file every time we save
-
-	const auto fn = [this, &customNodes, &nodeGraph](EditorNode* node)
-	{
-		if (node->GetType() == EditorNodeType::UnresolvedCustom)
-		{
-			UnresolvedCustomEditorNode* unresolvedNode = static_cast<UnresolvedCustomEditorNode*>(node);
-			if (unresolvedNode->GetIndex() < customNodes.size())
-			{
-				CustomEditorNode* customNodePrototype = customNodes[unresolvedNode->GetIndex()];
-
-				CustomEditorNode* customNode = static_cast<CustomEditorNode*>(customNodePrototype->Instance(&nodeGraph));
-				customNode->m_ID = unresolvedNode->m_ID;
-				
-				const auto& customNodePins = customNode->GetCustomPins();
-				const auto& unresolvedNodePins = unresolvedNode->GetCustomPins();
-				if (customNodePins.size() == unresolvedNodePins.size())
-				{
-					for (unsigned i = 0; i < customNodePins.size(); i++)
-					{
-						nodeGraph.ReplacePinLinks(unresolvedNodePins[i].ID, customNodePins[i].ID);
-					}
-				}
-				else
-				{
-					LOAD_ASSERT();
-					m_OperationSuccess = false;
-				}
-				nodeGraph.ReplaceNode(unresolvedNode->m_ID, customNode);
-			}
-			else
-			{
-				LOAD_ASSERT();
-				m_OperationSuccess = false;
-			}
-		}
-	};
-	nodeGraph.ForEachNode(fn);
-}
-
 void NodeGraphSerializer::ReadLinkList(NodeGraph& nodeGraph)
 {
 	EatToken(BEGIN_LINK_LIST_TOKEN);
@@ -460,7 +455,7 @@ void NodeGraphSerializer::ReadLinkList(NodeGraph& nodeGraph)
 #define INIT_BIN_OP_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Op = ReadStrAttr("OP"); } break;
 #define INIT_NAME_AND_PATH_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Path = ReadStrAttr("Path"); } break;
 
-EditorNode* NodeGraphSerializer::ReadNode()
+EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
 {
 	EatToken(BEGIN_NODE_TOKEN);
 
@@ -529,7 +524,7 @@ EditorNode* NodeGraphSerializer::ReadNode()
 		newNode->m_Width = ReadIntAttr("Width");
 		newNode->m_Height = ReadIntAttr("Height");
 		newNode->m_Framebuffer = ReadBoolAttr("IsFramebuffer");
-		if (m_Version > 2) newNode->m_DepthStencil = ReadBoolAttr("IsDepthStencil");
+		newNode->m_DepthStencil = ReadBoolAttr("IsDepthStencil");
 	} break;
 	case EditorNodeType::GetMesh:
 	{
@@ -556,8 +551,23 @@ EditorNode* NodeGraphSerializer::ReadNode()
 	} break;
 	case EditorNodeType::Custom:
 	{
-		const unsigned customNodeIndex = ReadIntAttr("CustomNodeIndex");
-		node = new UnresolvedCustomEditorNode(customNodeIndex);
+		CustomEditorNode* customNodeClass = nullptr;
+		const std::string customNodeName = ReadStrAttr("CustomNodeName");
+		for (const auto cm : customNodes)
+		{
+			if (customNodeName == cm->GetName())
+			{
+				customNodeClass = cm;
+				break;
+			}
+		}
+		if (customNodeClass == nullptr)
+		{
+			LOAD_ASSERT();
+			m_OperationSuccess = false;
+			return nullptr;
+		}
+		node = new CustomEditorNode(&nodeGraph, customNodeName, customNodeClass->GetNodeGraph(), false);
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -597,6 +607,7 @@ EditorNode* NodeGraphSerializer::ReadNode()
 			pin.IsInput = ReadBoolAttr("IsInput");
 			pin.Type = IntToEnum<PinType>(ReadIntAttr("Type"));
 			pin.Label = ReadStrAttr("Label");
+			pin.LinkedNode = ReadIntAttr("LinkedNode");
 			node->m_CustomPins[i] = pin;
 		}
 

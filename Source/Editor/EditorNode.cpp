@@ -351,13 +351,16 @@ void PinEditorNode::RenderContent()
     EditorWidgets::InputText("Name", m_Name);
 }
 
-CustomEditorNode::CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph) :
+CustomEditorNode::CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph, bool regneratePins) :
 	ExecutionEditorNode(name, EditorNodeType::Custom, true, true),
     m_Name(name),
 	m_NodeGraph(nodeGraph),
     m_ParentGraph(parentGraph)
 {
-    RegeneratePins();
+    if (regneratePins)
+    {
+        RegeneratePins();
+    }
 }
 
 void CustomEditorNode::RegeneratePins()
@@ -368,8 +371,18 @@ void CustomEditorNode::RegeneratePins()
     {
         if (node->GetType() == EditorNodeType::Pin)
         {
+            bool hasPin = false;
             PinEditorNode* pinNode = static_cast<PinEditorNode*>(node);
-            if (m_NodePinMap.find(pinNode->GetID()) == m_NodePinMap.end())
+            for (const auto& pin : GetCustomPins())
+            {
+                if (pin.LinkedNode == pinNode->GetID())
+                {
+                    hasPin = true;
+                    break;
+                }
+            }
+
+            if (!hasPin)
             {
                 pinsToAdd.push_back(pinNode);
             }
@@ -378,30 +391,22 @@ void CustomEditorNode::RegeneratePins()
     m_NodeGraph->ForEachNode(fn);
 
     // Detect pins to delete
-    std::vector <std::pair<NodeID, PinID>> toDelete{};
-    for (const auto& it : m_NodePinMap)
-    {
-        const NodeID nodeID = it.first;
-        const PinID pinID = it.second;
-        if (!m_NodeGraph->ContainsNode(nodeID))
+    std::vector <PinID> toDelete{};
+    for (const auto& pin : GetCustomPins())
+	{
+        if (!m_NodeGraph->ContainsNode(pin.LinkedNode))
         {
-            toDelete.push_back(std::make_pair(nodeID, pinID));
+            toDelete.push_back(pin.ID);
         }
 	}
 
     // Delete pins
-    for (const auto& it : toDelete)
+    for (const auto& pinID : toDelete)
     {
-        const NodeID nodeID = it.first;
-        const PinID pinID = it.second;
-
         if (m_ParentGraph)
             m_ParentGraph->RemovePin(pinID);
         else
             RemovePin(pinID);
-
-        m_NodePinMap.erase(nodeID);
-        m_PinNodeMap.erase(pinID);
     }
 
     // Add new pins
@@ -413,8 +418,7 @@ void CustomEditorNode::RegeneratePins()
 		if (pin.IsInput) pinToAdd = EditorNodePin::CreateOutputPin(pinNode->GetName(), pin.Type);
 		else pinToAdd = EditorNodePin::CreateInputPin(pinNode->GetName(), pin.Type);
 
+        pinToAdd.LinkedNode = pinNode->GetID();
 		AddCustomPin(pinToAdd);
-		m_PinNodeMap[pinToAdd.ID] = pinNode->GetID();
-		m_NodePinMap[pinNode->GetID()] = pinToAdd.ID;
     }
 }

@@ -145,6 +145,7 @@ struct EditorNodePin
     PinType Type = PinType::Invalid;
     PinID ID = 0;
     std::string Label = "";
+    NodeID LinkedNode = 0;
 
     static EditorNodePin CreateInputPin(const std::string& label, PinType type);
     static EditorNodePin CreateOutputPin(const std::string& label, PinType type);

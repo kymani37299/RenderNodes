@@ -58,7 +58,7 @@ class CustomEditorNode : public ExecutionEditorNode
 	SERIALIZEABLE_EDITOR_NODE();
 public:
 
-	CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph);
+	CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph, bool regneratePins = true);
 
 	EditorNode* Clone() const override
 	{
@@ -71,8 +71,32 @@ public:
 	}
 
 	const std::string& GetName() const { return m_Name; }
-	NodeID GetPinNode(PinID pinID) const { ASSERT(m_PinNodeMap.find(pinID) != m_PinNodeMap.end()); return m_PinNodeMap.at(pinID); }
-	PinID GetPin(NodeID nodeID) const { ASSERT(m_NodePinMap.find(nodeID) != m_NodePinMap.end()); return m_NodePinMap.at(nodeID); }
+
+	NodeID GetPinNode(PinID pinID) const 
+	{ 
+		for (const auto customPin : GetCustomPins())
+		{
+			if (customPin.ID == pinID)
+			{
+				ASSERT(customPin.LinkedNode != 0);
+				return customPin.LinkedNode;
+			}
+		}
+		ASSERT(0);
+		return 0;
+	}
+
+	PinID GetPin(NodeID nodeID) const 
+	{
+		for (const auto customPin : GetCustomPins())
+		{
+			if (customPin.LinkedNode == nodeID)
+			{
+				return customPin.ID;
+			}
+		}
+		return 0;
+	}
 
 	NodeGraph* GetNodeGraph() const { return m_NodeGraph.get(); }
 
@@ -82,26 +106,6 @@ private:
 	std::string m_Name;
 	SharedPtr<NodeGraph> m_NodeGraph;
 	NodeGraph* m_ParentGraph;
-
-	std::unordered_map<PinID, NodeID> m_PinNodeMap;
-	std::unordered_map<NodeID, PinID> m_NodePinMap;
-};
-
-// Used in deserialization
-class UnresolvedCustomEditorNode : public EditorNode
-{
-	SERIALIZEABLE_EDITOR_NODE();
-public:
-	UnresolvedCustomEditorNode(unsigned index) :
-		EditorNode("ERROR: This node should never be in graph", EditorNodeType::UnresolvedCustom),
-		m_Index(index) {}
-
-	unsigned GetIndex() const { return m_Index; }
-
-	EditorNode* Clone() const { return new UnresolvedCustomEditorNode{ m_Index }; }
-
-private:
-	unsigned m_Index;
 };
 
 class OnStartEditorNode : public ExecutionEditorNode

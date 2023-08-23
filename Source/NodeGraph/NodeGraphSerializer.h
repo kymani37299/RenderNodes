@@ -21,7 +21,7 @@ struct EditorNodePin;
 
 class NodeGraphSerializer
 {
-	static constexpr unsigned VERSION = 6;
+	static constexpr unsigned VERSION = 7;
 
 public:
 	void Serialize(const std::string& path, const NodeGraph& nodeGraph);
@@ -43,12 +43,11 @@ private:
 
 	// Reads
 	void ReadNodeGraph(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes);
-	void ReadNodeList(NodeGraph& nodeGraph);
+	void ReadNodeList(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes);
 	void ReadNodePositions(NodeGraph& nodeGraph);
 	std::vector<CustomEditorNode*> ReadCustomNodeList();
-	void ResolveCustomNodes(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes);
 	void ReadLinkList(NodeGraph& nodeGraph);
-	EditorNode* ReadNode();
+	EditorNode* ReadNode(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes);
 	EditorNodeLink ReadLink();
 	CustomEditorNode* ReadCustomNode(const std::vector<CustomEditorNode*>& customNodes);
 	
