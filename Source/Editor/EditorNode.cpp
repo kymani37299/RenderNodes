@@ -37,15 +37,15 @@ static void DrawPin(EditorNodePin pin, EditorNode* node)
             needsPinUpdate = ImGui::DragFloat("", &pin.ConstantValue.F);
             break;
         case PinType::Float2:
-            ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+            ImGui::SetNextItemWidth(ImGui::ConstantSize(75.0f));
             needsPinUpdate = ImGui::DragFloat2("", pin.ConstantValue.F2);
             break;
         case PinType::Float3:
-			ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+			ImGui::SetNextItemWidth(ImGui::ConstantSize(100.0f));
 			needsPinUpdate = ImGui::DragFloat3("", pin.ConstantValue.F3);
 			break;
         case PinType::Float4:
-			ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+			ImGui::SetNextItemWidth(ImGui::ConstantSize(125.0f));
 			needsPinUpdate = ImGui::DragFloat4("", pin.ConstantValue.F4);
 		    break; 
         case PinType::String:
