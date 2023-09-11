@@ -2,6 +2,8 @@
 
 #include "EditorNode.h"
 
+#include "../App/App.h"
+
 class ExecutionEditorNode : public EditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
@@ -123,6 +125,7 @@ public:
 
 class OnUpdateEditorNode : public ExecutionEditorNode
 {
+	SERIALIZEABLE_EDITOR_NODE();
 public:
 	OnUpdateEditorNode() :
 		ExecutionEditorNode("On update", EditorNodeType::OnUpdate, true)
@@ -136,6 +139,74 @@ public:
 	}
 };
 
+class InputExecutionEditorNode : public ExecutionEditorNode, IInputListener
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	InputExecutionEditorNode(const std::string& label, EditorNodeType type) :
+		ExecutionEditorNode(label, type, true)
+	{
+	}
+
+	InputExecutionEditorNode(const std::string& label, EditorNodeType type, int key, int mods) :
+		ExecutionEditorNode(label, type, true),
+		m_Key(key),
+		m_Mods(mods)
+	{
+	}
+
+	void RenderContent() override;
+
+	int GetKey() const { return m_Key; }
+	int GetMods() const { return m_Mods; }
+
+	void OnKeyReleased(int key, int mods) override;
+
+private:
+	bool m_ListeningToInput = false;
+
+	int m_Key = 0;
+	int m_Mods = 0;
+
+	std::string m_InputText;
+};
+
+class OnKeyPressedEditorNode : public InputExecutionEditorNode
+{
+public:
+	OnKeyPressedEditorNode() :
+		InputExecutionEditorNode("On key pressed", EditorNodeType::OnKeyPressed) {}
+
+	OnKeyPressedEditorNode(int key, int mods) :
+		InputExecutionEditorNode("On key pressed", EditorNodeType::OnKeyPressed, key, mods) {}
+
+	EditorNode* Clone() const override { return new OnKeyPressedEditorNode{GetKey(), GetMods()}; }
+};
+
+class OnKeyReleasedEditorNode : public InputExecutionEditorNode
+{
+public:
+	OnKeyReleasedEditorNode() :
+		InputExecutionEditorNode("On key released", EditorNodeType::OnKeyReleased) {}
+
+	OnKeyReleasedEditorNode(int key, int mods) :
+		InputExecutionEditorNode("On key released", EditorNodeType::OnKeyReleased, key, mods) {}
+
+	EditorNode* Clone() const override { return new OnKeyReleasedEditorNode{ GetKey(), GetMods() }; }
+};
+
+class OnKeyDownEditorNode : public InputExecutionEditorNode
+{
+public:
+	OnKeyDownEditorNode() :
+		InputExecutionEditorNode("On key down", EditorNodeType::OnKeyDown) {}
+
+	OnKeyDownEditorNode(int key, int mods) :
+		InputExecutionEditorNode("On key down", EditorNodeType::OnKeyDown, key, mods) {}
+
+	EditorNode* Clone() const override { return new OnKeyDownEditorNode{ GetKey(), GetMods() }; }
+};
+
 class AsignVariableEditorNode : public ExecutionEditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
@@ -144,7 +215,7 @@ public:
 		ExecutionEditorNode("Asign " + ToString(inputType), nodeType)
 	{
 		m_ValuePin = AddPin(EditorNodePin::CreateInputPin("Value", inputType));
-		m_NamePin = AddPin(EditorNodePin::CreateInputPin("Name", PinType::String));
+		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
 	}
 
 	const EditorNodePin& GetValuePin() const { return GetPins()[m_ValuePin]; }
@@ -169,10 +240,12 @@ public:
 };
 
 using AsignBoolEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignBool, PinType::Bool>;
+using AsignIntEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignInt, PinType::Int>;
 using AsignFloatEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat, PinType::Float>;
 using AsignFloat2EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat2, PinType::Float2>;
 using AsignFloat3EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat3, PinType::Float3>;
 using AsignFloat4EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat4, PinType::Float4>;
+using AsignFloat4x4EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat4x4, PinType::Float4x4>;
 
 class IfEditorNode : public ExecutionEditorNode
 {
@@ -209,6 +282,9 @@ public:
 		m_Float2InputPin = AddPin(EditorNodePin::CreateInputPin("Float2", PinType::Float2));
 		m_Float3InputPin = AddPin(EditorNodePin::CreateInputPin("Float3", PinType::Float3));
 		m_Float4InputPin = AddPin(EditorNodePin::CreateInputPin("Float4", PinType::Float4));
+		m_IntInputPin = AddPin(EditorNodePin::CreateInputPin("Int", PinType::Int));
+		m_BoolInputPin = AddPin(EditorNodePin::CreateInputPin("Bool", PinType::Bool));
+		m_StringInputPin = AddPin(EditorNodePin::CreateInputPin("String", PinType::String));
 	}
 
 	EditorNode* Clone() const override
@@ -220,12 +296,18 @@ public:
 	const EditorNodePin& GetFloat2InputPin() const { return GetPins()[m_Float2InputPin]; }
 	const EditorNodePin& GetFloat3InputPin() const { return GetPins()[m_Float3InputPin]; }
 	const EditorNodePin& GetFloat4InputPin() const { return GetPins()[m_Float4InputPin]; }
+	const EditorNodePin& GetIntInputPin() const { return GetPins()[m_IntInputPin]; }
+	const EditorNodePin& GetBoolInputPin() const { return GetPins()[m_BoolInputPin]; }
+	const EditorNodePin& GetStringInputPin() const { return GetPins()[m_StringInputPin]; }
 
 private:
 	unsigned m_FloatInputPin;
 	unsigned m_Float2InputPin;
 	unsigned m_Float3InputPin;
 	unsigned m_Float4InputPin;
+	unsigned m_IntInputPin;
+	unsigned m_BoolInputPin;
+	unsigned m_StringInputPin;
 };
 
 class CreateTextureEditorNode : public ExecutionEditorNode
@@ -235,35 +317,30 @@ public:
 	CreateTextureEditorNode() :
 		ExecutionEditorNode("Create texture", EditorNodeType::CreateTexture) 
 	{
-		m_NamePin = AddPin(EditorNodePin::CreateInputPin("Name", PinType::String));
+		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		m_WidthPin = AddPin(EditorNodePin::CreateConstantInputPin("Width", PinType::Int));
+		m_HeightPin = AddPin(EditorNodePin::CreateConstantInputPin("Height", PinType::Int));
+		m_FramebufferPin = AddPin(EditorNodePin::CreateConstantInputPin("Framebuffer", PinType::Bool));
+		m_DepthStencilPin = AddPin(EditorNodePin::CreateConstantInputPin("DepthStencil", PinType::Bool));
 	}
 
 	EditorNode* Clone() const override
 	{
-		CreateTextureEditorNode* node = new CreateTextureEditorNode{};
-		node->m_Width = m_Width;
-		node->m_Height = m_Height;
-		node->m_Framebuffer = m_Framebuffer;
-		node->m_DepthStencil = m_DepthStencil;
-		return node;
+		return new CreateTextureEditorNode{};
 	}
 
 	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }
-	int GetWidth() const { return m_Width; }
-	int GetHeight() const { return m_Height; }
-	bool IsFramebuffer() const { return m_Framebuffer; }
-	bool IsDepthStencil() const { return m_DepthStencil; }
-
-protected:
-	virtual void RenderContent() override;
-
+	const EditorNodePin& GetWidthPin() const { return GetPins()[m_WidthPin]; }
+	const EditorNodePin& GetHeightPin() const { return GetPins()[m_HeightPin]; }
+	const EditorNodePin& GetFramebufferPin() const { return GetPins()[m_FramebufferPin]; }
+	const EditorNodePin& GetDepthStencilPin() const { return GetPins()[m_DepthStencilPin]; }
+	
 private:
 	unsigned m_NamePin;
-
-	int m_Width = 1;
-	int m_Height = 1;
-	bool m_Framebuffer = false;
-	bool m_DepthStencil;
+	unsigned m_WidthPin;
+	unsigned m_HeightPin;
+	unsigned m_FramebufferPin;
+	unsigned m_DepthStencilPin;
 };
 
 class NameAndPathExecutionEditorNode : public ExecutionEditorNode
@@ -273,7 +350,7 @@ public:
 	NameAndPathExecutionEditorNode(const std::string& nodeLabel, EditorNodeType nodeType) :
 		ExecutionEditorNode(nodeLabel, nodeType) 
 	{
-		m_NamePin = AddPin(EditorNodePin::CreateInputPin("Name", PinType::String));
+		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
 	}
 
 	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }

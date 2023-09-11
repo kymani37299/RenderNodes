@@ -141,3 +141,31 @@ public:
 private:
 	std::vector<NodeID> m_PastedNodes;
 };
+
+class MakePinConstantCommand : public NodeGraphCommand
+{
+public:
+	MakePinConstantCommand(PinID pinID) :
+		m_PinID(pinID) {}
+
+	void Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
+	void Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
+
+private:
+	PinID m_PinID;
+	std::vector<EditorNodeLink> m_DeletedLinks;
+};
+
+class MakeConstantToPinCommand : public NodeGraphCommand
+{
+public:
+	MakeConstantToPinCommand(PinID pinID) :
+		m_PinID(pinID) {}
+
+	void Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
+	void Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
+
+private:
+	PinID m_PinID;
+	EditorNodePinConstant m_Value;
+};

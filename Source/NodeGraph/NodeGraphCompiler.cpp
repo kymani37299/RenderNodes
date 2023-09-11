@@ -88,6 +88,34 @@ CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph)
 	pipeline.OnStartNode = Compile(GetNodeGraph()->GetOnStartNode());
 	pipeline.OnUpdateNode = Compile(GetNodeGraph()->GetOnUpdateNode());
 
+	const auto compileInputNodes = [this, &graph](
+		EditorNodeType nodeType,
+		std::unordered_map<uint32_t, ExecutorNode*>& inputMap)
+	{
+		const auto getInputNodes = [&graph](EditorNodeType nodeType)
+		{
+			std::vector<InputExecutionEditorNode*> inputNodes{};
+			const auto fn = [&inputNodes, &nodeType](EditorNode* node) {
+				if (node->GetType() == nodeType)
+					inputNodes.push_back(static_cast<InputExecutionEditorNode*>(node));
+			};
+			graph.ForEachNode(fn);
+			return inputNodes;
+		};
+
+		const auto inputNodes = getInputNodes(nodeType);
+
+		for (const auto& inputNode : inputNodes)
+		{
+			const uint32_t inputHash = ExecutorInputState::GetInputHash(inputNode->GetKey(), inputNode->GetMods());
+			inputMap[inputHash] = Compile(inputNode);
+		}
+	};
+
+	compileInputNodes(EditorNodeType::OnKeyPressed, pipeline.OnKeyPressedNodes);
+	compileInputNodes(EditorNodeType::OnKeyReleased, pipeline.OnKeyReleasedNodes);
+	compileInputNodes(EditorNodeType::OnKeyDown, pipeline.OnKeyDownNodes);
+
 	m_ContextStack.pop();
 
 	return pipeline;
@@ -121,7 +149,9 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 		COMPILE_NODE(AsignFloat2, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(AsignFloat3, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(AsignFloat4, CompileAsignVariableNode, AsignVariableEditorNode);
+		COMPILE_NODE(AsignFloat4x4, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(AsignBool, CompileAsignVariableNode, AsignVariableEditorNode);
+		COMPILE_NODE(AsignInt, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(ClearRenderTarget, CompileClearRenderTargetNode, ClearRenderTargetEditorNode);
 		COMPILE_NODE(CreateTexture, CompileCreateTextureNode, CreateTextureEditorNode);
 		COMPILE_NODE(LoadTexture, CompileLoadTextureNode, LoadTextureEditorNode);
@@ -131,6 +161,9 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 		COMPILE_NODE(LoadMesh, CompileLoadMeshNode, LoadMeshEditorNode);
 		COMPILE_NODE(OnStart, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(OnUpdate, CompileEmptyNode, ExecutionEditorNode);
+		COMPILE_NODE(OnKeyPressed, CompileEmptyNode, ExecutionEditorNode);
+		COMPILE_NODE(OnKeyReleased, CompileEmptyNode, ExecutionEditorNode);
+		COMPILE_NODE(OnKeyDown, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(Pin, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(Custom, CompileEmptyNode, ExecutionEditorNode);
 	default:
@@ -167,10 +200,20 @@ ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode)
 
 ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 {
-	PinID inputPinID = GetNodeGraph()->GetOutputPinForInput(printNode->GetFloatInputPin().ID);
-	if (!inputPinID) inputPinID = GetNodeGraph()->GetOutputPinForInput(printNode->GetFloat2InputPin().ID);
-	if (!inputPinID) inputPinID = GetNodeGraph()->GetOutputPinForInput(printNode->GetFloat3InputPin().ID);
-	if (!inputPinID) inputPinID = GetNodeGraph()->GetOutputPinForInput(printNode->GetFloat4InputPin().ID);
+	const auto getValuePin = [this](const EditorNodePin& pin)
+	{
+		if (pin.HasConstantValue)
+			return pin.ID;
+		return GetNodeGraph()->GetOutputPinForInput(pin.ID);
+	};
+
+	PinID inputPinID = getValuePin(printNode->GetFloatInputPin());
+	if (!inputPinID) inputPinID = getValuePin(printNode->GetFloat2InputPin());
+	if (!inputPinID) inputPinID = getValuePin(printNode->GetFloat3InputPin());
+	if (!inputPinID) inputPinID = getValuePin(printNode->GetFloat4InputPin());
+	if (!inputPinID) inputPinID = getValuePin(printNode->GetIntInputPin());
+	if (!inputPinID) inputPinID = getValuePin(printNode->GetBoolInputPin());
+	if (!inputPinID) inputPinID = getValuePin(printNode->GetStringInputPin());
 
 	if (!inputPinID)
 	{
@@ -186,6 +229,9 @@ ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 	case PinType::Float2: return new PrintExecutorNode{ pinEvaluator.EvaluateFloat2(inputPin) };
 	case PinType::Float3: return new PrintExecutorNode{ pinEvaluator.EvaluateFloat3(inputPin) };
 	case PinType::Float4: return new PrintExecutorNode{ pinEvaluator.EvaluateFloat4(inputPin) };
+	case PinType::Int: return new PrintExecutorNode{ pinEvaluator.EvaluateInt(inputPin) };
+	case PinType::Bool: return new PrintExecutorNode{ pinEvaluator.EvaluateBool(inputPin) };
+	case PinType::String: return new PrintExecutorNode{ pinEvaluator.EvaluateString(inputPin) };
 	default:
 		NOT_IMPLEMENTED;
 	}
@@ -204,7 +250,9 @@ ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNod
 	case PinType::Float2: return new AsignVariableExecutorNode<Float2>(nameNode, pinEvaluator.EvaluateFloat2(asignValuePin));
 	case PinType::Float3: return new AsignVariableExecutorNode<Float3>(nameNode, pinEvaluator.EvaluateFloat3(asignValuePin));
 	case PinType::Float4: return new AsignVariableExecutorNode<Float4>(nameNode, pinEvaluator.EvaluateFloat4(asignValuePin));
+	case PinType::Float4x4: return new AsignVariableExecutorNode<Float4x4>(nameNode, pinEvaluator.EvaluateFloat4x4(asignValuePin));
 	case PinType::Bool:	return new AsignVariableExecutorNode<bool>(nameNode, pinEvaluator.EvaluateBool(asignValuePin));
+	case PinType::Int:	return new AsignVariableExecutorNode<int>(nameNode, pinEvaluator.EvaluateInt(asignValuePin));
 	default:
 		NOT_IMPLEMENTED;
 	}
@@ -215,7 +263,11 @@ ExecutorNode* NodeGraphCompiler::CompileCreateTextureNode(CreateTextureEditorNod
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	StringValueNode* nameNode = pinEvaluator.EvaluateString(createTextureNode->GetNamePin());
-	return new CreateTextureExecutorNode{ nameNode, createTextureNode->GetWidth(), createTextureNode->GetHeight(), createTextureNode->IsFramebuffer(), createTextureNode->IsDepthStencil() };
+	IntValueNode* widthNode = pinEvaluator.EvaluateInt(createTextureNode->GetWidthPin());
+	IntValueNode* heightNode = pinEvaluator.EvaluateInt(createTextureNode->GetHeightPin());
+	BoolValueNode* framebufferNode = pinEvaluator.EvaluateBool(createTextureNode->GetFramebufferPin());
+	BoolValueNode* depthStencilNode = pinEvaluator.EvaluateBool(createTextureNode->GetDepthStencilPin());
+	return new CreateTextureExecutorNode{ nameNode, widthNode, heightNode, framebufferNode, depthStencilNode };
 }
 
 ExecutorNode* NodeGraphCompiler::CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode)

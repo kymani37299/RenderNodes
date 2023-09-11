@@ -30,11 +30,13 @@ protected:
 };
 
 using BoolValueNode = ValueNode<bool>;
+using IntValueNode = ValueNode<int>;
 using StringValueNode = ValueNode<std::string>;
 using FloatValueNode = ValueNode<float>;
 using Float2ValueNode = ValueNode<Float2>;
 using Float3ValueNode = ValueNode<Float3>;
 using Float4ValueNode = ValueNode<Float4>;
+using Float4x4ValueNode = ValueNode<Float4x4>;
 using TextureValueNode = ValueNode<Texture*>;
 using MeshValueNode = ValueNode<Mesh*>;
 using BufferValueNode = ValueNode<Buffer*>;
@@ -53,6 +55,7 @@ struct BindTable
 	std::vector<Binding<Float2>> Float2s;
 	std::vector<Binding<Float3>> Float3s;
 	std::vector<Binding<Float4>> Float4s;
+	std::vector<Binding<Float4x4>> Float4x4s;
 };
 using BindTableValueNode = ValueNode<BindTable*>;
 
@@ -303,4 +306,112 @@ public:
 private:
 	unsigned m_VecIndex;
 	Ptr<ValueNode<U>> m_Value;
+};
+
+class Float4x4RotateValueNode : public Float4x4ValueNode
+{
+public:
+	Float4x4RotateValueNode(Float4x4ValueNode* lastTransformNode, FloatValueNode* angleNode, Float3ValueNode* axisNode) :
+		m_LastTransformNode(lastTransformNode),
+		m_AngleNode(angleNode),
+		m_AxisNode(axisNode) {}
+
+	Float4x4 GetValue(ExecuteContext& context) const override
+	{
+		const Float4x4 lastTransform = m_LastTransformNode ? m_LastTransformNode->GetValue(context) : glm::identity<Float4x4>();
+		const float angle = m_AngleNode->GetValue(context);
+		const Float3 axis = m_AxisNode->GetValue(context);
+		return glm::rotate(lastTransform, angle, axis);
+	}
+
+private:
+	Ptr<Float4x4ValueNode> m_LastTransformNode;
+	Ptr<FloatValueNode> m_AngleNode;
+	Ptr<Float3ValueNode> m_AxisNode;
+};
+
+class Float4x4TranslateValueNode : public Float4x4ValueNode
+{
+public:
+	Float4x4TranslateValueNode(Float4x4ValueNode* lastTransformNode, Float3ValueNode* valueNode) :
+		m_LastTransformNode(lastTransformNode),
+		m_ValueNode(valueNode) {}
+
+	Float4x4 GetValue(ExecuteContext& context) const override
+	{
+		const Float4x4 lastTransform = m_LastTransformNode ? m_LastTransformNode->GetValue(context) : glm::identity<Float4x4>();
+		const Float3 value = m_ValueNode->GetValue(context);
+		return glm::translate(lastTransform, value);
+	}
+
+private:
+	Ptr<Float4x4ValueNode> m_LastTransformNode;
+	Ptr<Float3ValueNode> m_ValueNode;
+};
+
+class Float4x4ScaleValueNode : public Float4x4ValueNode
+{
+public:
+	Float4x4ScaleValueNode(Float4x4ValueNode* lastTransformNode, Float3ValueNode* valueNode) :
+		m_LastTransformNode(lastTransformNode),
+		m_ValueNode(valueNode) {}
+
+	Float4x4 GetValue(ExecuteContext& context) const override
+	{
+		const Float4x4 lastTransform = m_LastTransformNode ? m_LastTransformNode->GetValue(context) : glm::identity<Float4x4>();
+		const Float3 value = m_ValueNode->GetValue(context);
+		return glm::scale(lastTransform, value);
+	}
+
+private:
+	Ptr<Float4x4ValueNode> m_LastTransformNode;
+	Ptr<Float3ValueNode> m_ValueNode;
+};
+
+class Float4x4LookAtValueNode : public Float4x4ValueNode
+{
+public:
+	Float4x4LookAtValueNode(Float3ValueNode* eyeNode, Float3ValueNode* centerNode, Float3ValueNode* upNode) :
+		m_EyeNode(eyeNode),
+		m_CenterNode(centerNode),
+		m_UpNode(upNode) {}
+
+	Float4x4 GetValue(ExecuteContext& context) const override
+	{
+		const Float3 eye = m_EyeNode->GetValue(context);
+		const Float3 center = m_CenterNode->GetValue(context);
+		const Float3 up = m_UpNode->GetValue(context);
+		return glm::lookAt(eye, center, up);
+	}
+
+private:
+	Ptr<Float3ValueNode> m_EyeNode;
+	Ptr<Float3ValueNode> m_CenterNode;
+	Ptr<Float3ValueNode> m_UpNode;
+};
+
+class Float4x4PerspectiveValueNode : public Float4x4ValueNode
+{
+public:
+	Float4x4PerspectiveValueNode(FloatValueNode* fovNode, FloatValueNode* aspectNode, FloatValueNode* zNearNode, FloatValueNode* zFarNode) :
+		m_FOVNode(fovNode),
+		m_AspectNode(aspectNode),
+		m_ZNearNode(zNearNode),
+		m_ZFarNode(zFarNode)
+	{}
+
+	Float4x4 GetValue(ExecuteContext& context) const override
+	{
+		const float fov = m_FOVNode->GetValue(context);
+		const float aspect = m_AspectNode->GetValue(context);
+		const float znear = m_ZNearNode->GetValue(context);
+		const float zfar = m_ZFarNode->GetValue(context);
+		return glm::perspective(fov, aspect, znear, zfar);
+	}
+
+private:
+	Ptr<FloatValueNode> m_FOVNode;
+	Ptr<FloatValueNode> m_AspectNode;
+	Ptr<FloatValueNode> m_ZNearNode;
+	Ptr<FloatValueNode> m_ZFarNode;
 };

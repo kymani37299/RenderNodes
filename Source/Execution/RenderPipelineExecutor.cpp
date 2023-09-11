@@ -1,5 +1,6 @@
 #include "RenderPipelineExecutor.h"
 
+#include "../App/App.h"
 #include "ExecutorNode.h"
 
 void InitStaticResources(ExecuteContext& context)
@@ -51,32 +52,61 @@ void InitStaticResources(ExecuteContext& context)
 	context.RenderResources.CubeMeshIndex = context.RenderResources.Meshes.size() - 1;
 }
 
+static void ExecuteNodePath(ExecuteContext& context, ExecutorNode* node)
+{
+	while (node)
+	{
+		node->Execute(context);
+		node = node->GetNextNode();
+	}
+}
+
+uint32_t ExecutorInputState::GetInputHash(int key, int mods)
+{
+	uint32_t hash = Hash::Crc32(key);
+	hash = Hash::Crc32(hash, mods);
+	return hash;
+}
+
 void RenderPipelineExecutor::OnStart()
 {
 	// Init context
 	m_Context = ExecuteContext{};
 	InitStaticResources(m_Context);
 
-	ExecutorNode* node = m_Pipeline.OnStartNode;
-	while (node)
-	{
-		node->Execute(m_Context);
-		node = node->GetNextNode();
-	}
+	// Clear console
+	App::Get()->GetConsole().Clear();
+
+	// Execute
+	ExecuteNodePath(m_Context, m_Pipeline.OnStartNode);
 }
 
 void RenderPipelineExecutor::OnUpdate(float dt)
 {
 	if (m_Context.Failure) return;
 
-	ExecutorNode* node = m_Pipeline.OnUpdateNode;
 	const std::string dtVar = "DT";
 	m_Context.Variables.GetMapFromType<float>()[Hash::Crc32(dtVar)] = dt;
-	while (node)
+
+	// Update input
+	const auto processInputNodes = [this](std::unordered_set<uint32_t>& keys, std::unordered_map<uint32_t, ExecutorNode*>& map)
 	{
-		node->Execute(m_Context);
-		node = node->GetNextNode();
-	}
+		for (const auto& key : keys)
+		{
+			if (map.find(key) != map.end())
+			{
+				ExecuteNodePath(m_Context, map[key]);
+			}
+		}
+	};
+	processInputNodes(m_Context.InputState.DownKeys, m_Pipeline.OnKeyDownNodes);
+	processInputNodes(m_Context.InputState.ReleasedKeys, m_Pipeline.OnKeyReleasedNodes);
+	processInputNodes(m_Context.InputState.PressedKeys, m_Pipeline.OnKeyPressedNodes);
+
+	ExecuteNodePath(m_Context, m_Pipeline.OnUpdateNode);
+
+	m_Context.InputState.PressedKeys.clear();
+	m_Context.InputState.ReleasedKeys.clear();
 }
 
 void RenderPipelineExecutor::Render()
@@ -87,9 +117,31 @@ void RenderPipelineExecutor::Render()
 	}
 }
 
+void RenderPipelineExecutor::HandleKeyPressed(int key, int mods)
+{
+	if (m_Context.Failure) return;
+
+	const uint32_t inputHash = ExecutorInputState::GetInputHash(key, mods);
+	m_Context.InputState.DownKeys.insert(inputHash);
+	m_Context.InputState.PressedKeys.insert(inputHash);
+}
+
+void RenderPipelineExecutor::HandleKeyReleased(int key, int mods)
+{
+	if (m_Context.Failure) return;
+
+	const uint32_t inputHash = ExecutorInputState::GetInputHash(key, mods);
+	m_Context.InputState.DownKeys.erase(inputHash);
+	m_Context.InputState.ReleasedKeys.insert(inputHash);
+}
+
 void RenderPipelineExecutor::SetCompiledPipeline(CompiledPipeline pipeline)
 {
 	delete m_Pipeline.OnStartNode;
 	delete m_Pipeline.OnUpdateNode;
+	for (auto& it : m_Pipeline.OnKeyPressedNodes) delete it.second;
+	for (auto& it : m_Pipeline.OnKeyReleasedNodes) delete it.second;
+	for (auto& it : m_Pipeline.OnKeyDownNodes) delete it.second;
+
 	m_Pipeline = pipeline;
 }

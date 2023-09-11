@@ -21,6 +21,7 @@ struct Texture
 	unsigned Height = 0;
 	unsigned NumMips = 0;
 
+	unsigned DepthStencilHandle = 0;
 	unsigned FrameBufferHandle = 0;
 	unsigned TextureHandle = 0;
 };

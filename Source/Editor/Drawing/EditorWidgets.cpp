@@ -16,7 +16,7 @@ namespace EditorWidgets
 		char buf[BUF_SIZE];
 		strcpy_s(buf, text.c_str());
 
-		ImGui::SetNextItemWidth(150.0f);
+		ImGui::SetNextItemWidth(ImGui::ConstantSize(150.0f));
 		if (ImGui::InputText(label, buf, BUF_SIZE))
 		{
 			text = std::string{ buf };

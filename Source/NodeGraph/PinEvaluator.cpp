@@ -2,6 +2,8 @@
 
 BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 {
+	if (pin.HasConstantValue) return new ConstantValueNode<bool>{ pin.ConstantValue.B };
+
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
 	ASSERT(pin.Type == PinType::Bool);
 	
@@ -17,6 +19,7 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 	case EditorNodeType::Bool: return EvaluateBool(static_cast<BoolEditorNode*>(node));
 	case EditorNodeType::VarBool: return EvaluateVarBool(static_cast<VarBoolEditorNode*>(node));
 	case EditorNodeType::BoolBinaryOperator: return EvaluateBoolBinaryOperator(static_cast<BoolBinaryOperatorEditorNode*>(node));
+	case EditorNodeType::IntComparisonOperator: return EvaluateIntComparisonOperator(static_cast<IntComparisonOperatorEditorNode*>(node));
 	case EditorNodeType::FloatComparisonOperator: return EvaluateFloatComparisonOperator(static_cast<FloatComparisonOperatorEditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<BoolValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<BoolValueNode>(static_cast<CustomEditorNode*>(node), pin);
@@ -27,8 +30,38 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 	return new ConstantValueNode<bool>(false);
 }
 
+IntValueNode* PinEvaluator::EvaluateInt(EditorNodePin pin)
+{
+	if (pin.HasConstantValue) return new ConstantValueNode<int>{ pin.ConstantValue.I };
+
+	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
+	ASSERT(pin.Type == PinType::Int);
+
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("Int pin input missing link!");
+		return new ConstantValueNode<int>(0);
+	}
+
+	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::Int: return EvaluateInt(static_cast<IntEditorNode*>(node));
+	case EditorNodeType::VarInt: return EvaluateVarInt(static_cast<VarIntEditorNode*>(node));
+	case EditorNodeType::IntBinaryOperator: return EvaluateIntBinaryOperator(static_cast<IntBinaryOperatorEditorNode*>(node));
+	case EditorNodeType::Pin: return EvaluatePinNode<IntValueNode>(static_cast<PinEditorNode*>(node));
+	case EditorNodeType::Custom: return EvaluateCustomNode<IntValueNode>(static_cast<CustomEditorNode*>(node), pin);
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateIntPin] internal error!");
+	}
+	return new ConstantValueNode<int>(0);
+}
+
 StringValueNode* PinEvaluator::EvaluateString(EditorNodePin pin)
 {
+	if (pin.HasConstantValue) return new ConstantValueNode<std::string>{ pin.ConstantValue.STR };
+	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
 	ASSERT(pin.Type == PinType::String);
 
@@ -53,6 +86,8 @@ StringValueNode* PinEvaluator::EvaluateString(EditorNodePin pin)
 
 FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 {
+	if (pin.HasConstantValue) return new ConstantValueNode<float>{ pin.ConstantValue.F };
+	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
 	ASSERT(pin.Type == PinType::Float);
 	
@@ -83,6 +118,8 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 
 Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 {
+	if (pin.HasConstantValue) return new ConstantValueNode<Float2>{ pin.ConstantValue.F2 };
+	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
 	ASSERT(pin.Type == PinType::Float2);
 
@@ -110,6 +147,8 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 
 Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 {
+	if (pin.HasConstantValue) return new ConstantValueNode<Float3>{ pin.ConstantValue.F3 };
+	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
 	ASSERT(pin.Type == PinType::Float3);
 	
@@ -137,6 +176,8 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 
 Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 {
+	if (pin.HasConstantValue) return new ConstantValueNode<Float4>{ pin.ConstantValue.F4 };
+	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
 	ASSERT(pin.Type == PinType::Float4);
 	
@@ -160,6 +201,39 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
 	return new ConstantValueNode<Float4>({});
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(EditorNodePin pin)
+{
+	// if (pin.HasConstantValue) return new ConstantValueNode<Float4x4>{ pin.ConstantValue.F4X4 };
+
+	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
+	ASSERT(pin.Type == PinType::Float4x4);
+
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("Float4x4 pin input missing link!");
+		return new ConstantValueNode<Float4x4>(glm::identity<Float4x4>());
+	}
+
+	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::Float4x4: return EvaluateFloat4x4(static_cast<Float4x4EditorNode*>(node));
+	case EditorNodeType::VarFloat4x4: return EvaluateVarFloat4x4(static_cast<VarFloat4x4EditorNode*>(node));
+	case EditorNodeType::Float4x4BinaryOperator: return EvaluateFloat4x4BinaryOperator(static_cast<Float4x4BinaryOperatorEditorNode*>(node));
+	case EditorNodeType::Transform_Rotate_Float4x4: return EvaluateFloat4x4Rotate(static_cast<Float4x4RotationTransformEditorNode*>(node));
+	case EditorNodeType::Transform_Translate_Float4x4: return EvaluateFloat4x4Translate(static_cast<Float4x4TranslationTransformEditorNode*>(node));
+	case EditorNodeType::Transform_Scale_Float4x4: return EvaluateFloat4x4Scale(static_cast<Float4x4ScaleTransformEditorNode*>(node));
+	case EditorNodeType::Transform_LookAt_Float4x4: return EvaluateFloat4x4LookAt(static_cast<Float4x4LookAtTransformEditorNode*>(node));
+	case EditorNodeType::Transform_PerspectiveProjection_Float4x4: return EvaluateFloat4x4Perspective(static_cast<Float4x4PerspectiveTransformEditorNode*>(node));
+	case EditorNodeType::Pin: return EvaluatePinNode<Float4x4ValueNode>(static_cast<PinEditorNode*>(node));
+	case EditorNodeType::Custom: return EvaluateCustomNode<Float4x4ValueNode>(static_cast<CustomEditorNode*>(node), pin);
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloat4x4Pin] internal error!");
+	}
+	return new ConstantValueNode<Float4x4>(glm::identity<Float4x4>());
 }
 
 TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
@@ -305,6 +379,32 @@ RenderStateValueNode* PinEvaluator::EvaluateRenderState(EditorNodePin pin)
 		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateRenderState] internal error!");
 	}
 	return new ConstantValueNode<RenderState>({});
+}
+
+
+IntValueNode* PinEvaluator::EvaluateInt(IntEditorNode* node)
+{
+	return new ConstantValueNode<int>(node->GetValue());
+}
+
+IntValueNode* PinEvaluator::EvaluateVarInt(VarIntEditorNode* node)
+{
+	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
+	return new VariableValueNode<int>(nameNode);
+}
+
+IntValueNode* PinEvaluator::EvaluateIntBinaryOperator(IntBinaryOperatorEditorNode* node)
+{
+	IntValueNode* a = EvaluateInt(node->GetAPin());
+	IntValueNode* b = EvaluateInt(node->GetBPin());
+	return new BinaryArithmeticOperatorValueNode<int>{ a, b, node->GetOp()[0] };
+}
+
+BoolValueNode* PinEvaluator::EvaluateIntComparisonOperator(IntComparisonOperatorEditorNode* node)
+{
+	IntValueNode* a = EvaluateInt(node->GetAPin());
+	IntValueNode* b = EvaluateInt(node->GetBPin());
+	return new ComparisonValueNode<int>{ a, b, node->GetOp() };
 }
 
 BoolValueNode* PinEvaluator::EvaluateVarBool(VarBoolEditorNode* node)
@@ -468,6 +568,70 @@ Float4ValueNode* PinEvaluator::EvaluateCreateFloat4(CreateFloat4EditorNode* node
 	return new CreateVectorValueNode<Float4, float, 4>({ x, y, z, w });
 }
 
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(Float4x4EditorNode* node)
+{
+	return new ConstantValueNode<Float4x4>(node->GetFloat4x4());
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateVarFloat4x4(VarFloat4x4EditorNode* node)
+{
+	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
+	return new VariableValueNode<Float4x4>(nameNode);
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4BinaryOperator(Float4x4BinaryOperatorEditorNode* node)
+{
+	Float4x4ValueNode* a = EvaluateFloat4x4(node->GetAPin());
+	Float4x4ValueNode* b = EvaluateFloat4x4(node->GetBPin());
+	return new BinaryArithmeticOperatorValueNode<Float4x4>{ a, b, node->GetOp()[0] };
+}
+
+Float4x4ValueNode* PinEvaluator::GetLastTransformValue(MatrixTransformEditorNode* node)
+{
+	const bool hasLastTransform = GetNodeGraph()->GetOutputPinForInput(node->GetLastTransformPin().ID);
+	return hasLastTransform ? EvaluateFloat4x4(node->GetLastTransformPin()) : nullptr;
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Rotate(Float4x4RotationTransformEditorNode* node)
+{
+	Float4x4ValueNode* lastTransform = GetLastTransformValue(node);
+	FloatValueNode* angle = EvaluateFloat(node->GetAnglePin());
+	Float3ValueNode* axis = EvaluateFloat3(node->GetAxisPin());
+	return new Float4x4RotateValueNode{ lastTransform, angle, axis };
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Translate(Float4x4TranslationTransformEditorNode* node)
+{
+	Float4x4ValueNode* lastTransform = GetLastTransformValue(node);
+	Float3ValueNode* value = EvaluateFloat3(node->GetValuePin());
+	return new Float4x4TranslateValueNode{ lastTransform, value };
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Scale(Float4x4ScaleTransformEditorNode* node)
+{
+	Float4x4ValueNode* lastTransform = GetLastTransformValue(node);
+	Float3ValueNode* value = EvaluateFloat3(node->GetValuePin());
+	return new Float4x4ScaleValueNode{ lastTransform, value };
+
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4LookAt(Float4x4LookAtTransformEditorNode* node)
+{
+	Float3ValueNode* eye = EvaluateFloat3(node->GetEyePin());
+	Float3ValueNode* center = EvaluateFloat3(node->GetCenterPin());
+	Float3ValueNode* up = EvaluateFloat3(node->GetUpPin());
+	return new Float4x4LookAtValueNode{ eye, center, up };
+}
+
+Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Perspective(Float4x4PerspectiveTransformEditorNode* node)
+{
+	FloatValueNode* fov = EvaluateFloat(node->GetFOVPin());
+	FloatValueNode* aspect = EvaluateFloat(node->GetAspectRatioPin());
+	FloatValueNode* znear = EvaluateFloat(node->GetZNearPin());
+	FloatValueNode* zfar = EvaluateFloat(node->GetZFarPin());
+	return new Float4x4PerspectiveValueNode{ fov, aspect, znear, zfar };
+}
+
 TextureValueNode* PinEvaluator::EvaluateGetTexture(GetTextureEditorNode* node)
 {
 	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
@@ -524,6 +688,9 @@ BindTableValueNode* PinEvaluator::EvaluateBindTable(BindTableEditorNode* node)
 			break;
 		case PinType::Float4:
 			bindTable->Float4s.push_back(BindTable::Binding<Float4>{pin.Label, Ptr<Float4ValueNode>(EvaluateFloat4(pin))});
+			break;
+		case PinType::Float4x4:
+			bindTable->Float4x4s.push_back(BindTable::Binding<Float4x4>{pin.Label, Ptr<Float4x4ValueNode>(EvaluateFloat4x4(pin))});
 			break;
 		default:
 			NOT_IMPLEMENTED;

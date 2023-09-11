@@ -2,13 +2,13 @@
 
 #include <sstream>
 
-#include "../App.h"
+#include "../App/App.h"
 #include "../Common.h"
 #include "../NodeGraph/NodeGraph.h"
 #include "../Editor/RenderPipelineEditor.h"
 
-#define ENABLE_TOKEN_VERIFICATION
-#define ASSERT_ON_LOAD_FAILED
+// #define ENABLE_TOKEN_VERIFICATION
+// #define ASSERT_ON_LOAD_FAILED
 
 #ifdef ASSERT_ON_LOAD_FAILED
 #define LOAD_ASSERT() ASSERT(0)
@@ -65,7 +65,7 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 	if (m_Version < 7)
 	{
 		m_OperationSuccess = false;
-		std::cout << "Not compatabile with this version of file " << std::endl;
+		App::Get()->GetConsole().Log("Not compatabile with this version of file");
 		return 0;
 	}
 
@@ -192,6 +192,61 @@ void NodeGraphSerializer::WriteCustomNode(CustomEditorNode* node)
 	WriteToken(END_NODE_TOKEN);
 }
 
+void NodeGraphSerializer::WritePinList(const std::vector<EditorNodePin>& pins, bool custom)
+{
+	WriteToken(BEGIN_PIN_LIST_TOKEN);
+	WriteAttribute("Count", pins.size());
+	for (const EditorNodePin& pin : pins)
+		WritePin(pin, custom);
+	WriteToken(END_PIN_LIST_TOKEN);
+
+}
+
+void NodeGraphSerializer::WritePin(const EditorNodePin& pin, bool custom)
+{
+	WriteAttribute("ID", pin.ID);
+	
+	if (custom)
+	{
+		WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
+		WriteAttribute("Type", EnumToInt(pin.Type));
+		WriteAttribute("Label", pin.Label);
+		WriteAttribute("LinkedNode", pin.LinkedNode);
+	}
+	
+	WriteAttribute("HasConstantValue", pin.HasConstantValue);
+
+	if (pin.HasConstantValue)
+	{
+		switch (pin.Type)
+		{
+		case PinType::Bool:
+			WriteAttribute("ConstantValueB", pin.ConstantValue.B);
+			break;
+		case PinType::Int:
+			WriteAttribute("ConstantValueI", pin.ConstantValue.I);
+			break;
+		case PinType::Float:
+			WriteAttribute("ConstantValueF", pin.ConstantValue.F);
+			break;
+		case PinType::Float2:
+			WriteAttribute("ConstantValueF2", pin.ConstantValue.F2);
+			break;
+		case PinType::Float3:
+			WriteAttribute("ConstantValueF3", pin.ConstantValue.F3);
+			break;
+		case PinType::Float4:
+			WriteAttribute("ConstantValueF4", pin.ConstantValue.F4);
+			break;
+		case PinType::String:
+			WriteAttribute("ConstantValueSTR", pin.ConstantValue.STR);
+			break;
+		default:
+			NOT_IMPLEMENTED;
+		}
+	}
+}
+
 void NodeGraphSerializer::WriteNodePositions(const NodeGraph& nodeGraph)
 {
 	WriteToken(BEGIN_NODE_POSITIONS_TOKEN);
@@ -227,6 +282,11 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		READ_EDITOR_NODE(BoolEditorNode);
 		WriteAttribute("Value", readNode->m_Value ? 1 : 0);
 	} break;
+	case EditorNodeType::Int:
+	{
+		READ_EDITOR_NODE(IntEditorNode);
+		WriteAttribute("Value", readNode->m_Value);
+	} break;
 	case EditorNodeType::String:
 	{
 		READ_EDITOR_NODE(StringEditorNode);
@@ -244,12 +304,28 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 			WriteAttribute("Value" + std::to_string(i), readNode->m_Values[i]);
 		}
 	} break;
+	case EditorNodeType::Float4x4:
+	{
+		READ_EDITOR_NODE(FloatNxNEditorNode);
+		WriteAttribute("NumFloatsX", readNode->m_NumValuesX);
+		WriteAttribute("NumFloatsY", readNode->m_NumValuesY);
+		for (unsigned i = 0; i < readNode->m_NumValuesX; i++)
+		{
+			for (unsigned j = 0; j < readNode->m_NumValuesY; j++)
+			{
+				WriteAttribute("Value" + std::to_string(i) + std::to_string(j), readNode->m_Values[i][j]);
+			}
+		}
+	} break;
 	case EditorNodeType::FloatBinaryOperator:
 	case EditorNodeType::Float2BinaryOperator:
 	case EditorNodeType::Float3BinaryOperator:
 	case EditorNodeType::Float4BinaryOperator:
+	case EditorNodeType::Float4x4BinaryOperator:
 	case EditorNodeType::FloatComparisonOperator:
 	case EditorNodeType::BoolBinaryOperator:
+	case EditorNodeType::IntBinaryOperator:
+	case EditorNodeType::IntComparisonOperator:
 	{
 		READ_EDITOR_NODE(BinaryOperatorEditorNode);
 		WriteAttribute("OP", readNode->m_Op);
@@ -273,14 +349,24 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::AsignFloat2:
 	case EditorNodeType::AsignFloat3:
 	case EditorNodeType::AsignFloat4:
+	case EditorNodeType::AsignFloat4x4:
 	case EditorNodeType::AsignBool:
+	case EditorNodeType::AsignInt:
 	case EditorNodeType::VarFloat:
 	case EditorNodeType::VarFloat2:
 	case EditorNodeType::VarFloat3:
 	case EditorNodeType::VarFloat4:
+	case EditorNodeType::VarFloat4x4:
 	case EditorNodeType::VarBool:
+	case EditorNodeType::VarInt:
 	case EditorNodeType::GetTexture:
 	case EditorNodeType::GetShader:
+	case EditorNodeType::CreateTexture:
+	case EditorNodeType::Transform_Rotate_Float4x4:
+	case EditorNodeType::Transform_Translate_Float4x4:
+	case EditorNodeType::Transform_Scale_Float4x4:
+	case EditorNodeType::Transform_LookAt_Float4x4:
+	case EditorNodeType::Transform_PerspectiveProjection_Float4x4:
 	{
 		READ_EDITOR_NODE(EditorNode);
 	} break;
@@ -291,14 +377,6 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteAttribute("TexcoordBit", readNode->m_TexcoordBit ? 1 : 0);
 		WriteAttribute("NormalBit", readNode->m_NormalBit ? 1 : 0);
 		WriteAttribute("TangentBit", readNode->m_TangentBit ? 1 : 0);
-	} break;
-	case EditorNodeType::CreateTexture:
-	{
-		READ_EDITOR_NODE(CreateTextureEditorNode);
-		WriteAttribute("Width", readNode->m_Width);
-		WriteAttribute("Height", readNode->m_Height);
-		WriteAttribute("IsFramebuffer", readNode->m_Framebuffer);
-		WriteAttribute("IsDepthStencil", readNode->m_DepthStencil);
 	} break;
 	case EditorNodeType::LoadShader:
 	case EditorNodeType::LoadTexture:
@@ -320,6 +398,14 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteAttribute("PinType", EnumToInt(readNode->GetPin().Type));
 		WriteAttribute("Name", readNode->m_Name);
 	} break;
+	case EditorNodeType::OnKeyPressed:
+	case EditorNodeType::OnKeyReleased:
+	case EditorNodeType::OnKeyDown:
+	{
+		READ_EDITOR_NODE(InputExecutionEditorNode);
+		WriteAttribute("Key", readNode->GetKey());
+		WriteAttribute("Mods", readNode->GetMods());
+	} break;
 	case EditorNodeType::Custom:
 	{
 		READ_EDITOR_NODE(CustomEditorNode);
@@ -332,24 +418,8 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 
 	WriteAttribute("ID", node->m_ID);
 
-	// Write pins
-	WriteToken(BEGIN_PIN_LIST_TOKEN);
-	WriteAttribute("Count", node->m_Pins.size());
-	for (const EditorNodePin& pin : node->m_Pins) WriteAttribute("ID", pin.ID);
-	WriteToken(END_PIN_LIST_TOKEN);
-	
-	// Write custom pins
-	WriteToken(BEGIN_PIN_LIST_TOKEN);
-	WriteAttribute("Count", node->m_CustomPins.size());
-	for (const EditorNodePin& pin : node->m_CustomPins)
-	{
-		WriteAttribute("ID", pin.ID);
-		WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
-		WriteAttribute("Type", EnumToInt(pin.Type));
-		WriteAttribute("Label", pin.Label);
-		WriteAttribute("LinkedNode", pin.LinkedNode);
-	}
-	WriteToken(END_PIN_LIST_TOKEN);
+	WritePinList(node->m_Pins, false);
+	WritePinList(node->m_CustomPins, true);
 
 	WriteToken(END_NODE_TOKEN);
 }
@@ -452,8 +522,10 @@ void NodeGraphSerializer::ReadLinkList(NodeGraph& nodeGraph)
 #define INIT_NODE(NodeType) NodeType* newNode = new NodeType{}; node = newNode
 #define INIT_SIMPLE_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass);  } break;
 #define INIT_FLOAT_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); const unsigned numFloats = ReadIntAttr("NumFloats"); for (unsigned i = 0; i < numFloats; i++) { newNode->m_Values[i] = ReadFloatAttr("Value" + std::to_string(i)); }  } break;
+#define INIT_FLOAT_MATRIX_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); const unsigned numFloatsX = ReadIntAttr("NumFloatsX"); const unsigned numFloatsY = ReadIntAttr("NumFloatsY"); for (unsigned i = 0; i < numFloatsX; i++) { for(unsigned j = 0; j < numFloatsY; j++) { newNode->m_Values[i][j] = ReadFloatAttr("Value" + std::to_string(i) + std::to_string(j)); } }  } break;
 #define INIT_BIN_OP_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Op = ReadStrAttr("OP"); } break;
 #define INIT_NAME_AND_PATH_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Path = ReadStrAttr("Path"); } break;
+#define INIT_INPUT_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Key = ReadIntAttr("Key"); newNode->m_Mods = ReadIntAttr("Mods"); } break
 
 EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
 {
@@ -475,15 +547,19 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_SIMPLE_NODE(OnUpdate, OnUpdateEditorNode);
 		INIT_SIMPLE_NODE(OnStart, OnStartEditorNode);
 		INIT_SIMPLE_NODE(AsignBool, AsignBoolEditorNode);
+		INIT_SIMPLE_NODE(AsignInt, AsignIntEditorNode);
 		INIT_SIMPLE_NODE(AsignFloat, AsignFloatEditorNode);
 		INIT_SIMPLE_NODE(AsignFloat2, AsignFloat2EditorNode);
 		INIT_SIMPLE_NODE(AsignFloat3, AsignFloat3EditorNode);
 		INIT_SIMPLE_NODE(AsignFloat4, AsignFloat4EditorNode);
+		INIT_SIMPLE_NODE(AsignFloat4x4, AsignFloat4x4EditorNode);
 		INIT_SIMPLE_NODE(VarBool, VarBoolEditorNode);
+		INIT_SIMPLE_NODE(VarInt, VarIntEditorNode);
 		INIT_SIMPLE_NODE(VarFloat, VarFloatEditorNode);
 		INIT_SIMPLE_NODE(VarFloat2, VarFloat2EditorNode);
 		INIT_SIMPLE_NODE(VarFloat3, VarFloat3EditorNode);
 		INIT_SIMPLE_NODE(VarFloat4, VarFloat4EditorNode);
+		INIT_SIMPLE_NODE(VarFloat4x4, VarFloat4x4EditorNode);
 		INIT_SIMPLE_NODE(GetTexture, GetTextureEditorNode);
 		INIT_SIMPLE_NODE(GetShader, GetShaderEditorNode);
 		INIT_SIMPLE_NODE(GetCubeMesh, GetCubeMeshEditorNode);
@@ -491,40 +567,52 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_SIMPLE_NODE(DrawMesh, DrawMeshEditorNode);
 		INIT_SIMPLE_NODE(BindTable, BindTableEditorNode);
 		INIT_SIMPLE_NODE(PresentTexture, PresentTextureEditorNode);
+		INIT_SIMPLE_NODE(CreateTexture, CreateTextureEditorNode);
+		INIT_SIMPLE_NODE(Transform_Rotate_Float4x4, Float4x4RotationTransformEditorNode);
+		INIT_SIMPLE_NODE(Transform_Translate_Float4x4, Float4x4TranslationTransformEditorNode);
+		INIT_SIMPLE_NODE(Transform_Scale_Float4x4, Float4x4ScaleTransformEditorNode);
+		INIT_SIMPLE_NODE(Transform_LookAt_Float4x4, Float4x4LookAtTransformEditorNode);
+		INIT_SIMPLE_NODE(Transform_PerspectiveProjection_Float4x4, Float4x4PerspectiveTransformEditorNode);
 
 		INIT_FLOAT_NODE(Float, FloatEditorNode);
 		INIT_FLOAT_NODE(Float2, Float2EditorNode);
 		INIT_FLOAT_NODE(Float3, Float3EditorNode);
 		INIT_FLOAT_NODE(Float4, Float4EditorNode);
 
+		INIT_FLOAT_MATRIX_NODE(Float4x4, Float4x4EditorNode);
+
 		INIT_BIN_OP_NODE(FloatBinaryOperator, FloatBinaryOperatorEditorNode);
 		INIT_BIN_OP_NODE(Float2BinaryOperator, Float2BinaryOperatorEditorNode);
 		INIT_BIN_OP_NODE(Float3BinaryOperator, Float3BinaryOperatorEditorNode);
 		INIT_BIN_OP_NODE(Float4BinaryOperator, Float4BinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(Float4x4BinaryOperator, Float4x4BinaryOperatorEditorNode);
 		INIT_BIN_OP_NODE(FloatComparisonOperator, FloatComparisonOperatorEditorNode);
 		INIT_BIN_OP_NODE(BoolBinaryOperator, BoolBinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(IntBinaryOperator, IntBinaryOperatorEditorNode);
+		INIT_BIN_OP_NODE(IntComparisonOperator, IntComparisonOperatorEditorNode);
 
 		INIT_NAME_AND_PATH_NODE(LoadTexture, LoadTextureEditorNode);
 		INIT_NAME_AND_PATH_NODE(LoadShader, LoadShaderEditorNode);
 		INIT_NAME_AND_PATH_NODE(LoadMesh, LoadMeshEditorNode);
+
+		INIT_INPUT_NODE(OnKeyPressed, OnKeyPressedEditorNode);
+		INIT_INPUT_NODE(OnKeyReleased, OnKeyReleasedEditorNode);
+		INIT_INPUT_NODE(OnKeyDown, OnKeyDownEditorNode);
 
 	case EditorNodeType::Bool:
 	{
 		INIT_NODE(BoolEditorNode);
 		newNode->m_Value = ReadBoolAttr("Value");
 	} break;
+	case EditorNodeType::Int:
+	{
+		INIT_NODE(IntEditorNode);
+		newNode->m_Value = ReadIntAttr("Value");
+	} break;
 	case EditorNodeType::String:
 	{
 		INIT_NODE(StringEditorNode);
 		newNode->m_Value = ReadStrAttr("Value");
-	} break;
-	case EditorNodeType::CreateTexture:
-	{
-		INIT_NODE(CreateTextureEditorNode);
-		newNode->m_Width = ReadIntAttr("Width");
-		newNode->m_Height = ReadIntAttr("Height");
-		newNode->m_Framebuffer = ReadBoolAttr("IsFramebuffer");
-		newNode->m_DepthStencil = ReadBoolAttr("IsDepthStencil");
 	} break;
 	case EditorNodeType::GetMesh:
 	{
@@ -577,6 +665,36 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 
 	node->m_ID = ReadIntAttr("ID");
 	
+	const auto readConstantValue = [this](EditorNodePin& pin)
+	{
+		switch (pin.Type)
+		{
+		case PinType::Bool:
+			pin.ConstantValue.B = ReadBoolAttr("ConstantValueB");
+			break;
+		case PinType::Int:
+			pin.ConstantValue.I = ReadIntAttr("ConstantValueI");
+			break;
+		case PinType::Float:
+			pin.ConstantValue.F = ReadFloatAttr("ConstantValueF");
+			break;
+		case PinType::Float2:
+			pin.ConstantValue.F2 = ReadFloat2Attr("ConstantValueF2");
+			break;
+		case PinType::Float3:
+			pin.ConstantValue.F3 = ReadFloat3Attr("ConstantValueF3");
+			break;
+		case PinType::Float4:
+			pin.ConstantValue.F4 = ReadFloat4Attr("ConstantValueF4");
+			break;
+		case PinType::String:
+			pin.ConstantValue.STR = ReadStrAttr("ConstantValueSTR");
+			break;
+		default:
+			NOT_IMPLEMENTED;
+		}
+	};
+
 	// Read pins
 	{
 		EatToken(BEGIN_PIN_LIST_TOKEN);
@@ -589,7 +707,20 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 			return node;
 		}
 		for (unsigned i = 0; i < pinCount; i++)
+		{
 			node->m_Pins[i].ID = ReadIntAttr("ID");
+
+			if (m_Version > 7)
+			{
+				node->m_Pins[i].HasConstantValue = ReadBoolAttr("HasConstantValue");
+				if (node->m_Pins[i].HasConstantValue) readConstantValue(node->m_Pins[i]);
+			}
+			else
+			{
+				node->m_Pins[i].HasConstantValue = false;
+			}
+
+		}
 
 		EatToken(END_PIN_LIST_TOKEN);
 	}
@@ -608,6 +739,17 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 			pin.Type = IntToEnum<PinType>(ReadIntAttr("Type"));
 			pin.Label = ReadStrAttr("Label");
 			pin.LinkedNode = ReadIntAttr("LinkedNode");
+
+			if (m_Version > 7)
+			{
+				pin.HasConstantValue = ReadBoolAttr("HasConstantValue");
+				if (pin.HasConstantValue) readConstantValue(pin);
+			}
+			else
+			{
+				pin.HasConstantValue = false;
+			}
+
 			node->m_CustomPins[i] = pin;
 		}
 
@@ -820,4 +962,31 @@ bool NodeGraphSerializer::ReadBoolAttr(const std::string& name)
 std::string NodeGraphSerializer::ReadStrAttr(const std::string& name)
 {
 	return ReadAttribute(name);
+}
+
+Float2 NodeGraphSerializer::ReadFloat2Attr(const std::string& name)
+{
+	Float2 value;
+	value.x = ReadFloatAttr(name + ".X");
+	value.y = ReadFloatAttr(name + ".Y");
+	return value;
+}
+
+Float3 NodeGraphSerializer::ReadFloat3Attr(const std::string& name)
+{
+	Float3 value;
+	value.x = ReadFloatAttr(name + ".X");
+	value.y = ReadFloatAttr(name + ".Y");
+	value.z = ReadFloatAttr(name + ".Z");
+	return value;
+}
+
+Float4 NodeGraphSerializer::ReadFloat4Attr(const std::string& name)
+{
+	Float4 value;
+	value.x = ReadFloatAttr(name + ".X");
+	value.y = ReadFloatAttr(name + ".Y");
+	value.z = ReadFloatAttr(name + ".Z");
+	value.w = ReadFloatAttr(name + ".W");
+	return value;
 }

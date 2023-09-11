@@ -91,11 +91,13 @@ public:
 	}
 
 	BoolValueNode* EvaluateBool(EditorNodePin pin);
+	IntValueNode* EvaluateInt(EditorNodePin pin);
 	StringValueNode* EvaluateString(EditorNodePin pin);
 	FloatValueNode* EvaluateFloat(EditorNodePin pin);
 	Float2ValueNode* EvaluateFloat2(EditorNodePin pin);
 	Float3ValueNode* EvaluateFloat3(EditorNodePin pin);
 	Float4ValueNode* EvaluateFloat4(EditorNodePin pin);
+	Float4x4ValueNode* EvaluateFloat4x4(EditorNodePin pin);
 	TextureValueNode* EvaluateTexture(EditorNodePin pin);
 	BufferValueNode* EvaluateBuffer(EditorNodePin pin);
 	MeshValueNode* EvaluateMesh(EditorNodePin pin);
@@ -105,11 +107,13 @@ public:
 
 	template<typename ReturnType> ReturnType* EvaluatePin(EditorNodePin pin);
 	template<> BoolValueNode* EvaluatePin<BoolValueNode>(EditorNodePin pin) { return EvaluateBool(pin); }
+	template<> IntValueNode* EvaluatePin<IntValueNode>(EditorNodePin pin) { return EvaluateInt(pin); }
 	template<> StringValueNode* EvaluatePin<StringValueNode>(EditorNodePin pin) { return EvaluateString(pin); }
 	template<> FloatValueNode* EvaluatePin<FloatValueNode>(EditorNodePin pin) { return EvaluateFloat(pin); }
 	template<> Float2ValueNode* EvaluatePin<Float2ValueNode>(EditorNodePin pin) { return EvaluateFloat2(pin); }
 	template<> Float3ValueNode* EvaluatePin<Float3ValueNode>(EditorNodePin pin) { return EvaluateFloat3(pin); }
 	template<> Float4ValueNode* EvaluatePin<Float4ValueNode>(EditorNodePin pin) { return EvaluateFloat4(pin); }
+	template<> Float4x4ValueNode* EvaluatePin<Float4x4ValueNode>(EditorNodePin pin) { return EvaluateFloat4x4(pin); }
 	template<> TextureValueNode* EvaluatePin<TextureValueNode>(EditorNodePin pin) { return EvaluateTexture(pin); }
 	template<> BufferValueNode* EvaluatePin<BufferValueNode>(EditorNodePin pin) { return EvaluateBuffer(pin); }
 	template<> MeshValueNode* EvaluatePin<MeshValueNode>(EditorNodePin pin) { return EvaluateMesh(pin); }
@@ -122,6 +126,11 @@ private:
 	BoolValueNode* EvaluateVarBool(VarBoolEditorNode* node);
 	BoolValueNode* EvaluateBoolBinaryOperator(BoolBinaryOperatorEditorNode* node);
 	BoolValueNode* EvaluateFloatComparisonOperator(FloatComparisonOperatorEditorNode* node);
+
+	IntValueNode* EvaluateInt(IntEditorNode* node);
+	IntValueNode* EvaluateVarInt(VarIntEditorNode* node);
+	IntValueNode* EvaluateIntBinaryOperator(IntBinaryOperatorEditorNode* node);
+	BoolValueNode* EvaluateIntComparisonOperator(IntComparisonOperatorEditorNode* node);
 
 	StringValueNode* EvaluateString(StringEditorNode* node);
 
@@ -147,6 +156,17 @@ private:
 	Float4ValueNode* EvaluateCreateFloat4(CreateFloat4EditorNode* node);
 	Float4ValueNode* EvaluateVarFloat4(VarFloat4EditorNode* node);
 	Float4ValueNode* EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* node);
+
+	Float4x4ValueNode* EvaluateFloat4x4(Float4x4EditorNode* node);
+	Float4x4ValueNode* EvaluateVarFloat4x4(VarFloat4x4EditorNode* node);
+	Float4x4ValueNode* EvaluateFloat4x4BinaryOperator(Float4x4BinaryOperatorEditorNode* node);
+	Float4x4ValueNode* GetLastTransformValue(MatrixTransformEditorNode* node);
+	Float4x4ValueNode* EvaluateFloat4x4Rotate(Float4x4RotationTransformEditorNode* node);
+	Float4x4ValueNode* EvaluateFloat4x4Translate(Float4x4TranslationTransformEditorNode* node);
+	Float4x4ValueNode* EvaluateFloat4x4Scale(Float4x4ScaleTransformEditorNode* node);
+	Float4x4ValueNode* EvaluateFloat4x4LookAt(Float4x4LookAtTransformEditorNode* node);
+	Float4x4ValueNode* EvaluateFloat4x4Perspective(Float4x4PerspectiveTransformEditorNode* node);
+
 
 	TextureValueNode* EvaluateGetTexture(GetTextureEditorNode* node);
 

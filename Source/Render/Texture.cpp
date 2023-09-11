@@ -38,15 +38,11 @@ Ptr<Texture> Texture::Create(unsigned width, unsigned height, unsigned flags, co
 
 		if (flags & TF_DepthStencil)
 		{
-			unsigned int depthStencilHandle;
-			GL_CALL(glGenRenderbuffers(1, &depthStencilHandle));
-			GL_CALL(glBindRenderbuffer(GL_RENDERBUFFER, depthStencilHandle));
+			GL_CALL(glGenRenderbuffers(1, &texture->DepthStencilHandle));
+			GL_CALL(glBindRenderbuffer(GL_RENDERBUFFER, texture->DepthStencilHandle));
 			GL_CALL(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height));
-			GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthStencilHandle));
+			GL_CALL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, texture->DepthStencilHandle));
 			GL_CALL(glBindRenderbuffer(GL_RENDERBUFFER, 0));
-
-			// The handle will still remain because of framebuffer reference, it will be deleted when framebuffer is deleted
-			GL_CALL(glDeleteRenderbuffers(1, &depthStencilHandle)); 
 		}
 		GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 	}
@@ -59,4 +55,5 @@ Texture::~Texture()
 {
 	GL_CALL(glDeleteTextures(1, &TextureHandle));
 	if (FrameBufferHandle) GL_CALL(glDeleteFramebuffers(1, &FrameBufferHandle));
+	if (DepthStencilHandle) GL_CALL(glDeleteRenderbuffers(1, &DepthStencilHandle));
 }

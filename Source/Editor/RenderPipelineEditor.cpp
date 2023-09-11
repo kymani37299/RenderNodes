@@ -4,7 +4,7 @@
 
 #include "../Common.h"
 #include "../IDGen.h"
-#include "../App.h"
+#include "../App/App.h"
 #include "../NodeGraph/NodeGraphCommands.h"
 
 RenderPipelineEditor::RenderPipelineEditor(NodeGraphCommandExecutor* commandExecutor) :

@@ -2,18 +2,64 @@
 #include "ExecutorEditorNode.h"
 #include "EvaluationEditorNode.h"
 
+#include "../App/App.h"
 #include "../Common.h"
 #include "../Util/FileDialog.h"
 #include "Drawing/EditorWidgets.h"
 #include "RenderPipelineEditor.h"
 
-static void DrawPin(const EditorNodePin& pin)
+// Returns if we need to update pin
+static void DrawPin(EditorNodePin pin, EditorNode* node)
 {
+    ImGui::PushID(pin.ID);
     ImNode::BeginPin(pin.ID, pin.IsInput ? ImNode::PinKind::Input : ImNode::PinKind::Output);
-    ImGui::PushStyleColor(ImGuiCol_Text, (ImU32) GetPinColor(pin.Type));
-    ImGui::Text(pin.Type == PinType::Execution ? ">>" : "->");
-    ImGui::PopStyleColor();
+    if (!pin.HasConstantValue)
+    {
+		ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)GetPinColor(pin.Type));
+		ImGui::Text(pin.Type == PinType::Execution ? ">>" : "->");
+		ImGui::PopStyleColor();
+    }
+    else
+    {
+        bool needsPinUpdate = false;
+
+        switch (pin.Type)
+        {
+        case PinType::Bool:
+            needsPinUpdate = ImGui::Checkbox("", &pin.ConstantValue.B);
+            break;
+        case PinType::Int:
+            ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+            needsPinUpdate = ImGui::DragInt("", &pin.ConstantValue.I);
+            break;
+        case PinType::Float:
+            ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+            needsPinUpdate = ImGui::DragFloat("", &pin.ConstantValue.F);
+            break;
+        case PinType::Float2:
+            ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+            needsPinUpdate = ImGui::DragFloat2("", pin.ConstantValue.F2);
+            break;
+        case PinType::Float3:
+			ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+			needsPinUpdate = ImGui::DragFloat3("", pin.ConstantValue.F3);
+			break;
+        case PinType::Float4:
+			ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+			needsPinUpdate = ImGui::DragFloat4("", pin.ConstantValue.F4);
+		    break; 
+        case PinType::String:
+            ImGui::SetNextItemWidth(ImGui::ConstantSize(150.0f));
+            needsPinUpdate = ImGui::InputText("", pin.ConstantValue.STR);
+            break;
+        default:
+            NOT_IMPLEMENTED;
+        }
+
+        if (needsPinUpdate) node->UpdatePin(pin);
+    }
     ImNode::EndPin();
+    ImGui::PopID();
 }
 
 static void DrawPinLabel(const EditorNodePin& pin)
@@ -21,6 +67,14 @@ static void DrawPinLabel(const EditorNodePin& pin)
     ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)GetPinColor(pin.Type));
     ImGui::Text(pin.Label.c_str());
     ImGui::PopStyleColor();
+}
+
+EditorNodePin EditorNodePin::CreateConstantInputPin(const std::string& label, PinType type)
+{
+	EditorNodePin pin = CreateInputPin(label, type);
+	pin.HasConstantValue = true;
+	pin.ConstantValue.SetDefaultValue(type);
+    return pin;
 }
 
 EditorNodePin EditorNodePin::CreateInputPin(const std::string& label, PinType type)
@@ -51,9 +105,31 @@ EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
     m_Type(nodeType)
 { }
 
+void EditorNode::UpdatePin(const EditorNodePin& newPin)
+{
+    for (auto& pin : m_Pins)
+    {
+        if (pin.ID == newPin.ID)
+        {
+            pin = newPin;
+            return;
+        }
+    }
+
+    for (auto& pin : m_CustomPins)
+    {
+        if (pin.ID == newPin.ID)
+        {
+            pin = newPin;
+            return;
+        }
+    }
+    ASSERT_M(0, "Pin to update not found!");
+}
+
 void EditorNode::RemovePin(PinID pinID)
 {
-    // TODO: We also need to remove all links that are with this pin
+    // Note: Links related to this pin also need to be handled when using this function
 
 	for (unsigned i = 0; i < m_Pins.size(); i++)
 	{
@@ -92,8 +168,8 @@ void EditorNode::Render()
         ImGui::Spring(0);
 
         ImGui::BeginVertical("Input execution pins");
-        for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution &&  pin.IsInput) DrawPin(pin);
-        for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution &&  pin.IsInput) DrawPin(pin);
+        for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution &&  pin.IsInput) DrawPin(pin, this);
+        for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution &&  pin.IsInput) DrawPin(pin, this);
         ImGui::EndVertical();
 
         ImGui::BeginVertical("Input execution labels");
@@ -113,14 +189,14 @@ void EditorNode::Render()
 		ImGui::EndVertical();
 
         ImGui::BeginVertical("Output execution pins");
-		for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPin(pin);
-		for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPin(pin);
+		for (const auto& pin : m_Pins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPin(pin, this);
+		for (const auto& pin : m_CustomPins) if (pin.Type == PinType::Execution && !pin.IsInput) DrawPin(pin, this);
         ImGui::EndVertical();
 
         ImGui::EndHorizontal();
     }
 
-	ImGui::Dummy({ 5, 5 });
+	ImGui::Dummy({ ImGui::ConstantSize(5), ImGui::ConstantSize(5) });
 
     {
         ImGui::BeginHorizontal("Node body");
@@ -128,18 +204,14 @@ void EditorNode::Render()
         ImGui::Spring(0);
 
         ImGui::BeginVertical("Input pins");
-		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPin(pin);
-		for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPin(pin);
+		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPin(pin, this);
+		for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPin(pin, this);
         ImGui::EndVertical();
 
 		ImGui::BeginVertical("Input labels");
 		for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPinLabel(pin);
 		for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && pin.IsInput) DrawPinLabel(pin);
 		ImGui::EndVertical();
-
-        ImGui::BeginVertical("Render content");
-        RenderContent();
-        ImGui::EndVertical();
 
         ImGui::Spring(1);
 
@@ -149,12 +221,14 @@ void EditorNode::Render()
 		ImGui::EndVertical();
 
         ImGui::BeginVertical("Output pins");
-        for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPin(pin);
-        for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPin(pin);
+        for (const auto& pin : m_Pins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPin(pin, this);
+        for (const auto& pin : m_CustomPins) if (pin.Type != PinType::Execution && !pin.IsInput) DrawPin(pin, this);
         ImGui::EndVertical();
 
         ImGui::EndHorizontal();
     }
+
+	RenderContent();
 
     ImGui::EndVertical();
 
@@ -165,7 +239,7 @@ void EditorNode::Render()
 
 void EditorNode::RenderContent()
 {
-    ImGui::Dummy(ImVec2{ 25, 25 });
+    ImGui::Dummy(ImVec2{ ImGui::ConstantSize(25), ImGui::ConstantSize(25) });
 }
 
 unsigned EditorNode::AddCustomPin(const EditorNodePin& pin)
@@ -185,6 +259,12 @@ void BoolEditorNode::RenderContent()
     ImGui::Checkbox("", &m_Value);
 }
 
+void IntEditorNode::RenderContent()
+{
+    ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+	ImGui::DragInt("", &m_Value);
+}
+
 void StringEditorNode::RenderContent()
 {
     EditorWidgets::InputText("Value", m_Value);
@@ -196,9 +276,29 @@ void FloatNEditorNode::RenderContent()
 
     for (unsigned i = 0; i < m_NumValues; i++)
     {
-		ImGui::SetNextItemWidth(50.0f);
+		ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
 		ImGui::DragFloat(valueNames[i].c_str(), &m_Values[i]);
     }
+}
+
+void FloatNxNEditorNode::RenderContent()
+{
+    ImGui::BeginVertical("Matrix");
+    for (unsigned i = 0; i < m_NumValuesX; i++)
+    {
+        ImGui::PushID(i);
+        ImGui::BeginHorizontal("Matrix row");
+		for (unsigned j = 0; j < m_NumValuesY; j++)
+		{
+            ImGui::PushID(j);
+			ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+            ImGui::DragFloat("", &m_Values[i][j]);
+            ImGui::PopID();
+		}
+        ImGui::EndHorizontal();
+        ImGui::PopID();
+    }
+    ImGui::EndVertical();
 }
 
 void BinaryOperatorEditorNode::RenderContent()
@@ -209,18 +309,6 @@ void BinaryOperatorEditorNode::RenderContent()
 void BinaryOperatorEditorNode::RenderPopups()
 {
     m_OperatorSelector.DrawSelectionMenu();
-}
-
-void CreateTextureEditorNode::RenderContent()
-{
-    ExecutionEditorNode::RenderContent();
-
-    ImGui::SetNextItemWidth(50.0f);
-    ImGui::DragInt("Width", &m_Width, 1, 1);
-    ImGui::SetNextItemWidth(50.0f);
-    ImGui::DragInt("Height", &m_Height, 1, 1);
-    ImGui::Checkbox("FrameBuffer", &m_Framebuffer);
-    ImGui::Checkbox("DepthStencil", &m_DepthStencil);
 }
 
 void NameAndPathExecutionEditorNode::RenderContent()
@@ -249,8 +337,19 @@ void NameAndPathExecutionEditorNode::RenderContent()
 void BindTableEditorNode::RenderContent()
 {
     ImGui::Text("Binding name");
-    EditorWidgets::InputText("", m_InputName);
-    ImGui::Dummy({ 10.0f, 10.0f });
+
+    if (m_TypeValue == "Texture")
+    {
+        ImGui::SetNextItemWidth(ImGui::ConstantSize(50.0f));
+        ImGui::DragInt("", &m_InputInt, 1, 0, 31);
+        m_InputName = std::to_string(m_InputInt);
+    }
+    else
+    {
+        EditorWidgets::InputText("", m_InputName);
+    }
+    
+    ImGui::Dummy({ ImGui::ConstantSize(10.0f), ImGui::ConstantSize(10.0f) });
 
     bool canAdd = true;
     if (m_InputName.empty())
@@ -288,9 +387,12 @@ void BindTableEditorNode::RenderContent()
         else if (m_TypeValue == "Float2") pinType = PinType::Float2;
         else if (m_TypeValue == "Float3") pinType = PinType::Float3;
         else if (m_TypeValue == "Float4") pinType = PinType::Float4;
+        else if (m_TypeValue == "Float4x4") pinType = PinType::Float4x4;
         else NOT_IMPLEMENTED;
 
         AddCustomPin(EditorNodePin::CreateInputPin(m_InputName, pinType));
+
+        m_InputInt = 0;
     }
 
 	if (!canAdd)
@@ -349,6 +451,119 @@ void RenderStateEditorNode::RenderContent()
 void PinEditorNode::RenderContent()
 {
     EditorWidgets::InputText("Name", m_Name);
+}
+
+static std::string GetInputName(int key, int mods)
+{
+    std::string prefix = "";
+    if (mods & GLFW_MOD_CONTROL) prefix += "Ctrl + ";
+    if (mods & GLFW_MOD_ALT) prefix += "Alt + ";
+    if (mods & GLFW_MOD_SHIFT) prefix += "Shift + ";
+    if (mods & GLFW_MOD_SUPER) prefix += "Super + ";
+
+    bool canBeCasted = key >= GLFW_KEY_A && key <= GLFW_KEY_Z;
+    canBeCasted = canBeCasted || (key >= GLFW_KEY_0 && key <= GLFW_KEY_9);
+    canBeCasted = canBeCasted || key == GLFW_KEY_APOSTROPHE;
+    canBeCasted = canBeCasted || key == GLFW_KEY_COMMA;
+    canBeCasted = canBeCasted || key == GLFW_KEY_MINUS;
+    canBeCasted = canBeCasted || key == GLFW_KEY_PERIOD;
+    canBeCasted = canBeCasted || key == GLFW_KEY_SLASH;
+    canBeCasted = canBeCasted || key == GLFW_KEY_SEMICOLON;
+    canBeCasted = canBeCasted || key == GLFW_KEY_EQUAL;
+    canBeCasted = canBeCasted || key == GLFW_KEY_LEFT_BRACKET;
+    canBeCasted = canBeCasted || key == GLFW_KEY_BACKSLASH;
+    canBeCasted = canBeCasted || key == GLFW_KEY_RIGHT_BRACKET;
+    canBeCasted = canBeCasted || key == GLFW_KEY_GRAVE_ACCENT;
+
+    if (canBeCasted)
+    {
+        return prefix + std::string(1, key);
+    }
+
+    if (key >= GLFW_KEY_F1 && key <= GLFW_KEY_F25)
+    {
+        return prefix + "F" + std::to_string(key - GLFW_KEY_F1 + 1);
+    }
+
+    if (key >= GLFW_KEY_KP_0 && key <= GLFW_KEY_KP_9)
+    {
+        return prefix + "Numpad " + std::to_string(key - GLFW_KEY_KP_0);
+    }
+
+    switch (key)
+    {
+    case GLFW_KEY_SPACE: return prefix + "Space";
+    case GLFW_KEY_ESCAPE             : return prefix + "Esc";
+    case GLFW_KEY_ENTER              : return prefix + "Enter";
+    case GLFW_KEY_TAB                : return prefix + "Tab";
+    case GLFW_KEY_BACKSPACE          : return prefix + "Backspace";
+    case GLFW_KEY_INSERT             : return prefix + "Insert";
+    case GLFW_KEY_DELETE             : return prefix + "Delete";
+    case GLFW_KEY_RIGHT              : return prefix + "Right";
+    case GLFW_KEY_LEFT               : return prefix + "Left";
+    case GLFW_KEY_DOWN               : return prefix + "Down";
+    case GLFW_KEY_UP                 : return prefix + "Up";
+    case GLFW_KEY_PAGE_UP            : return prefix + "PageUp";
+    case GLFW_KEY_PAGE_DOWN          : return prefix + "PageDown";
+    case GLFW_KEY_HOME               : return prefix + "Home";
+    case GLFW_KEY_END                : return prefix + "End";
+    case GLFW_KEY_CAPS_LOCK          : return prefix + "CapsLock";
+    case GLFW_KEY_SCROLL_LOCK        : return prefix + "ScrollLock";
+    case GLFW_KEY_NUM_LOCK           : return prefix + "NumLock";
+    case GLFW_KEY_PRINT_SCREEN       : return prefix + "PrintSc";
+    case GLFW_KEY_PAUSE              : return prefix + "Pause";
+    case GLFW_KEY_KP_DECIMAL         : return prefix + "Numpad .";
+    case GLFW_KEY_KP_DIVIDE          : return prefix + "Numpad /";
+    case GLFW_KEY_KP_MULTIPLY        : return prefix + "Numpad *";
+    case GLFW_KEY_KP_SUBTRACT        : return prefix + "Numpad -";
+    case GLFW_KEY_KP_ADD             : return prefix + "Numpad +";
+    case GLFW_KEY_KP_ENTER           : return prefix + "Numpad Enter";
+    case GLFW_KEY_KP_EQUAL           : return prefix + "Numpad =";
+    case GLFW_KEY_LEFT_SHIFT         : return prefix + "Left Shift";
+    case GLFW_KEY_LEFT_CONTROL       : return prefix + "Left Ctrl";
+    case GLFW_KEY_LEFT_ALT           : return prefix + "Left Alt";
+    case GLFW_KEY_LEFT_SUPER         : return prefix + "Left Super";
+    case GLFW_KEY_RIGHT_SHIFT        : return prefix + "Right Shift";
+    case GLFW_KEY_RIGHT_CONTROL      : return prefix + "Right Ctrl";
+    case GLFW_KEY_RIGHT_ALT          : return prefix + "Right Alt";
+    case GLFW_KEY_RIGHT_SUPER        : return prefix + "Right Super";
+    case GLFW_KEY_MENU               : return prefix + "Menu";
+    }
+    return "Unknown key";
+}
+
+void InputExecutionEditorNode::RenderContent()
+{
+	if (m_ListeningToInput)
+	{
+		ImGui::Text("Press any key...");
+	}
+	else
+	{
+		if (ImGui::Button("Set input"))
+		{
+			m_ListeningToInput = true;
+			App::Get()->SubscribeToInput(this);
+		}
+	}
+
+    if (m_Key == 0)
+    {
+        m_InputText = "No key assigned";
+    }
+    else
+    {
+        m_InputText = GetInputName(m_Key, m_Mods);
+    }
+    ImGui::Text(m_InputText.c_str());
+}
+
+void InputExecutionEditorNode::OnKeyReleased(int key, int mods)
+{
+	m_Key = key;
+    m_Mods = mods;
+	m_ListeningToInput = false;
+	App::Get()->UnsubscribeToInput(this);
 }
 
 CustomEditorNode::CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph, bool regneratePins) :

@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "Common.h"
+#include "../Common.h"
+#include "AppConsole.h"
+#include "IInputListener.h"
 
 class RenderPipelineEditor;
 class RenderPipelineExecutor;
@@ -51,13 +53,17 @@ public:
 
 	void RenderMenuBar();
 	void RenderFrame();
-	void HandleKeyPressed(int key, int mods);
+	void HandleInputAction(int key, int mods, int action);
 
 	void AddCustomNode(CustomEditorNode* node);
 	void OpenCustomNode(CustomEditorNode* node);
 
 	CustomNodeList* GetCustomNodes() { return &m_CustomNodeList; }
 
+	void SubscribeToInput(IInputListener* listener);
+	void UnsubscribeToInput(IInputListener* lisnener);
+
+	AppConsole& GetConsole() { return m_Console; }
 private:
 	void NewDocument();
 	void LoadDocument();
@@ -80,6 +86,9 @@ private:
 	std::string m_CurrentLoadedFile = "";
 	unsigned m_LastExecutedCommandCount = 0;
 
+	// Input
+	std::vector<IInputListener*> m_InputListeners;
+
 	AppMode m_Mode = AppMode::Editor;
 	
 	// Workers
@@ -93,4 +102,6 @@ private:
 	Ptr<CustomNodePipelineEditor> m_CustomNodeEditor;
 
 	CustomNodeList m_CustomNodeList;
+
+	AppConsole m_Console;
 };

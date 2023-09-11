@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "../App/App.h"
 #include "../Common.h"
 #include "Buffer.h"
 #include "Texture.h"
@@ -70,7 +71,7 @@ namespace SceneLoading
 		{
 			for (const std::string& e : m_ErrorMessages)
 			{
-				std::cout << "[Loader error] " << e << std::endl;
+				App::Get()->GetConsole().Log("[Loader error] " + e);
 			}
 		}
 

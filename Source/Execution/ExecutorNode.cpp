@@ -2,6 +2,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include "../App/App.h"
 #include "../Common.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
@@ -11,14 +12,14 @@ namespace ExecutionPrivate
 {
 	void Failure(const std::string& nodeName, const std::string& msg)
 	{
-		std::cout << "[FAILURE] " << "[" << nodeName << "] " << msg << std::endl;
+		App::Get()->GetConsole().Log("[FAILURE] [" + nodeName + "] " + msg);
 	}
 
 	void Warning(bool condition, const std::string& nodeName, const std::string& msg)
 	{
 		if (!condition)
 		{
-			std::cout << "[WARN] " << "[" << nodeName << "] " << msg << std::endl;
+			App::Get()->GetConsole().Log("[WARN] [" + nodeName + "] " + msg);
 		}
 	}
 
@@ -39,40 +40,34 @@ namespace
 		GL_CALL(glBindVertexArray(vao));
 
 		unsigned nextAttribArray = 0;
-		unsigned nextOffset = 0;
-
 		const auto& vertexBits = extraInfo.MeshVertexBits;
 
 		if (vertexBits.Position)
 		{
 			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Positions->Handle));
-			GL_CALL(glVertexAttribPointer(nextAttribArray, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 3, GL_FLOAT, GL_FALSE, 0, (void*)0));
 			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
-			nextOffset += 3 * sizeof(float);
 		}
 
 		if (vertexBits.Texcoord)
 		{
 			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Texcoords->Handle));
-			GL_CALL(glVertexAttribPointer(nextAttribArray, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 2, GL_FLOAT, GL_FALSE, 0, (void*)0));
 			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
-			nextOffset += 2 * sizeof(float);
 		}
 
 		if (vertexBits.Normal)
 		{
 			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Normals->Handle));
-			GL_CALL(glVertexAttribPointer(nextAttribArray, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 3, GL_FLOAT, GL_FALSE, 0, (void*)0));
 			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
-			nextOffset += 3 * sizeof(float);
 		}
 
 		if (vertexBits.Tangent)
 		{
 			GL_CALL(glBindBuffer(GL_ARRAY_BUFFER, mesh->Tangents->Handle));
-			GL_CALL(glVertexAttribPointer(nextAttribArray, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)nextOffset));
+			GL_CALL(glVertexAttribPointer(nextAttribArray, 4, GL_FLOAT, GL_FALSE, 0, (void*)0));
 			GL_CALL(glEnableVertexAttribArray(nextAttribArray++));
-			nextOffset += 4 * sizeof(float);
 		}
 
 		return vao;
@@ -96,15 +91,15 @@ namespace
 			Texture* texture = binding.Value.get() ? binding.Value->GetValue(context) : (Texture*) nullptr;
 			if (!texture) continue;
 
-			unsigned textureSlot;
-			if (GetUniformIndex(shader, binding.Name, textureSlot))
+			int textureSlot = std::stoi(binding.Name);
+			if (textureSlot >= 0 && textureSlot < 32)
 			{
 				GL_CALL(glActiveTexture(GL_TEXTURE0 + textureSlot));
 				GL_CALL(glBindTexture(GL_TEXTURE_2D, texture->TextureHandle));
 			}
 			else
 			{
-				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+				Warning("TableBind", "Invalid texture binding " + binding.Name + ". Valid bindings are in range [0,31]");
 			}
 		}
 
@@ -167,6 +162,21 @@ namespace
 				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
 			}
 		}
+
+		for (const auto& binding : bindTable->Float4x4s)
+		{
+			const Float4x4 value = binding.Value.get() ? binding.Value->GetValue(context) : glm::identity<Float4x4>();
+
+			unsigned uniformSlot;
+			if (GetUniformIndex(shader, binding.Name, uniformSlot))
+			{
+				GL_CALL(glUniformMatrix4fv(uniformSlot, 1, GL_FALSE, glm::value_ptr(value)));
+			}
+			else
+			{
+				Warning("TableBind", "Unable to find " + binding.Name + " binding in shader");
+			}
+		}
 	}
 
 	void TableUnbind(Shader* shader, BindTable* bindTable)
@@ -176,8 +186,8 @@ namespace
 		for (unsigned i = 0; i < bindTable->Textures.size(); i++)
 		{
 			const auto& binding = bindTable->Textures[i];
-			unsigned textureSlot;
-			if (GetUniformIndex(shader, binding.Name, textureSlot))
+			int textureSlot = std::stoi(binding.Name);
+			if (textureSlot >= 0 && textureSlot < 32)
 			{
 				GL_CALL(glActiveTexture(GL_TEXTURE0 + textureSlot));
 				GL_CALL(glBindTexture(GL_TEXTURE_2D, 0));
@@ -222,10 +232,13 @@ std::string ToString(const Float4& value)
 
 void PrintExecutorNode::Execute(ExecuteContext& context)
 {
-	if(m_FloatNode)  std::cout << m_FloatNode->GetValue(context) << std::endl;
-	if(m_Float2Node)  std::cout << ToString(m_Float2Node->GetValue(context)) << std::endl;
-	if(m_Float3Node)  std::cout << ToString(m_Float3Node->GetValue(context)) << std::endl;
-	if(m_Float4Node)  std::cout << ToString(m_Float4Node->GetValue(context)) << std::endl;
+	if (m_FloatNode)  App::Get()->GetConsole().Log(std::to_string(m_FloatNode->GetValue(context)));
+	if (m_Float2Node) App::Get()->GetConsole().Log(ToString(m_Float2Node->GetValue(context)));
+	if (m_Float3Node) App::Get()->GetConsole().Log(ToString(m_Float3Node->GetValue(context)));
+	if (m_Float4Node) App::Get()->GetConsole().Log(ToString(m_Float4Node->GetValue(context)));
+	if (m_IntNode) App::Get()->GetConsole().Log(std::to_string(m_IntNode->GetValue(context)));
+	if (m_BoolNode) App::Get()->GetConsole().Log(m_BoolNode->GetValue(context) ? "true" : "false");
+	if (m_StringNode) App::Get()->GetConsole().Log(m_StringNode->GetValue(context));
 }
 
 void ClearRenderTargetExecutorNode::Execute(ExecuteContext& context)
@@ -249,7 +262,7 @@ void PresentTextureExecutorNode::Execute(ExecuteContext& context)
 {
 	Texture* texture = m_Texture->GetValue(context);
 	Warning(texture, "PresentTextureExecutorNode", "Input texture is null");
-	Warning(texture->Flags & TF_Framebuffer, "PresentTextureExecutorNode", "Trying to present texture that doesn't have framebuffer enabled");
+	Warning(texture && texture->Flags & TF_Framebuffer, "PresentTextureExecutorNode", "Trying to present texture that doesn't have framebuffer enabled");
 	context.RenderTarget = texture;
 }
 
@@ -303,10 +316,15 @@ void CreateTextureExecutorNode::Execute(ExecuteContext& context)
 	const std::string name = m_NameNode->GetValue(context);
 	const unsigned varKey = Hash::Crc32(name);
 
+	const int width = m_WidthNode->GetValue(context);
+	const int height = m_HeightNode->GetValue(context);
+	const bool isFramebuffer = m_FramebufferNode->GetValue(context);
+	const bool isDepthStencil = m_DepthStencilNode->GetValue(context);
+
 	unsigned textureFlags = TF_None;
-	if (m_IsFramebuffer) textureFlags |= TF_Framebuffer;
-	if (m_IsDepthStencil) textureFlags |= TF_DepthStencil;
-	context.Variables.Textures[varKey] = AddToPtrVector(context.RenderResources.Textures, Texture::Create(m_Width, m_Height, textureFlags));
+	if (isFramebuffer) textureFlags |= TF_Framebuffer;
+	if (isDepthStencil) textureFlags |= TF_DepthStencil;
+	context.Variables.Textures[varKey] = AddToPtrVector(context.RenderResources.Textures, Texture::Create(width, height, textureFlags));
 }
 
 DrawMeshExecutorNode::~DrawMeshExecutorNode()

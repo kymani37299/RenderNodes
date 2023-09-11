@@ -65,6 +65,23 @@ enum class EditorNodeType
     Pin,
     Custom,
     UnresolvedCustom,
+    OnKeyPressed,
+    OnKeyReleased,
+    OnKeyDown,
+    Int,
+    VarInt,
+    AsignInt,
+    IntBinaryOperator,
+    IntComparisonOperator,
+    Float4x4,
+    Transform_Rotate_Float4x4,
+    VarFloat4x4,
+    AsignFloat4x4,
+	Transform_Translate_Float4x4,
+	Transform_Scale_Float4x4,
+	Transform_LookAt_Float4x4,
+	Transform_PerspectiveProjection_Float4x4,
+    Float4x4BinaryOperator,
 };
 
 // DO NOT CHANGE ORDER OF VALUES
@@ -87,7 +104,9 @@ enum class PinType
     BindTable,
     RenderState,
     String,
-
+    Int,
+    Float4x4,
+    
     Count
 };
 
@@ -109,6 +128,8 @@ static const std::string ToString(PinType pinType)
     case PinType::BindTable: return "BindTable";
     case PinType::RenderState: return "RenderState";
     case PinType::String: return "String";
+    case PinType::Int: return "Int";
+    case PinType::Float4x4: return "Float4x4";
     default: NOT_IMPLEMENTED;
     }
     return "<unknown>";
@@ -132,12 +153,58 @@ static ImColor GetPinColor(PinType type)
     case PinType::BindTable: return ImColor(206, 171, 177);
     case PinType::RenderState: return ImColor(165, 190, 0);
     case PinType::String: return ImColor(192, 110, 82);
+    case PinType::Int: return ImColor(200, 100, 100);
+    case PinType::Float4x4: return ImColor(184, 240, 153);
     default:
         NOT_IMPLEMENTED;
         break;
     }
     return ImColor(0, 0, 0, 255);
 }
+
+struct EditorNodePinConstant
+{
+	union
+	{
+		bool B;
+        int I;
+        float F;
+		Float2 F2;
+		Float3 F3;
+		Float4 F4;
+	};
+	std::string STR;
+
+    void SetDefaultValue(PinType pinType)
+    {
+        switch (pinType)
+        {
+        case PinType::Bool:
+            B = false;
+            break;
+        case PinType::Int:
+            I = 0;
+            break;
+        case PinType::Float:
+            F = 0.0f;
+            break;
+        case PinType::Float2:
+            F2 = Float2{ 0.0f };
+            break;
+        case PinType::Float3:
+            F3 = Float3{ 0.0f };
+            break;
+        case PinType::Float4:
+            F4 = Float4{ 0.0f };
+            break;
+        case PinType::String:
+            STR = "";
+            break;
+        default:
+            NOT_IMPLEMENTED;
+        }
+    }
+};
 
 struct EditorNodePin
 {
@@ -147,8 +214,12 @@ struct EditorNodePin
     std::string Label = "";
     NodeID LinkedNode = 0;
 
+    bool HasConstantValue = false;
+    EditorNodePinConstant ConstantValue;
+
+    static EditorNodePin CreateConstantInputPin(const std::string& label, PinType type);
     static EditorNodePin CreateInputPin(const std::string& label, PinType type);
-    static EditorNodePin CreateOutputPin(const std::string& label, PinType type);
+    static EditorNodePin CreateOutputPin(const std::string& label, PinType type);	
 };
 
 struct EditorNodeLink
@@ -186,6 +257,7 @@ public:
     const std::vector<EditorNodePin>& GetPins() const { return m_Pins; }
     const std::vector<EditorNodePin>& GetCustomPins() const { return m_CustomPins; }
 
+    void UpdatePin(const EditorNodePin& newPin);
     void RemovePin(PinID pinID);
 
     void Render();

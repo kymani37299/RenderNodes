@@ -270,3 +270,50 @@ void PasteNodesNodeGraphCommand::Undo(NodeGraphCommandExecutorContext& context, 
 		nodeGraph.RemoveNode(pastedNode);
 	}
 }
+
+void MakePinConstantCommand::Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
+{
+	EditorNodePin pin = nodeGraph.GetPinByID(m_PinID);
+	pin.HasConstantValue = true;
+	pin.ConstantValue.SetDefaultValue(pin.Type);
+	nodeGraph.UpdatePin(pin);
+
+	const auto fn = [this](const EditorNodeLink& link)
+	{
+		if (link.Start == m_PinID || link.End == m_PinID)
+		{
+			m_DeletedLinks.push_back(link);
+		}
+	};
+	nodeGraph.ForEachLink(fn);
+
+	for (const auto& link : m_DeletedLinks)
+		nodeGraph.RemoveLink(link.ID);
+}
+
+void MakePinConstantCommand::Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
+{
+	EditorNodePin pin = nodeGraph.GetPinByID(m_PinID);
+	pin.HasConstantValue = false;
+	nodeGraph.UpdatePin(pin);
+
+	for (const auto& link : m_DeletedLinks)
+		nodeGraph.AddLink(link);
+}
+
+void MakeConstantToPinCommand::Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
+{
+	EditorNodePin pin = nodeGraph.GetPinByID(m_PinID);
+	pin.HasConstantValue = false;
+
+	m_Value = pin.ConstantValue;
+	nodeGraph.UpdatePin(pin);
+}
+
+void MakeConstantToPinCommand::Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
+{
+	EditorNodePin pin = nodeGraph.GetPinByID(m_PinID);
+	pin.HasConstantValue = true;
+	pin.ConstantValue = m_Value;
+	nodeGraph.UpdatePin(pin);
+}

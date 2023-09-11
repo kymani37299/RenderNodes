@@ -5,6 +5,8 @@
 #include <string>
 #include <set>
 
+#include "../App/App.h"
+
 static bool ReadFile(const std::string& path, std::vector<std::string>& content)
 {
 	std::ifstream fileStream(path, std::ios::in);
@@ -49,6 +51,11 @@ std::string GetTag(GLenum type)
 	}
 }
 
+static void LogError(const std::string& err)
+{
+	App::Get()->GetConsole().Log("[Shader compiler error] " + err);
+}
+
 static unsigned CompileShader(unsigned type, const char* source)
 {
 	GL_CALL(unsigned id = glCreateShader(type));
@@ -63,7 +70,7 @@ static unsigned CompileShader(unsigned type, const char* source)
 		GL_CALL(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length));
 		char* message = (char*)alloca(length * sizeof(char));
 		GL_CALL(glGetShaderInfoLog(id, length, &length, message));
-		std::cout << "[Shader compilation error] " << GetTag(type) << " " << message << std::endl;
+		LogError(GetTag(type) + " " + message);
 		GL_CALL(glDeleteShader(id));
 		return 0;
 	}
@@ -94,7 +101,7 @@ static bool ReadShaderFile(std::string& outputCode, const std::string& includeRo
 	std::vector<std::string> shaderContent;
 	if (!ReadFile(includeRoot + includePath, shaderContent))
 	{
-		std::cout << "[Shader compiler] Failed to load shader file: " << includeRoot << includePath << std::endl;
+		LogError("Failed to load shader file: " + includeRoot + includePath);
 		return false;
 	}
 
@@ -132,7 +139,7 @@ Ptr<Shader> Shader::Compile(const std::string& path)
 	std::string shaderCode;
 	if (!ReadShaderFile(shaderCode, includeRoot, shaderFile))
 	{
-		std::cout << "[Shader compiler error] failed to compile shader" << std::endl;
+		LogError("Failed to compile shader!");
 		return nullptr;
 	}
 
@@ -144,7 +151,7 @@ Ptr<Shader> Shader::Compile(const std::string& path)
 
 	if (!vsModule || !fsModule)
 	{
-		std::cout << "[Shader compiler error] failed to compile shader" << std::endl;
+		LogError("Failed to compile shader!");
 		return nullptr;
 	}
 
@@ -158,6 +165,7 @@ Ptr<Shader> Shader::Compile(const std::string& path)
 	GL_CALL(glGetProgramiv(shader->Handle, GL_LINK_STATUS, (int*)&validLinking));
 	if (!validLinking)
 	{
+		LogError("Failed to link shader!");
 		std::cout << "[Shader compiler error] failed to link shader" << std::endl;
 		return nullptr;
 	}
@@ -167,7 +175,7 @@ Ptr<Shader> Shader::Compile(const std::string& path)
 	GL_CALL(glGetProgramiv(shader->Handle, GL_VALIDATE_STATUS, (int*)&validShader));
 	if (!validShader)
 	{
-		std::cout << "[Shader compiler error] Shader not valid" << std::endl;
+		LogError("Shader is not valid!");
 		return nullptr;
 	}
 

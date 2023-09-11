@@ -1,20 +1,20 @@
 #include "App.h"
 
-#include "Common.h"
-#include "IDGen.h"
+#include "../Common.h"
+#include "../IDGen.h"
 
 #include <filesystem>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
-#include "Editor/RenderPipelineEditor.h"
-#include "Editor/Drawing/EditorWidgets.h"
-#include "Execution/RenderPipelineExecutor.h"
-#include "NodeGraph/NodeGraphCompiler.h"
-#include "NodeGraph/NodeGraphSerializer.h"
-#include "NodeGraph/NodeGraphCommands.h"
+#include "../Editor/RenderPipelineEditor.h"
+#include "../Editor/Drawing/EditorWidgets.h"
+#include "../Execution/RenderPipelineExecutor.h"
+#include "../NodeGraph/NodeGraphCompiler.h"
+#include "../NodeGraph/NodeGraphSerializer.h"
+#include "../NodeGraph/NodeGraphCommands.h"
 
-#include "Util/FileDialog.h"
+#include "../Util/FileDialog.h"
 
 // From IDGen.h
 std::atomic<UniqueID> IDGen::Allocator = 1;
@@ -26,10 +26,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	if (action == GLFW_RELEASE)
-		return;
-
-	App::Get()->HandleKeyPressed(key, mods);
+	App::Get()->HandleInputAction(key, mods, action);
 }
 
 App* App::s_Instance = nullptr;
@@ -84,6 +81,8 @@ App::App()
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+	ImGui::GetIO().FontGlobalScale = m_Width / 1920.0f;
 
     ImGui::StyleColorsDark();
 
@@ -147,13 +146,12 @@ void App::Run()
 
 		RenderMenuBar();
 
-		const ImVec2 menuBarOffset = ImVec2{ 0.0f, 20.0f };
+		const ImVec2 menuBarOffset = ImVec2{ 0.0f, ImGui::ConstantSize(20.0f) };
 
 		ImGui::SetNextWindowPos(menuBarOffset);
 		ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize - menuBarOffset);
 		ImGui::Begin("Window", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize);
-		ImGui::SetWindowFontScale(m_Width / 1920.0f);
-
+		
 		RenderFrame();
 
 		ImGui::End();
@@ -204,7 +202,7 @@ void App::RenderFrame()
 {
 	if (m_Mode == AppMode::Editor)
 	{
-		ImGui::SetNextItemWidth(250.0f);
+		ImGui::SetNextItemWidth(ImGui::ConstantSize(250.0f));
 		if (ImGui::Button("   Run   ")) CompileAndRun();
 		ImGui::Separator();
 
@@ -212,7 +210,7 @@ void App::RenderFrame()
 	}
 	else if (m_Mode == AppMode::Run)
 	{
-		ImGui::SetNextItemWidth(250.0f);
+		ImGui::SetNextItemWidth(ImGui::ConstantSize(250.0f));
 		if (ImGui::Button("   Stop   ")) m_Mode = AppMode::Editor;
 		ImGui::Separator();
 
@@ -230,7 +228,7 @@ void App::RenderFrame()
 
 		EditorWidgets::InputText("Name", m_CustomNodeEditor->GetNameRef(), m_CustomNodeEditor->EditMode());
 
-		ImGui::SetNextItemWidth(250.0f);
+		ImGui::SetNextItemWidth(ImGui::ConstantSize(250.0f));
 
 		const bool canBeCreated = m_CustomNodeEditor->CanCreateNode();
 		const bool editNode = m_CustomNodeEditor->EditMode();
@@ -269,20 +267,47 @@ void App::RenderFrame()
 	{
 		NOT_IMPLEMENTED;
 	}
+
+	m_Console.Draw();
 }
 
-void App::HandleKeyPressed(int key, int mods)
+void App::HandleInputAction(int key, int mods, int action)
 {
-	if (m_Mode == AppMode::Editor)
+	// TODO: Use IInputListeners
+	if (action == GLFW_PRESS)
 	{
-		m_Editor->HandleKeyPressed(key, mods);
+		if (m_Mode == AppMode::Editor)
+		{
+			m_Editor->HandleKeyPressed(key, mods);
 
-		if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_S)
-			SaveDocument();
+			if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_S)
+				SaveDocument();
+		}
+		else if (m_Mode == AppMode::CustomNode)
+		{
+			m_CustomNodeEditor->HandleKeyPressed(key, mods);
+		}
+		else if (m_Mode == AppMode::Run)
+		{
+			m_Executor->HandleKeyPressed(key, mods);
+		}
 	}
-	else if (m_Mode == AppMode::CustomNode)
+
+	if (action == GLFW_RELEASE)
 	{
-		m_CustomNodeEditor->HandleKeyPressed(key, mods);
+		m_Executor->HandleKeyReleased(key, mods);
+	}
+	
+	if (action == GLFW_PRESS)
+	{
+		for (IInputListener* listener : m_InputListeners)
+			listener->OnKeyPressed(key, mods);
+	}
+
+	if (action == GLFW_RELEASE)
+	{
+		for (IInputListener* listener : m_InputListeners)
+			listener->OnKeyReleased(key, mods);
 	}
 }
 
@@ -297,6 +322,30 @@ void App::OpenCustomNode(CustomEditorNode* node)
 
 	m_Mode = AppMode::CustomNode;
 	m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ node });
+}
+
+void App::SubscribeToInput(IInputListener* listener)
+{
+	m_InputListeners.push_back(listener);
+}
+
+void App::UnsubscribeToInput(IInputListener* lisnener)
+{
+	uint32_t listenerIndex = -1;
+	for (uint32_t i = 0; i < m_InputListeners.size(); i++)
+	{
+		if (lisnener == m_InputListeners[i])
+		{
+			listenerIndex = i;
+			break;
+		}
+	}
+
+	ASSERT(listenerIndex != -1);
+	if (listenerIndex != -1)
+	{
+		m_InputListeners.erase(m_InputListeners.begin() + listenerIndex);
+	}
 }
 
 void App::NewDocument()
@@ -400,7 +449,7 @@ void App::CompileAndRun()
 	else
 	{
 		for (const std::string& err : m_Compiler->GetErrorMessages())
-			std::cout << "[Compilation error] " << err << std::endl;
+			App::Get()->GetConsole().Log("[Compilation error] " + err);
 		m_Mode = AppMode::Editor;
 	}
 }

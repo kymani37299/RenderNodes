@@ -1,7 +1,7 @@
 #include "EditorContextMenu.h"
 
 #include "../../Common.h"
-#include "../../App.h"
+#include "../../App/App.h"
 #include "../../NodeGraph/NodeGraph.h"
 #include "../../NodeGraph/NodeGraphCommands.h"
 
@@ -131,7 +131,7 @@ void NewNodeContextMenu::DrawContent()
 			{
 				m_CommandExecutor->ExecuteCommand(new PasteNodesNodeGraphCommand{});
 			}
-			ImGui::Dummy({ 10, 10 });
+			ImGui::Dummy({ ImGui::ConstantSize(10), ImGui::ConstantSize(10) });
 		}
 	}
 
@@ -181,53 +181,71 @@ void NewNodeContextMenu::DrawContent()
 		}
 	}
 
-	BEGIN_MENU("Constants", BoolEditorNode, StringEditorNode, FloatEditorNode, Float2EditorNode, Float3EditorNode, Float4EditorNode)
+	BEGIN_MENU("Constants", BoolEditorNode, IntEditorNode, StringEditorNode, FloatEditorNode, Float2EditorNode, Float3EditorNode, Float4EditorNode, Float4x4EditorNode)
 	{
 		MENU_ITEM("Bool", BoolEditorNode);
+		MENU_ITEM("Int", IntEditorNode);
 		MENU_ITEM("String", StringEditorNode);
 		MENU_ITEM("Float", FloatEditorNode);
 		MENU_ITEM("Float2", Float2EditorNode);
 		MENU_ITEM("Float3", Float3EditorNode);
 		MENU_ITEM("Float4", Float4EditorNode);
+		MENU_ITEM("Float4x4", Float4x4EditorNode);
 		END_MENU();
 	}
 
-	BEGIN_MENU("Assign variable", AsignBoolEditorNode, AsignFloatEditorNode, AsignFloat2EditorNode, AsignFloat3EditorNode, AsignFloat4EditorNode)
+	BEGIN_MENU("Assign variable", AsignBoolEditorNode, AsignIntEditorNode, AsignFloatEditorNode, AsignFloat2EditorNode, AsignFloat3EditorNode, AsignFloat4EditorNode, AsignFloat4x4EditorNode)
 	{
 		MENU_ITEM("Bool", AsignBoolEditorNode);
+		MENU_ITEM("Int", AsignIntEditorNode);
 		MENU_ITEM("Float", AsignFloatEditorNode);
 		MENU_ITEM("Float2", AsignFloat2EditorNode);
 		MENU_ITEM("Float3", AsignFloat3EditorNode);
 		MENU_ITEM("Float4", AsignFloat4EditorNode);
+		MENU_ITEM("Float4x4", AsignFloat4x4EditorNode);
 		END_MENU();
 	}
 
-	BEGIN_MENU("Get variable", VarBoolEditorNode, VarFloatEditorNode, VarFloat2EditorNode, VarFloat3EditorNode, VarFloat4EditorNode)
+	BEGIN_MENU("Get variable", VarBoolEditorNode, VarIntEditorNode, VarFloatEditorNode, VarFloat2EditorNode, VarFloat3EditorNode, VarFloat4EditorNode, VarFloat4x4EditorNode)
 	{
 		MENU_ITEM("Bool", VarBoolEditorNode);
+		MENU_ITEM("Int", VarIntEditorNode);
 		MENU_ITEM("Float", VarFloatEditorNode);
 		MENU_ITEM("Float2", VarFloat2EditorNode);
 		MENU_ITEM("Float3", VarFloat3EditorNode);
 		MENU_ITEM("Float4", VarFloat4EditorNode);
+		MENU_ITEM("Float4x4", VarFloat4x4EditorNode);
 		END_MENU();
 	}
 
-	BEGIN_MENU("Operator", BoolBinaryOperatorEditorNode, FloatBinaryOperatorEditorNode, Float2BinaryOperatorEditorNode, Float3BinaryOperatorEditorNode, Float4BinaryOperatorEditorNode)
+	BEGIN_MENU("Operator", BoolBinaryOperatorEditorNode, IntBinaryOperatorEditorNode, FloatBinaryOperatorEditorNode, Float2BinaryOperatorEditorNode, Float3BinaryOperatorEditorNode, Float4BinaryOperatorEditorNode, Float4x4BinaryOperatorEditorNode)
 	{
 		MENU_ITEM("Bool", BoolBinaryOperatorEditorNode);
+		MENU_ITEM("Int", IntBinaryOperatorEditorNode);
 		MENU_ITEM("Float", FloatBinaryOperatorEditorNode);
 		MENU_ITEM("Float2", Float2BinaryOperatorEditorNode);
 		MENU_ITEM("Float3", Float3BinaryOperatorEditorNode);
 		MENU_ITEM("Float4", Float4BinaryOperatorEditorNode);
+		MENU_ITEM("Float4x4", Float4x4BinaryOperatorEditorNode);
 		END_MENU();
 	}
 
-	BEGIN_MENU("Compare", FloatComparisonOperatorEditorNode)
+	BEGIN_MENU("Transform", Float4x4RotationTransformEditorNode, Float4x4TranslationTransformEditorNode, Float4x4ScaleTransformEditorNode, Float4x4LookAtTransformEditorNode, Float4x4PerspectiveTransformEditorNode)
+	{
+		MENU_ITEM("Float4x4: Rotate", Float4x4RotationTransformEditorNode);
+		MENU_ITEM("Float4x4: Translate", Float4x4TranslationTransformEditorNode);
+		MENU_ITEM("Float4x4: Scale", Float4x4ScaleTransformEditorNode);
+		MENU_ITEM("Float4x4: Look at", Float4x4LookAtTransformEditorNode);
+		MENU_ITEM("Float4x4: Perspective projection", Float4x4PerspectiveTransformEditorNode);
+		END_MENU();
+	}
+
+	BEGIN_MENU("Compare", FloatComparisonOperatorEditorNode, IntComparisonOperatorEditorNode)
 	{
 		MENU_ITEM("Float", FloatComparisonOperatorEditorNode);
+		MENU_ITEM("Int", IntComparisonOperatorEditorNode);
 		END_MENU();
 	}
-
 
 	BEGIN_MENU("Create", CreateTextureEditorNode, CreateFloat2EditorNode, CreateFloat3EditorNode, CreateFloat4EditorNode)
 	{
@@ -271,6 +289,17 @@ void NewNodeContextMenu::DrawContent()
 		END_MENU();
 	}
 
+	if (!m_CustomNodeEditor)
+	{
+		BEGIN_MENU("Input", OnKeyPressedEditorNode, OnKeyReleasedEditorNode, OnKeyDownEditorNode)
+		{
+			MENU_ITEM("On key pressed", OnKeyPressedEditorNode);
+			MENU_ITEM("On key released", OnKeyReleasedEditorNode);
+			MENU_ITEM("On key down", OnKeyDownEditorNode);
+			END_MENU();
+		}
+	}
+	
 	MENU_ITEM("BindTable", BindTableEditorNode);
 	MENU_ITEM("RenderState", RenderStateEditorNode);
 	MENU_ITEM("If condition", IfEditorNode);
@@ -333,15 +362,27 @@ void PinContextMenu::DrawContent()
 {
 	ASSERT(m_PinID);
 	const bool isCustomPin = m_CommandExecutor->GetNodeGraph()->IsCustomPin(m_PinID);
-	if (!isCustomPin)
+	if (isCustomPin && ImGui::MenuItem("Delete")) m_CommandExecutor->ExecuteCommand(new RemovePinNodeGraphCommand{ m_PinID });
+
+	const auto& pin = m_CommandExecutor->GetNodeGraph()->GetPinByID(m_PinID);
+	static PinType allowedConstantTypes[] = { PinType::Bool, PinType::Float, PinType::Float2, PinType::Float3, PinType::Float4, PinType::String, PinType::Int };
+	bool canBeConstant = false;
+
+	if (pin.IsInput)
 	{
-		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-		ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+		for (uint32_t i = 0; i < STATIC_ARRAY_SIZE(allowedConstantTypes); i++)
+		{
+			if (pin.Type == allowedConstantTypes[i])
+			{
+				canBeConstant = true;
+				break;
+			}
+		}
 	}
-	if (ImGui::MenuItem("Delete")) m_CommandExecutor->ExecuteCommand(new RemovePinNodeGraphCommand{ m_PinID });
-	if (!isCustomPin)
+	
+	if (canBeConstant)
 	{
-		ImGui::PopItemFlag();
-		ImGui::PopStyleVar();
+		if (pin.HasConstantValue && ImGui::MenuItem("Make as pin")) m_CommandExecutor->ExecuteCommand(new MakeConstantToPinCommand{ m_PinID });
+		if(!pin.HasConstantValue && ImGui::MenuItem("Make as constant")) m_CommandExecutor->ExecuteCommand(new MakePinConstantCommand{ m_PinID });
 	}
 }

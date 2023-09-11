@@ -158,6 +158,13 @@ EditorNodePin NodeGraph::GetPinByID(PinID pinID) const
     return EditorNodePin{};
 }
 
+void NodeGraph::UpdatePin(const EditorNodePin& newPin) const
+{
+    EditorNode* node = GetPinOwner(newPin.ID);
+    ASSERT_M(node, "Pin not found!");
+    if(node) node->UpdatePin(newPin);
+}
+
 EditorNode* NodeGraph::GetPinOwner(PinID pinID) const
 {
     for (const auto& it : m_Nodes)

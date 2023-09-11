@@ -73,6 +73,15 @@ public:
 	PrintExecutorNode(Float4ValueNode* floatNode) :
 		m_Float4Node(floatNode) {}
 
+	PrintExecutorNode(IntValueNode* intNode) :
+		m_IntNode(intNode) {}
+
+	PrintExecutorNode(BoolValueNode* boolNode) :
+		m_BoolNode(boolNode) {}
+
+	PrintExecutorNode(StringValueNode* stringNode) :
+		m_StringNode(stringNode) {}
+
 	void Execute(ExecuteContext& context) override;
 
 private:
@@ -80,6 +89,9 @@ private:
 	Ptr<Float2ValueNode> m_Float2Node;
 	Ptr<Float3ValueNode> m_Float3Node;
 	Ptr<Float4ValueNode> m_Float4Node;
+	Ptr<IntValueNode> m_IntNode;
+	Ptr<BoolValueNode> m_BoolNode;
+	Ptr<StringValueNode> m_StringNode;
 };
 
 class ClearRenderTargetExecutorNode : public ExecutorNode
@@ -128,22 +140,21 @@ private:
 class CreateTextureExecutorNode : public ExecutorNode
 {
 public:
-	CreateTextureExecutorNode(StringValueNode* nameNode, int width, int height, bool isFramebuffer, bool isDepthStencil):
+	CreateTextureExecutorNode(StringValueNode* nameNode, IntValueNode* widthNode, IntValueNode* heightNode, BoolValueNode* framebufferNode, BoolValueNode* depthStencilNode):
 		m_NameNode(nameNode),
-		m_Width(width),
-		m_Height(height),
-		m_IsFramebuffer(isFramebuffer),
-		m_IsDepthStencil(isDepthStencil) {}
+		m_WidthNode(widthNode),
+		m_HeightNode(heightNode),
+		m_FramebufferNode(framebufferNode),
+		m_DepthStencilNode(depthStencilNode) {}
 
 	void Execute(ExecuteContext& context) override;
 
 private:
 	Ptr<StringValueNode> m_NameNode;
-
-	int m_Width;
-	int m_Height;
-	bool m_IsFramebuffer;
-	bool m_IsDepthStencil;
+	Ptr<IntValueNode> m_WidthNode;
+	Ptr<IntValueNode> m_HeightNode;
+	Ptr<BoolValueNode> m_FramebufferNode;
+	Ptr<BoolValueNode> m_DepthStencilNode;
 };
 
 class PresentTextureExecutorNode : public ExecutorNode

@@ -101,7 +101,8 @@
     <ClCompile Include="External\ImGUI\imgui_tables.cpp" />
     <ClCompile Include="External\ImGUI\imgui_widgets.cpp" />
     <ClCompile Include="External\NativeFileDialog\src\nfd_win.cpp" />
-    <ClCompile Include="Source\App.cpp" />
+    <ClCompile Include="Source\App\App.cpp" />
+    <ClCompile Include="Source\App\AppConsole.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorContextMenu.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorWidgets.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
@@ -139,8 +140,11 @@
     <ClInclude Include="External\NativeFileDialog\src\include\nfd.h" />
     <ClInclude Include="External\NativeFileDialog\src\include\nfd.hpp" />
     <ClInclude Include="External\ScopeGuard\ScopeGuard.h" />
-    <ClInclude Include="Source\App.h" />
+    <ClInclude Include="Source\App\App.h" />
+    <ClInclude Include="Source\App\AppConsole.h" />
+    <ClInclude Include="Source\App\IInputListener.h" />
     <ClInclude Include="Source\Common.h" />
+    <ClInclude Include="Source\DataTypes.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorContextMenu.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorWidgets.h" />
     <ClInclude Include="Source\Editor\EditorNode.h" />
@@ -148,6 +152,7 @@
     <ClInclude Include="Source\Editor\ExecutorEditorNode.h" />
     <ClInclude Include="Source\Execution\ExecuteContext.h" />
     <ClInclude Include="Source\Execution\ValueNode.h" />
+    <ClInclude Include="Source\imgui_rendernodes.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraph.h" />
     <ClInclude Include="Source\Editor\RenderPipelineEditor.h" />
     <ClInclude Include="Source\Execution\ExecutorNode.h" />

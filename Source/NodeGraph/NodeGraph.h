@@ -20,12 +20,14 @@ public:
     void RemoveNode(NodeID nodeID);
     void RemoveLink(LinkID linkID);
     void RemovePin(PinID pinID);
-
+    
     bool ContainsNode(NodeID nodeID) const;
 
     EditorNode* GetNodeByID(NodeID nodeID) const;
     EditorNodeLink GetLinkByID(LinkID linkID) const;
 	EditorNodePin GetPinByID(PinID pinID) const;
+
+    void UpdatePin(const EditorNodePin& newPin) const;
 
     EditorNode* GetPinOwner(PinID pinID) const;
     bool IsCustomPin(PinID pinID) const;

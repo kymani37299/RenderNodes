@@ -42,7 +42,7 @@
     <ClCompile Include="Source\Editor\RenderPipelineEditor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Source\App.cpp">
+    <ClCompile Include="Source\App\App.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\Editor\EditorNode.cpp">
@@ -108,6 +108,9 @@
     <ClCompile Include="Source\Editor\Drawing\EditorWidgets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Source\App\AppConsole.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Common.h">
@@ -146,7 +149,7 @@
     <ClInclude Include="Source\Execution\RenderPipelineExecutor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\App.h">
+    <ClInclude Include="Source\App\App.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\Editor\EditorNode.h">
@@ -237,6 +240,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Source\NodeGraph\NodeGraphContext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\imgui_rendernodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\DataTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\App\AppConsole.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\App\IInputListener.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
