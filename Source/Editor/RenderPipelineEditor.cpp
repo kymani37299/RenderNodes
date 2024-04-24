@@ -6,6 +6,7 @@
 #include "../IDGen.h"
 #include "../App/App.h"
 #include "../NodeGraph/NodeGraphCommands.h"
+#include "EditorErrorHandler.h"
 
 RenderPipelineEditor::RenderPipelineEditor(NodeGraphCommandExecutor* commandExecutor) :
 	m_CommandExecutor(commandExecutor)
@@ -169,11 +170,7 @@ void RenderPipelineEditor::UpdateEditor()
                     endPin = tmpPin;
                 }
 
-                bool validLink = startPin.ID != endPin.ID;
-                validLink = validLink && startPin.IsInput != endPin.IsInput;
-                validLink = validLink && startPin.Type == endPin.Type;
-
-                if (!validLink)
+                if (!EditorNodePin::CanBeLinked(startPin, endPin))
                 {
                     ImNode::RejectNewItem(ImColor(255, 0, 0), 2.0f);
                 }
@@ -218,15 +215,27 @@ void RenderPipelineEditor::UpdateEditor()
         EditorNode* editorNode = m_NodeGraph->GetNodeByID(nodeID);
         if (editorNode->GetType() == EditorNodeType::Custom)
         {
-            App::Get()->OpenCustomNode(static_cast<CustomEditorNode*>(editorNode));
+            App::Get()->OpenCustomNode(static_cast<CustomEditorNode*>(editorNode)->GetName());
         }
     }
 }
 
 void RenderPipelineEditor::RenderEditor()
 {
-    const auto renderNode = [](EditorNode* node) {
+    EditorErrorHandler& errorHandler = App::Get()->GetErrorHandler();
+
+    const auto renderNode = [&errorHandler](EditorNode* node) {
+        bool isError = errorHandler.IsErrorNode(node->GetID());
+        if (isError)
+        {
+            ImNode::PushStyleColor(ImNode::StyleColor::StyleColor_NodeBorder, ImVec4(0.8f, 0.1f, 0.0f, 1.0f));
+        }
         node->Render();
+        if (isError)
+        {
+            ImNode::PopStyleColor();
+        }
+
     };
     m_NodeGraph->ForEachNode(renderNode);
 

@@ -14,6 +14,10 @@ public:
     void HandleKeyReleased(int key, int mods);
 
     void SetCompiledPipeline(CompiledPipeline pipeline);
+
+private:
+    void HandleErrors();
+
 private:
     ExecuteContext m_Context;
     CompiledPipeline m_Pipeline;

@@ -381,6 +381,53 @@ RenderStateValueNode* PinEvaluator::EvaluateRenderState(EditorNodePin pin)
 	return new ConstantValueNode<RenderState>({});
 }
 
+SceneObjectValueNode* PinEvaluator::EvaluateSceneObject(EditorNodePin pin)
+{
+	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
+	ASSERT(pin.Type == PinType::SceneObject);
+
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("SceneObject pin input not linked!");
+		return new ConstantValueNode<SceneObject*>({});
+	}
+
+	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::ForEachSceneObject: return EvaluateForEachSceneObject(static_cast<ForEachSceneObjectEditorNode*>(node));
+	case EditorNodeType::Pin: return EvaluatePinNode<SceneObjectValueNode>(static_cast<PinEditorNode*>(node));
+	case EditorNodeType::Custom: return EvaluateCustomNode<SceneObjectValueNode>(static_cast<CustomEditorNode*>(node), pin);
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateRenderState] internal error!");
+	}
+	return new ConstantValueNode<SceneObject*>({});
+}
+
+SceneValueNode* PinEvaluator::EvaluateScene(EditorNodePin pin)
+{
+	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
+	ASSERT(pin.Type == PinType::Scene);
+
+	if (pin.Type == PinType::Invalid)
+	{
+		m_ErrorMessages.push_back("Scene pin input not linked!");
+		return new ConstantValueNode<Scene*>({});
+	}
+
+	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
+	switch (node->GetType())
+	{
+	case EditorNodeType::GetScene: return EvaluateGetScene(static_cast<GetSceneEditorNode*>(node));
+	case EditorNodeType::Pin: return EvaluatePinNode<SceneValueNode>(static_cast<PinEditorNode*>(node));
+	case EditorNodeType::Custom: return EvaluateCustomNode<SceneValueNode>(static_cast<CustomEditorNode*>(node), pin);
+	default:
+		NOT_IMPLEMENTED;
+		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateRenderState] internal error!");
+	}
+	return new ConstantValueNode<Scene*>({});
+}
 
 IntValueNode* PinEvaluator::EvaluateInt(IntEditorNode* node)
 {
@@ -586,15 +633,9 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4BinaryOperator(Float4x4BinaryOp
 	return new BinaryArithmeticOperatorValueNode<Float4x4>{ a, b, node->GetOp()[0] };
 }
 
-Float4x4ValueNode* PinEvaluator::GetLastTransformValue(MatrixTransformEditorNode* node)
-{
-	const bool hasLastTransform = GetNodeGraph()->GetOutputPinForInput(node->GetLastTransformPin().ID);
-	return hasLastTransform ? EvaluateFloat4x4(node->GetLastTransformPin()) : nullptr;
-}
-
 Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Rotate(Float4x4RotationTransformEditorNode* node)
 {
-	Float4x4ValueNode* lastTransform = GetLastTransformValue(node);
+	Float4x4ValueNode* lastTransform = EvaluatePinOptional<Float4x4ValueNode, &PinEvaluator::EvaluateFloat4x4>(node->GetLastTransformPin());
 	FloatValueNode* angle = EvaluateFloat(node->GetAnglePin());
 	Float3ValueNode* axis = EvaluateFloat3(node->GetAxisPin());
 	return new Float4x4RotateValueNode{ lastTransform, angle, axis };
@@ -602,14 +643,14 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Rotate(Float4x4RotationTransfor
 
 Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Translate(Float4x4TranslationTransformEditorNode* node)
 {
-	Float4x4ValueNode* lastTransform = GetLastTransformValue(node);
+	Float4x4ValueNode* lastTransform = EvaluatePinOptional<Float4x4ValueNode, &PinEvaluator::EvaluateFloat4x4>(node->GetLastTransformPin());
 	Float3ValueNode* value = EvaluateFloat3(node->GetValuePin());
 	return new Float4x4TranslateValueNode{ lastTransform, value };
 }
 
 Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Scale(Float4x4ScaleTransformEditorNode* node)
 {
-	Float4x4ValueNode* lastTransform = GetLastTransformValue(node);
+	Float4x4ValueNode* lastTransform = EvaluatePinOptional<Float4x4ValueNode, &PinEvaluator::EvaluateFloat4x4>(node->GetLastTransformPin());
 	Float3ValueNode* value = EvaluateFloat3(node->GetValuePin());
 	return new Float4x4ScaleValueNode{ lastTransform, value };
 
@@ -650,14 +691,14 @@ MeshValueNode* PinEvaluator::EvaluateGetCubeMesh(GetCubeMeshEditorNode* node)
 
 MeshValueNode* PinEvaluator::EvaluateGetMesh(GetMeshEditorNode* node)
 {
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-
+	SceneObjectValueNode* sceneObjectNode = EvaluateSceneObject(node->GetSceneObjectPin());
+	
 	ValueNodeExtraInfo extraInfo;
 	extraInfo.MeshVertexBits.Position = node->GetPositionBit();
 	extraInfo.MeshVertexBits.Texcoord = node->GetTexcoordBit();
 	extraInfo.MeshVertexBits.Normal = node->GetNormalBit();
 	extraInfo.MeshVertexBits.Tangent = node->GetTangentBit();
-	return new VariableValueNode<Mesh*>(nameNode, extraInfo);
+	return new GetMeshValueNode(sceneObjectNode, extraInfo);
 }
 
 ShaderValueNode* PinEvaluator::EvaluateGetShader(GetShaderEditorNode* node)
@@ -717,4 +758,17 @@ RenderStateValueNode* PinEvaluator::EvaluateRenderState(RenderStateEditorNode* n
 	else NOT_IMPLEMENTED;
 
 	return new ConstantValueNode<RenderState>{ state };
+}
+
+SceneObjectValueNode* PinEvaluator::EvaluateForEachSceneObject(ForEachSceneObjectEditorNode* node)
+{
+	const std::string iteratorName = ExecutionPrivate::GetIteratorName(node->GetSceneObjectPin().ID);
+	StringValueNode* iteratorNameNode = new ConstantValueNode<std::string>{ iteratorName };
+	return new VariableValueNode<SceneObject*>{ iteratorNameNode };
+}
+
+SceneValueNode* PinEvaluator::EvaluateGetScene(GetSceneEditorNode* node)
+{
+	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
+	return new VariableValueNode<Scene*>(nameNode);
 }

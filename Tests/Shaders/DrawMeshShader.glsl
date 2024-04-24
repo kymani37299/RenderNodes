@@ -10,10 +10,12 @@ out vec2 out_UV;
 out vec3 out_Normal;
 
 uniform mat4 Model;
+uniform mat4 View;
+uniform mat4 Projection;
 
 void main()
 {
-    gl_Position = vec4(in_Pos * 0.1, 1.0f) * Model;
+    gl_Position = vec4(in_Pos * 0.1, 1.0f) * Model * View * Projection;
     out_UV = in_UV;
     out_Normal = in_Normal;
 }

@@ -4,25 +4,23 @@
 #include <unordered_set>
 
 #include "../Common.h"
+#include "../IDGen.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
 #include "../Render/Buffer.h"
+#include "ExecutorScene.h"
 
 namespace ExecutionPrivate
 {
 	void Failure(const std::string& nodeName, const std::string& msg);
 	void Warning(bool condition, const std::string& nodeName, const std::string& msg);
-}
 
-struct Mesh
-{
-	unsigned NumPrimitives = 0;
-	Ptr<Buffer> Positions;
-	Ptr<Buffer> Texcoords;
-	Ptr<Buffer> Normals;
-	Ptr<Buffer> Tangents;
-	Ptr<Buffer> Indices;
-};
+	inline std::string GetIteratorName(PinID pinID)
+	{
+		return "Internal_Iterator_" + std::to_string(pinID);
+	}
+
+}
 
 struct ExecutorVariableBlock
 {
@@ -35,8 +33,9 @@ struct ExecutorVariableBlock
 	std::unordered_map<uint32_t, Float4x4> Float4x4s;
 	std::unordered_map<uint32_t, Texture*> Textures;
 	std::unordered_map<uint32_t, Buffer*> Buffers;
-	std::unordered_map<uint32_t, Mesh*> Meshes;
 	std::unordered_map<uint32_t, Shader*> Shaders;
+	std::unordered_map<uint32_t, Scene*> Scenes;
+	std::unordered_map<uint32_t, SceneObject*> SceneObjects;
 
 	template<typename T> std::unordered_map<uint32_t, T>& GetMapFromType();
 	template<> std::unordered_map<uint32_t, bool>& GetMapFromType<bool>() { return Bools; }
@@ -49,7 +48,8 @@ struct ExecutorVariableBlock
 	template<> std::unordered_map<uint32_t, Texture*>& GetMapFromType<Texture*>() { return Textures; }
 	template<> std::unordered_map<uint32_t, Shader*>& GetMapFromType<Shader*>() { return Shaders; }
 	template<> std::unordered_map<uint32_t, Buffer*>& GetMapFromType<Buffer*>() { return Buffers; }
-	template<> std::unordered_map<uint32_t, Mesh*>& GetMapFromType<Mesh*>() { return Meshes; }
+	template<> std::unordered_map<uint32_t, Scene*>& GetMapFromType<Scene*>() { return Scenes; }
+	template<> std::unordered_map<uint32_t, SceneObject*>& GetMapFromType<SceneObject*>() { return SceneObjects; }
 };
 
 enum class ExecutorStaticResource
@@ -65,6 +65,7 @@ struct ExecutorRenderResources
 	std::vector<Ptr<Buffer>> Buffers;
 	std::vector<Ptr<Mesh>> Meshes;
 	std::vector<Ptr<Shader>> Shaders;
+	std::vector<Ptr<Scene>> Scenes;
 
 	template<typename T, ExecutorStaticResource staticResource>  T GetStaticResource();
 	template<> Mesh* GetStaticResource<Mesh*, ExecutorStaticResource::CubeMesh>() { return Meshes[CubeMeshIndex].get(); }
@@ -79,17 +80,20 @@ struct ExecutorInputState
 	static uint32_t GetInputHash(int key, int mods);
 };
 
+class ExecutorNode;
+
 struct ExecuteContext
 {
 	Texture* RenderTarget = nullptr;
 	ExecutorVariableBlock Variables;
 	ExecutorRenderResources RenderResources;
 	ExecutorInputState InputState;
-
+	
+	std::unordered_map<ExecutorNode*, NodeID> EditorLinks;
+	
 	bool Failure = false;
+	NodeID FailedNode = 0;
 };
-
-class ExecutorNode;
 
 struct CompiledPipeline
 {
@@ -99,4 +103,6 @@ struct CompiledPipeline
 	std::unordered_map<uint32_t, ExecutorNode*> OnKeyPressedNodes;
 	std::unordered_map<uint32_t, ExecutorNode*> OnKeyDownNodes;
 	std::unordered_map<uint32_t, ExecutorNode*> OnKeyReleasedNodes;
+
+	std::unordered_map<ExecutorNode*, NodeID> EditorLinks;
 };

@@ -147,10 +147,12 @@
     <ClInclude Include="Source\DataTypes.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorContextMenu.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorWidgets.h" />
+    <ClInclude Include="Source\Editor\EditorErrorHandler.h" />
     <ClInclude Include="Source\Editor\EditorNode.h" />
     <ClInclude Include="Source\Editor\EvaluationEditorNode.h" />
     <ClInclude Include="Source\Editor\ExecutorEditorNode.h" />
     <ClInclude Include="Source\Execution\ExecuteContext.h" />
+    <ClInclude Include="Source\Execution\ExecutorScene.h" />
     <ClInclude Include="Source\Execution\ValueNode.h" />
     <ClInclude Include="Source\imgui_rendernodes.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraph.h" />

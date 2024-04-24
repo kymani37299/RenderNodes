@@ -11,8 +11,27 @@ class ExecutorNode
 public:
 	virtual ~ExecutorNode() {}
 
-	// If node reutrns false it means failure and execution stops
 	virtual void Execute(ExecuteContext& context) = 0;
+
+	// Executes whole node path to the end
+	void ExecuteNodePath(ExecuteContext& context)
+	{
+		if (context.Failure)
+			return;
+
+		ExecutorNode* currentNode = this;
+		while (currentNode)
+		{
+			currentNode->Execute(context);
+
+			if (context.Failure)
+			{
+				context.FailedNode = context.EditorLinks.count(currentNode) > 0 ? context.EditorLinks[currentNode] : 0;
+				break;
+			}
+			currentNode = currentNode->GetNextNode();
+		}
+	}
 
 	void SetNextNode(ExecutorNode* node)
 	{
@@ -220,10 +239,10 @@ private:
 	Ptr<RenderStateValueNode> m_RenderState;
 };
 
-class LoadMeshExecutorNode : public ExecutorNode
+class LoadSceneExecutorNode : public ExecutorNode
 {
 public:
-	LoadMeshExecutorNode(StringValueNode* nameNode, const std::string& meshPath) :
+	LoadSceneExecutorNode(StringValueNode* nameNode, const std::string& meshPath) :
 		m_NameNode(nameNode),
 		m_MeshPath(meshPath) {}
 
@@ -231,4 +250,21 @@ public:
 private:
 	Ptr<StringValueNode> m_NameNode;
 	std::string m_MeshPath;
+};
+
+class ForEachSceneObjectExecutorNode : public ExecutorNode
+{
+public:
+	ForEachSceneObjectExecutorNode(SceneValueNode* sceneNode, PinID sceneObjectPinID, ExecutorNode* loopExecutorNode) :
+		m_SceneNode(sceneNode),
+		m_SceneObjectIteratorHash(Hash::Crc32(ExecutionPrivate::GetIteratorName(sceneObjectPinID))),
+		m_LoopExecutorNode(loopExecutorNode)
+	{ }
+
+	void Execute(ExecuteContext& context) override;
+
+private:
+	uint32_t m_SceneObjectIteratorHash;
+	Ptr<SceneValueNode> m_SceneNode;
+	Ptr<ExecutorNode> m_LoopExecutorNode;
 };

@@ -56,7 +56,7 @@ static bool IsCustomNodeCompatible(const CustomEditorNode* node, const EditorNod
 	EditorNodePin targetPin;
 	for (const auto& pin : node->GetPins())
 	{
-		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		if (EditorNodePin::CanBeLinked(pin, nodePin))
 		{
 			targetPin = pin;
 			break;
@@ -65,7 +65,7 @@ static bool IsCustomNodeCompatible(const CustomEditorNode* node, const EditorNod
 
 	for (const auto& pin : node->GetCustomPins())
 	{
-		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		if (EditorNodePin::CanBeLinked(pin, nodePin))
 		{
 			targetPin = pin;
 			break;
@@ -76,7 +76,7 @@ static bool IsCustomNodeCompatible(const CustomEditorNode* node, const EditorNod
 }
 
 template<typename T>
-static bool IsCompatible_Impl(const EditorNodePin& nodePin)
+static bool IsCompatible(const EditorNodePin& nodePin)
 {
 	if (nodePin.Type == PinType::Invalid)
 		return true;
@@ -85,7 +85,7 @@ static bool IsCompatible_Impl(const EditorNodePin& nodePin)
 	EditorNodePin targetPin;
 	for (const auto& pin : node->GetPins())
 	{
-		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		if (EditorNodePin::CanBeLinked(pin, nodePin))
 		{
 			targetPin = pin;
 			break;
@@ -94,7 +94,7 @@ static bool IsCompatible_Impl(const EditorNodePin& nodePin)
 
 	for (const auto& pin : node->GetCustomPins())
 	{
-		if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+		if (EditorNodePin::CanBeLinked(pin, nodePin))
 		{
 			targetPin = pin;
 			break;
@@ -104,21 +104,87 @@ static bool IsCompatible_Impl(const EditorNodePin& nodePin)
 	return targetPin.Type != PinType::Invalid;
 }
 
-// Variadic template function, working thanks to u/IyeOnline https://www.reddit.com/r/cpp_questions/comments/14c4cxw/variadic_template_function_question/
-template<typename... Args>
-static bool IsCompatible(const EditorNodePin& nodePin)
+template<typename T>
+class NewNodeMenuItem : public EditorWidgets::MenuItem
 {
-	return (IsCompatible_Impl<Args>(nodePin) || ...);
-}
+public:
+	NewNodeMenuItem(const std::string& label, EditorNode** newNodePtr) :
+		EditorWidgets::MenuItem(label),
+		m_NewNodePtr(newNodePtr) {}
 
-#define BEGIN_MENU(Text, ...) if(IsCompatible<__VA_ARGS__>(nodePin) && ImGui::BeginMenu(Text))
-#define MENU_ITEM(Text, NodeType)  if (IsCompatible<NodeType>(nodePin) && ImGui::MenuItem(Text)) newNode = new NodeType()
-#define END_MENU() ImGui::EndMenu()
+	virtual void OnClick() const override
+	{
+		*m_NewNodePtr = new T{};
+	}
+
+private:
+	EditorNode** m_NewNodePtr;
+};
+
+class NewCustomNodeMenuItem : public EditorWidgets::MenuItem
+{
+public:
+	NewCustomNodeMenuItem(const std::string& label, EditorNode** newNodePtr, CustomEditorNode* customNode, NodeGraph* parentGraph):
+		EditorWidgets::MenuItem(label),
+		m_NewNodePtr(newNodePtr),
+		m_CustomNode(customNode),
+		m_ParentGraph(parentGraph)
+	{}
+
+	virtual void OnClick() const override
+	{
+		*m_NewNodePtr = m_CustomNode->Instance(m_ParentGraph);
+	}
+
+private:
+	EditorNode** m_NewNodePtr;
+	CustomEditorNode* m_CustomNode;
+	NodeGraph* m_ParentGraph;
+};
+
+class NewPinNodeMenuItem : public EditorWidgets::MenuItem
+{
+public:
+	NewPinNodeMenuItem(const std::string& label, EditorNode** newNodePtr, PinType pinType, bool isInput):
+		EditorWidgets::MenuItem(label),
+		m_NewNodePtr(newNodePtr),
+		m_PinType(pinType),
+		m_IsInput(isInput)
+	{}
+
+	virtual void OnClick() const override
+	{
+		*m_NewNodePtr = new PinEditorNode{ m_IsInput, m_PinType };
+	}
+
+private:
+	EditorNode** m_NewNodePtr;
+	PinType m_PinType;
+	bool m_IsInput;
+};
+
+template<typename T>
+void AddIfCompatible(EditorWidgets::Menu& menu, const std::string& label, EditorNode** newNode, const EditorNodePin& nodePin)
+{
+	if (IsCompatible<T>(nodePin))
+		menu.AddItem(new NewNodeMenuItem<T>(label, newNode));
+}
 
 void NewNodeContextMenu::DrawContent()
 {
-	EditorNode* newNode = nullptr;
-	
+	if (m_ShouldRebuildMenus)
+	{
+		RebuildMenus();
+		m_ShouldRebuildMenus = false;
+	}
+
+	if (!ImGui::IsAnyItemActive() && !ImGui::IsMouseClicked(0))
+		ImGui::SetKeyboardFocusHere(0);
+
+	ImGui::InputText("Search", m_SearchFilter);
+
+	m_NewNode = nullptr;
+
 	EditorNodePin nodePin;
 	if (m_DraggedPin) nodePin = m_CommandExecutor->GetNodeGraph()->GetPinByID(m_DraggedPin);
 
@@ -135,9 +201,25 @@ void NewNodeContextMenu::DrawContent()
 		}
 	}
 
+	m_CreationMenu.Render(m_SearchFilter);
+
+	if (m_NewNode)
+	{
+		const auto nodePos = ImNode::ScreenToCanvas(ImGui::GetMousePos());
+		m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ m_NewNode, {nodePos.x, nodePos.y}, m_DraggedPin });
+	}
+}
+
+void NewNodeContextMenu::RebuildMenus()
+{
+	EditorNodePin nodePin;
+	if (m_DraggedPin) nodePin = m_CommandExecutor->GetNodeGraph()->GetPinByID(m_DraggedPin);
+
+	m_CreationMenu = EditorWidgets::Menu{ "", true };
+
 	if (m_CustomNodeEditor)
 	{
-		const auto pinsMenu = [this, &newNode, &nodePin](bool isInput)
+		const auto pinsMenu = [this, &nodePin](bool isInput, EditorWidgets::Menu& pinMenu)
 		{
 			bool excludeExecutionPin = false;
 			if (!isInput)
@@ -163,166 +245,137 @@ void NewNodeContextMenu::DrawContent()
 				if (nodePin.Type != PinType::Invalid && pinType != nodePin.Type)
 					continue;
 
-				const std::string menuLabel = ToString(pinType);
-				if (ImGui::MenuItem(menuLabel.c_str())) newNode = new PinEditorNode{ isInput, pinType };
+				pinMenu.AddItem(new NewPinNodeMenuItem{ ToString(pinType), &m_NewNode, pinType, isInput });
 			}
 		};
 
-		if ((nodePin.Type == PinType::Invalid || nodePin.IsInput) && ImGui::BeginMenu("Input Pins"))
+		if (nodePin.Type == PinType::Invalid || nodePin.IsInput)
 		{
-			pinsMenu(false);
-			ImGui::EndMenu();
+			EditorWidgets::Menu pinInputMenu{ "Input Pins" };
+			pinsMenu(false, pinInputMenu);
+			m_CreationMenu.AddMenu(pinInputMenu);
 		}
 
-		if ((nodePin.Type == PinType::Invalid || !nodePin.IsInput) && ImGui::BeginMenu("Output Pins"))
+		if (nodePin.Type == PinType::Invalid || !nodePin.IsInput)
 		{
-			pinsMenu(true);
-			ImGui::EndMenu();
+			EditorWidgets::Menu pinOutputMenu{ "Output Pins" };
+			pinsMenu(true, pinOutputMenu);
+			m_CreationMenu.AddMenu(pinOutputMenu);
 		}
 	}
 
-	BEGIN_MENU("Constants", BoolEditorNode, IntEditorNode, StringEditorNode, FloatEditorNode, Float2EditorNode, Float3EditorNode, Float4EditorNode, Float4x4EditorNode)
-	{
-		MENU_ITEM("Bool", BoolEditorNode);
-		MENU_ITEM("Int", IntEditorNode);
-		MENU_ITEM("String", StringEditorNode);
-		MENU_ITEM("Float", FloatEditorNode);
-		MENU_ITEM("Float2", Float2EditorNode);
-		MENU_ITEM("Float3", Float3EditorNode);
-		MENU_ITEM("Float4", Float4EditorNode);
-		MENU_ITEM("Float4x4", Float4x4EditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu constantsMenu{ "Constants" };
+	AddIfCompatible<BoolEditorNode>(constantsMenu, "Bool", &m_NewNode, nodePin);
+	AddIfCompatible<StringEditorNode>(constantsMenu, "String", &m_NewNode, nodePin);
+	AddIfCompatible<FloatEditorNode>(constantsMenu, "Float", &m_NewNode, nodePin);
+	AddIfCompatible<Float2EditorNode>(constantsMenu, "Float2", &m_NewNode, nodePin);
+	AddIfCompatible<Float3EditorNode>(constantsMenu, "Float3", &m_NewNode, nodePin);
+	AddIfCompatible<Float4EditorNode>(constantsMenu, "Float4", &m_NewNode, nodePin);
+	AddIfCompatible<Float4x4EditorNode>(constantsMenu, "Float4x4", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(constantsMenu);
 
-	BEGIN_MENU("Assign variable", AsignBoolEditorNode, AsignIntEditorNode, AsignFloatEditorNode, AsignFloat2EditorNode, AsignFloat3EditorNode, AsignFloat4EditorNode, AsignFloat4x4EditorNode)
-	{
-		MENU_ITEM("Bool", AsignBoolEditorNode);
-		MENU_ITEM("Int", AsignIntEditorNode);
-		MENU_ITEM("Float", AsignFloatEditorNode);
-		MENU_ITEM("Float2", AsignFloat2EditorNode);
-		MENU_ITEM("Float3", AsignFloat3EditorNode);
-		MENU_ITEM("Float4", AsignFloat4EditorNode);
-		MENU_ITEM("Float4x4", AsignFloat4x4EditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu assignMenu{ "Assign variable" };
+	AddIfCompatible<AsignBoolEditorNode>(assignMenu, "Bool", &m_NewNode, nodePin);
+	AddIfCompatible<AsignIntEditorNode>(assignMenu, "Int", &m_NewNode, nodePin);
+	AddIfCompatible<AsignFloatEditorNode>(assignMenu, "Float", &m_NewNode, nodePin);
+	AddIfCompatible<AsignFloat2EditorNode>(assignMenu, "Float2", &m_NewNode, nodePin);
+	AddIfCompatible<AsignFloat3EditorNode>(assignMenu, "Float3", &m_NewNode, nodePin);
+	AddIfCompatible<AsignFloat4EditorNode>(assignMenu, "Float4", &m_NewNode, nodePin);
+	AddIfCompatible<AsignFloat4x4EditorNode>(assignMenu, "Float4x4", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(assignMenu);
 
-	BEGIN_MENU("Get variable", VarBoolEditorNode, VarIntEditorNode, VarFloatEditorNode, VarFloat2EditorNode, VarFloat3EditorNode, VarFloat4EditorNode, VarFloat4x4EditorNode)
-	{
-		MENU_ITEM("Bool", VarBoolEditorNode);
-		MENU_ITEM("Int", VarIntEditorNode);
-		MENU_ITEM("Float", VarFloatEditorNode);
-		MENU_ITEM("Float2", VarFloat2EditorNode);
-		MENU_ITEM("Float3", VarFloat3EditorNode);
-		MENU_ITEM("Float4", VarFloat4EditorNode);
-		MENU_ITEM("Float4x4", VarFloat4x4EditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu getVarMenu{ "Get variable" };
+	AddIfCompatible<VarBoolEditorNode>(getVarMenu, "Bool", &m_NewNode, nodePin);
+	AddIfCompatible<VarIntEditorNode>(getVarMenu, "Int", &m_NewNode, nodePin);
+	AddIfCompatible<VarFloatEditorNode>(getVarMenu, "Float", &m_NewNode, nodePin);
+	AddIfCompatible<VarFloat2EditorNode>(getVarMenu, "Float2", &m_NewNode, nodePin);
+	AddIfCompatible<VarFloat3EditorNode>(getVarMenu, "Float3", &m_NewNode, nodePin);
+	AddIfCompatible<VarFloat4EditorNode>(getVarMenu, "Float4", &m_NewNode, nodePin);
+	AddIfCompatible<VarFloat4x4EditorNode>(getVarMenu, "Float4x4", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(getVarMenu);
 
-	BEGIN_MENU("Operator", BoolBinaryOperatorEditorNode, IntBinaryOperatorEditorNode, FloatBinaryOperatorEditorNode, Float2BinaryOperatorEditorNode, Float3BinaryOperatorEditorNode, Float4BinaryOperatorEditorNode, Float4x4BinaryOperatorEditorNode)
-	{
-		MENU_ITEM("Bool", BoolBinaryOperatorEditorNode);
-		MENU_ITEM("Int", IntBinaryOperatorEditorNode);
-		MENU_ITEM("Float", FloatBinaryOperatorEditorNode);
-		MENU_ITEM("Float2", Float2BinaryOperatorEditorNode);
-		MENU_ITEM("Float3", Float3BinaryOperatorEditorNode);
-		MENU_ITEM("Float4", Float4BinaryOperatorEditorNode);
-		MENU_ITEM("Float4x4", Float4x4BinaryOperatorEditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu operatorMenu{ "Operator" };
+	AddIfCompatible<BoolBinaryOperatorEditorNode>(operatorMenu, "Bool", &m_NewNode, nodePin);
+	AddIfCompatible<IntBinaryOperatorEditorNode>(operatorMenu, "Int", &m_NewNode, nodePin);
+	AddIfCompatible<FloatBinaryOperatorEditorNode>(operatorMenu, "Float", &m_NewNode, nodePin);
+	AddIfCompatible<Float2BinaryOperatorEditorNode>(operatorMenu, "Float2", &m_NewNode, nodePin);
+	AddIfCompatible<Float3BinaryOperatorEditorNode>(operatorMenu, "Float3", &m_NewNode, nodePin);
+	AddIfCompatible<Float4BinaryOperatorEditorNode>(operatorMenu, "Float4", &m_NewNode, nodePin);
+	AddIfCompatible<Float4x4BinaryOperatorEditorNode>(operatorMenu, "Float4x4", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(operatorMenu);
 
-	BEGIN_MENU("Transform", Float4x4RotationTransformEditorNode, Float4x4TranslationTransformEditorNode, Float4x4ScaleTransformEditorNode, Float4x4LookAtTransformEditorNode, Float4x4PerspectiveTransformEditorNode)
-	{
-		MENU_ITEM("Float4x4: Rotate", Float4x4RotationTransformEditorNode);
-		MENU_ITEM("Float4x4: Translate", Float4x4TranslationTransformEditorNode);
-		MENU_ITEM("Float4x4: Scale", Float4x4ScaleTransformEditorNode);
-		MENU_ITEM("Float4x4: Look at", Float4x4LookAtTransformEditorNode);
-		MENU_ITEM("Float4x4: Perspective projection", Float4x4PerspectiveTransformEditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu transformMenu{ "Transform" };
+	AddIfCompatible<Float4x4RotationTransformEditorNode>(transformMenu, "Float4x4: Rotate", &m_NewNode, nodePin);
+	AddIfCompatible<Float4x4TranslationTransformEditorNode>(transformMenu, "Float4x4: Translate", &m_NewNode, nodePin);
+	AddIfCompatible<Float4x4ScaleTransformEditorNode>(transformMenu, "Float4x4: Scale", &m_NewNode, nodePin);
+	AddIfCompatible<Float4x4LookAtTransformEditorNode>(transformMenu, "Float4x4: Look at", &m_NewNode, nodePin);
+	AddIfCompatible<Float4x4PerspectiveTransformEditorNode>(transformMenu, "Float4x4: Perspective projection", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(transformMenu);
 
-	BEGIN_MENU("Compare", FloatComparisonOperatorEditorNode, IntComparisonOperatorEditorNode)
-	{
-		MENU_ITEM("Float", FloatComparisonOperatorEditorNode);
-		MENU_ITEM("Int", IntComparisonOperatorEditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu compareMenu{ "Compare" };
+	AddIfCompatible<FloatComparisonOperatorEditorNode>(compareMenu, "Float", &m_NewNode, nodePin);
+	AddIfCompatible<IntComparisonOperatorEditorNode>(compareMenu, "Int", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(compareMenu);
 
-	BEGIN_MENU("Create", CreateTextureEditorNode, CreateFloat2EditorNode, CreateFloat3EditorNode, CreateFloat4EditorNode)
-	{
-		MENU_ITEM("Texture", CreateTextureEditorNode);
-		MENU_ITEM("Float2", CreateFloat2EditorNode);
-		MENU_ITEM("Float3", CreateFloat3EditorNode);
-		MENU_ITEM("Float4", CreateFloat4EditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu createMenu{ "Create" };
+	AddIfCompatible<CreateTextureEditorNode>(createMenu, "Texture", &m_NewNode, nodePin);
+	AddIfCompatible<CreateFloat2EditorNode>(createMenu, "Float2", &m_NewNode, nodePin);
+	AddIfCompatible<CreateFloat3EditorNode>(createMenu, "Float3", &m_NewNode, nodePin);
+	AddIfCompatible<CreateFloat4EditorNode>(createMenu, "Float4", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(createMenu);
 
-	BEGIN_MENU("Split", SplitFloat2EditorNode, SplitFloat3EditorNode, SplitFloat4EditorNode)
-	{
-		MENU_ITEM("Float2", SplitFloat2EditorNode);
-		MENU_ITEM("Float3", SplitFloat3EditorNode);
-		MENU_ITEM("Float4", SplitFloat4EditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu splitMenu{ "Split" };
+	AddIfCompatible<SplitFloat2EditorNode>(splitMenu, "Float2", &m_NewNode, nodePin);
+	AddIfCompatible<SplitFloat3EditorNode>(splitMenu, "Float3", &m_NewNode, nodePin);
+	AddIfCompatible<SplitFloat4EditorNode>(splitMenu, "Float4", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(splitMenu);
 
-	BEGIN_MENU("Load", LoadTextureEditorNode, LoadShaderEditorNode, LoadMeshEditorNode)
-	{
-		MENU_ITEM("Texture", LoadTextureEditorNode);
-		MENU_ITEM("Shader", LoadShaderEditorNode);
-		MENU_ITEM("Mesh", LoadMeshEditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu loadMenu{ "Load" };
+	AddIfCompatible<LoadTextureEditorNode>(loadMenu, "Texture", &m_NewNode, nodePin);
+	AddIfCompatible<LoadShaderEditorNode>(loadMenu, "Shader", &m_NewNode, nodePin);
+	AddIfCompatible<LoadSceneEditorNode>(loadMenu, "Scene object", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(loadMenu);
 
-	BEGIN_MENU("Get", GetTextureEditorNode, GetShaderEditorNode, GetMeshEditorNode, GetCubeMeshEditorNode)
-	{
-		MENU_ITEM("Texture", GetTextureEditorNode);
-		MENU_ITEM("Shader", GetShaderEditorNode);
-		MENU_ITEM("Mesh", GetMeshEditorNode);
-		MENU_ITEM("Cube mesh", GetCubeMeshEditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu getMenu{ "Get" };
+	AddIfCompatible<GetTextureEditorNode>(getMenu, "Texture", &m_NewNode, nodePin);
+	AddIfCompatible<GetShaderEditorNode>(getMenu, "Shader", &m_NewNode, nodePin);
+	AddIfCompatible<GetMeshEditorNode>(getMenu, "Mesh", &m_NewNode, nodePin);
+	AddIfCompatible<GetCubeMeshEditorNode>(getMenu, "Cube mesh", &m_NewNode, nodePin);
+	AddIfCompatible<GetSceneEditorNode>(getMenu, "Scene", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(getMenu);
 
-	BEGIN_MENU("Render", ClearRenderTargetEditorNode, PresentTextureEditorNode, DrawMeshEditorNode)
-	{
-		MENU_ITEM("Clear framebuffer", ClearRenderTargetEditorNode);
-		MENU_ITEM("Present texture", PresentTextureEditorNode);
-		MENU_ITEM("Draw mesh", DrawMeshEditorNode);
-		END_MENU();
-	}
+	EditorWidgets::Menu renderMenu{ "Render" };
+	AddIfCompatible<ClearRenderTargetEditorNode>(renderMenu, "Clear framebuffer", &m_NewNode, nodePin);
+	AddIfCompatible<PresentTextureEditorNode>(renderMenu, "Present texture", &m_NewNode, nodePin);
+	AddIfCompatible<DrawMeshEditorNode>(renderMenu, "Draw mesh", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(renderMenu);
 
 	if (!m_CustomNodeEditor)
 	{
-		BEGIN_MENU("Input", OnKeyPressedEditorNode, OnKeyReleasedEditorNode, OnKeyDownEditorNode)
-		{
-			MENU_ITEM("On key pressed", OnKeyPressedEditorNode);
-			MENU_ITEM("On key released", OnKeyReleasedEditorNode);
-			MENU_ITEM("On key down", OnKeyDownEditorNode);
-			END_MENU();
-		}
+		EditorWidgets::Menu inputMenu{ "Input" };
+		AddIfCompatible<OnKeyPressedEditorNode>(inputMenu, "On key pressed", &m_NewNode, nodePin);
+		AddIfCompatible<OnKeyReleasedEditorNode>(inputMenu, "On key released", &m_NewNode, nodePin);
+		AddIfCompatible<OnKeyDownEditorNode>(inputMenu, "On key down", &m_NewNode, nodePin);
+		m_CreationMenu.AddMenu(inputMenu);
 	}
-	
-	MENU_ITEM("BindTable", BindTableEditorNode);
-	MENU_ITEM("RenderState", RenderStateEditorNode);
-	MENU_ITEM("If condition", IfEditorNode);
-	MENU_ITEM("Print", PrintEditorNode);
+
+	AddIfCompatible<BindTableEditorNode>(m_CreationMenu, "BindTable", &m_NewNode, nodePin);
+	AddIfCompatible<RenderStateEditorNode>(m_CreationMenu, "RenderState", &m_NewNode, nodePin);
+	AddIfCompatible<IfEditorNode>(m_CreationMenu, "If condition", &m_NewNode, nodePin);
+	AddIfCompatible<ForEachSceneObjectEditorNode>(m_CreationMenu, "For each scene object", &m_NewNode, nodePin);
+	AddIfCompatible<PrintEditorNode>(m_CreationMenu, "Print", &m_NewNode, nodePin);
 
 	const auto& customNodes = *App::Get()->GetCustomNodes();
 	if (!customNodes.empty())
 	{
-		if (ImGui::BeginMenu("Custom"))
+		EditorWidgets::Menu customMenu{ "Custom" };
+
+		for (const auto& customNode : customNodes)
 		{
-			for (const auto& customNode : customNodes)
-			{
-				if (IsCustomNodeCompatible(customNode.get(), nodePin) && ImGui::MenuItem(customNode->GetName().c_str())) newNode = customNode->Instance(m_CommandExecutor->GetNodeGraph());
-			}
-
-			ImGui::EndMenu();
+			if (IsCustomNodeCompatible(customNode.get(), nodePin))
+				customMenu.AddItem(new NewCustomNodeMenuItem{ customNode->GetName(), &m_NewNode, customNode.get(), m_CommandExecutor->GetNodeGraph() });
 		}
-	}
-
-	if (newNode)
-	{
-		const auto nodePos = ImNode::ScreenToCanvas(ImGui::GetMousePos());
-		m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ newNode, {nodePos.x, nodePos.y}, m_DraggedPin });
+		m_CreationMenu.AddMenu(customMenu);
 	}
 }
 
@@ -337,7 +390,7 @@ void NodeContextMenu::DrawContent()
 	{
 		if (ImGui::MenuItem("Open"))
 		{
-			App::Get()->OpenCustomNode(static_cast<CustomEditorNode*>(node));
+			App::Get()->OpenCustomNode(static_cast<CustomEditorNode*>(node)->GetName());
 		}
 	}
 

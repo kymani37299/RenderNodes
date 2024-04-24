@@ -76,7 +76,7 @@ void AddNodeNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& context, 
 		EditorNodePin targetPin;
 		for (const auto& pin : m_Node->GetPins())
 		{
-			if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+			if (EditorNodePin::CanBeLinked(nodePin, pin))
 			{
 				targetPin = pin;
 				break;
@@ -87,7 +87,7 @@ void AddNodeNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& context, 
 		{
 			for (const auto& pin : m_Node->GetCustomPins())
 			{
-				if (pin.Type == nodePin.Type && pin.IsInput != nodePin.IsInput)
+				if (EditorNodePin::CanBeLinked(nodePin, pin))
 				{
 					targetPin = pin;
 					break;
@@ -261,6 +261,11 @@ void PasteNodesNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& contex
 
 	for (const auto& link : linksToAdd)
 		nodeGraph.AddLink(link);
+
+	// Select pasted nodes
+	ImNode::SelectNode(m_PastedNodes[0], false);
+	for (const auto& pastedNodeID : m_PastedNodes)
+		ImNode::SelectNode(pastedNodeID, true);
 }
 
 void PasteNodesNodeGraphCommand::Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)

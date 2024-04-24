@@ -278,13 +278,7 @@ public:
 	PrintEditorNode() :
 		ExecutionEditorNode("Print node", EditorNodeType::Print)
 	{
-		m_FloatInputPin = AddPin(EditorNodePin::CreateInputPin("Float", PinType::Float));
-		m_Float2InputPin = AddPin(EditorNodePin::CreateInputPin("Float2", PinType::Float2));
-		m_Float3InputPin = AddPin(EditorNodePin::CreateInputPin("Float3", PinType::Float3));
-		m_Float4InputPin = AddPin(EditorNodePin::CreateInputPin("Float4", PinType::Float4));
-		m_IntInputPin = AddPin(EditorNodePin::CreateInputPin("Int", PinType::Int));
-		m_BoolInputPin = AddPin(EditorNodePin::CreateInputPin("Bool", PinType::Bool));
-		m_StringInputPin = AddPin(EditorNodePin::CreateInputPin("String", PinType::String));
+		m_InputPin = AddPin(EditorNodePin::CreateInputPin("Value", PinType::Any));
 	}
 
 	EditorNode* Clone() const override
@@ -292,22 +286,10 @@ public:
 		return new PrintEditorNode{};
 	}
 
-	const EditorNodePin& GetFloatInputPin() const { return  GetPins()[m_FloatInputPin]; }
-	const EditorNodePin& GetFloat2InputPin() const { return GetPins()[m_Float2InputPin]; }
-	const EditorNodePin& GetFloat3InputPin() const { return GetPins()[m_Float3InputPin]; }
-	const EditorNodePin& GetFloat4InputPin() const { return GetPins()[m_Float4InputPin]; }
-	const EditorNodePin& GetIntInputPin() const { return GetPins()[m_IntInputPin]; }
-	const EditorNodePin& GetBoolInputPin() const { return GetPins()[m_BoolInputPin]; }
-	const EditorNodePin& GetStringInputPin() const { return GetPins()[m_StringInputPin]; }
+	const EditorNodePin& GetInputPin() const { return GetPins()[m_InputPin]; }
 
 private:
-	unsigned m_FloatInputPin;
-	unsigned m_Float2InputPin;
-	unsigned m_Float3InputPin;
-	unsigned m_Float4InputPin;
-	unsigned m_IntInputPin;
-	unsigned m_BoolInputPin;
-	unsigned m_StringInputPin;
+	unsigned m_InputPin;
 };
 
 class CreateTextureEditorNode : public ExecutionEditorNode
@@ -396,16 +378,16 @@ public:
 	}
 };
 
-class LoadMeshEditorNode : public NameAndPathExecutionEditorNode
+class LoadSceneEditorNode : public NameAndPathExecutionEditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
 public:
-	LoadMeshEditorNode() :
-		NameAndPathExecutionEditorNode("Load mesh", EditorNodeType::LoadMesh) {}
+	LoadSceneEditorNode() :
+		NameAndPathExecutionEditorNode("Load scene", EditorNodeType::LoadScene) {}
 
 	EditorNode* Clone() const override
 	{
-		LoadMeshEditorNode* node = new LoadMeshEditorNode{};
+		LoadSceneEditorNode* node = new LoadSceneEditorNode{};
 		node->m_Path = m_Path;
 		return node;
 	}
@@ -488,4 +470,31 @@ private:
 
 	unsigned m_BindTablePin;
 	unsigned m_RenderStatePin;
+};
+
+class ForEachSceneObjectEditorNode : public ExecutionEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	ForEachSceneObjectEditorNode():
+		ExecutionEditorNode("For each scene object", EditorNodeType::ForEachSceneObject)
+	{
+		m_LoopPin = AddPin(EditorNodePin::CreateOutputPin("Loop", PinType::Execution));
+		m_ScenePin = AddPin(EditorNodePin::CreateInputPin("Scene", PinType::Scene));
+		m_SceneObjectPin = AddPin(EditorNodePin::CreateOutputPin("Scene object[*]", PinType::SceneObject));
+	}
+
+	EditorNode* Clone() const override
+	{
+		return new ForEachSceneObjectEditorNode{};
+	}
+
+	const EditorNodePin& GetLoopPin() const { return GetPins()[m_LoopPin]; }
+	const EditorNodePin& GetScenePin() const { return GetPins()[m_ScenePin]; }
+	const EditorNodePin& GetSceneObjectPin() const { return GetPins()[m_SceneObjectPin]; }
+
+private:
+	unsigned m_SceneObjectPin;
+	unsigned m_LoopPin;
+	unsigned m_ScenePin;
 };

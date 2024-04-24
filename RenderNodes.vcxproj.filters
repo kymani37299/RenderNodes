@@ -254,6 +254,12 @@
     <ClInclude Include="Source\App\IInputListener.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Execution\ExecutorScene.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Editor\EditorErrorHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="External\ImGUI-Nodes\imgui_bezier_math.inl">

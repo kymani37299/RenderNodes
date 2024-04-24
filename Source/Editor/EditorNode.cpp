@@ -97,6 +97,11 @@ EditorNodePin EditorNodePin::CreateOutputPin(const std::string& label, PinType t
     return pin;
 }
 
+bool EditorNodePin::CanBeLinked(const EditorNodePin& a, const EditorNodePin& b)
+{
+    return (a.ID != b.ID) && (a.IsInput != b.IsInput) && (a.Type == b.Type || a.Type == PinType::Any || b.Type == PinType::Any);
+}
+
 std::unordered_map<std::type_index, EditorNode*> EditorNode::s_ClassRepresents;
 
 EditorNode::EditorNode(const std::string& label, EditorNodeType nodeType) :
@@ -322,7 +327,7 @@ void NameAndPathExecutionEditorNode::RenderContent()
         {
         case EditorNodeType::LoadTexture: fileOpened = FileDialog::OpenTextureFile(texPath); break;
         case EditorNodeType::LoadShader: fileOpened = FileDialog::OpenShaderFile(texPath); break;
-        case EditorNodeType::LoadMesh: fileOpened = FileDialog::OpenSceneFile(texPath); break;
+        case EditorNodeType::LoadScene: fileOpened = FileDialog::OpenSceneFile(texPath); break;
         default: NOT_IMPLEMENTED;
         }
 
@@ -409,8 +414,6 @@ void BindTableEditorNode::RenderPopups()
 
 void GetMeshEditorNode::RenderContent()
 {
-    Super::RenderContent();
-
     ImGui::Checkbox("Positions", &m_PositionBit);
     ImGui::Checkbox("Texcoords", &m_TexcoordBit);
     ImGui::Checkbox("Normals", &m_NormalBit);

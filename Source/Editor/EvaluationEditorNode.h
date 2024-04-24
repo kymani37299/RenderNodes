@@ -570,14 +570,22 @@ using Float4x4BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeTyp
 
 using GetTextureEditorNode = VariableEditorNodeT<EditorNodeType::GetTexture, PinType::Texture>;
 using GetShaderEditorNode = VariableEditorNodeT<EditorNodeType::GetShader, PinType::Shader>;
+using GetSceneEditorNode = VariableEditorNodeT<EditorNodeType::GetScene, PinType::Scene>;
 
-class GetMeshEditorNode : public VariableEditorNodeT<EditorNodeType::GetMesh, PinType::Mesh>
+class GetMeshEditorNode : public EvaluationEditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
 
-	using Super = VariableEditorNodeT<EditorNodeType::GetMesh, PinType::Mesh>;
-
 public:
+	GetMeshEditorNode():
+		EvaluationEditorNode("Get mesh", EditorNodeType::GetMesh)
+	{
+		m_SceneObjectPin = AddPin(EditorNodePin::CreateInputPin("Scene object", PinType::SceneObject));
+		AddPin(EditorNodePin::CreateOutputPin("Mesh", PinType::Mesh));
+	}
+
+	const EditorNodePin& GetSceneObjectPin() const { return GetPins()[m_SceneObjectPin]; }
+
 	bool GetPositionBit() const { return m_PositionBit; }
 	bool GetTexcoordBit() const { return m_TexcoordBit; }
 	bool GetNormalBit() const { return m_NormalBit; }
@@ -597,6 +605,8 @@ protected:
 	void RenderContent() override;
 
 private:
+	unsigned m_SceneObjectPin;
+
 	bool m_PositionBit, m_TexcoordBit, m_NormalBit, m_TangentBit;
 };
 

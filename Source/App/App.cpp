@@ -7,6 +7,7 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
+#include "../Editor/EditorErrorHandler.h"
 #include "../Editor/RenderPipelineEditor.h"
 #include "../Editor/Drawing/EditorWidgets.h"
 #include "../Execution/RenderPipelineExecutor.h"
@@ -97,6 +98,7 @@ App::App()
     m_Executor = Ptr<RenderPipelineExecutor>(new RenderPipelineExecutor{});
     m_Compiler = Ptr<NodeGraphCompiler>(new NodeGraphCompiler{});
     m_Serializer = Ptr<NodeGraphSerializer>(new NodeGraphSerializer{});
+	m_ErrorHandler = Ptr<EditorErrorHandler>(new EditorErrorHandler{});
 
 	NewDocument();
 }
@@ -131,6 +133,8 @@ void App::Run()
     {
         glfwSwapBuffers(m_Window);
         glfwPollEvents();
+
+		ProcessRequests();
 
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
@@ -188,8 +192,7 @@ void App::RenderMenuBar()
 			if (ImGui::MenuItem("Add custom node"))
 			{
 				std::filesystem::remove("CustomNodeEditor.json");
-				m_Mode = AppMode::CustomNode;
-				m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ });
+				AddRequest(AppRequest::ChangeModeRequest(AppMode::CustomNode, ""));
 			}
 			ImGui::EndMenu();
 		}
@@ -211,7 +214,8 @@ void App::RenderFrame()
 	else if (m_Mode == AppMode::Run)
 	{
 		ImGui::SetNextItemWidth(ImGui::ConstantSize(250.0f));
-		if (ImGui::Button("   Stop   ")) m_Mode = AppMode::Editor;
+		if (ImGui::Button("   Stop   ")) 
+			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 		ImGui::Separator();
 
 		const float dt = 1000.0f / ImGui::GetIO().Framerate;
@@ -243,9 +247,8 @@ void App::RenderFrame()
 			if (!editNode) AddCustomNode(m_CustomNodeEditor->CreateNode());
 			else m_CustomNodeEditor->RewriteNode();
 
-			m_Mode = AppMode::Editor;
-			m_CustomNodeEditor = nullptr;
-
+			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
+			
 			m_NodeGraph->RefreshCustomNodes();
 		}
 
@@ -255,7 +258,8 @@ void App::RenderFrame()
 			ImGui::PopStyleVar();
 		}
 
-		if (ImGui::Button("   Abort    ")) m_Mode = AppMode::Editor;
+		if (ImGui::Button("   Abort    "))
+			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 
 		ImGui::EndHorizontal();
 
@@ -316,12 +320,9 @@ void App::AddCustomNode(CustomEditorNode* node)
 	m_CustomNodeList.push_back(Ptr<CustomEditorNode>(node));
 }
 
-void App::OpenCustomNode(CustomEditorNode* node)
+void App::OpenCustomNode(const std::string& name)
 {
-	node->GetNodeGraph()->RefreshCustomNodes();
-
-	m_Mode = AppMode::CustomNode;
-	m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ node });
+	AddRequest(AppRequest::ChangeModeRequest(AppMode::CustomNode, name));
 }
 
 void App::SubscribeToInput(IInputListener* listener)
@@ -359,7 +360,7 @@ void App::NewDocument()
 	
 	m_CurrentLoadedFile = "";
 	m_LastExecutedCommandCount = 0;
-	m_Mode = AppMode::Editor;
+	AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 
 	m_CustomNodeList.clear();
 }
@@ -387,7 +388,7 @@ void App::LoadDocument()
 			m_CurrentLoadedFile = path;
 			m_NodeGraph = Ptr<NodeGraph>(loadedNodeGraph);
 			m_LastExecutedCommandCount = 0;
-			m_Mode = AppMode::Editor;
+			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 		}
 		else
 		{
@@ -438,19 +439,26 @@ void App::SaveAsDocument()
 
 void App::CompileAndRun()
 {
+	m_ErrorHandler->Clear();
+
 	CompiledPipeline pipeline = m_Compiler->Compile(*m_NodeGraph);
-	bool compilationSuccessful = m_Compiler->GetErrorMessages().empty();
+	bool compilationSuccessful = m_Compiler->GetCompileErrors().empty();
 	if (compilationSuccessful)
 	{
-		m_Mode = AppMode::Run;
-		m_Executor->SetCompiledPipeline(pipeline);
+		AddRequest(AppRequest::ChangeModeRequest(AppMode::Run));
+		m_Executor->SetCompiledPipeline(pipeline); // TODO: This should also be in handle app request
 		m_Executor->OnStart();
 	}
 	else
 	{
-		for (const std::string& err : m_Compiler->GetErrorMessages())
-			App::Get()->GetConsole().Log("[Compilation error] " + err);
-		m_Mode = AppMode::Editor;
+		AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
+		
+		// Mark error nodes
+		for (const auto& err : m_Compiler->GetCompileErrors())
+		{
+			m_Console.Log("[Compilation error] " + err.Message);
+			m_ErrorHandler->MarkErrorNode(err.Node);
+		}
 	}
 }
 
@@ -464,5 +472,65 @@ std::string App::GetWindowTitle()
 		windowTitle += "*";
 
 	return windowTitle;
+}
+
+void App::ProcessRequests()
+{
+	while (!m_Requests.empty())
+	{
+		const auto& request = m_Requests.front();
+		switch (request.Type)
+		{
+		case AppRequestType::ChangeMode:
+			ProcessChangeModeRequest(request);
+			break;
+		}
+		m_Requests.pop();
+	}
+}
+
+void App::ProcessChangeModeRequest(const AppRequest& request)
+{
+	m_Mode = request.ChangeMode.Mode;
+	if (m_Mode == AppMode::CustomNode)
+	{
+		CustomEditorNode* customNode = nullptr;
+		
+		// Is name is empty, this is new node
+		if (request.ChangeMode.CustomNodeName != "")
+		{
+			for (const auto& cn : m_CustomNodeList)
+			{
+				if (cn->GetName() == request.ChangeMode.CustomNodeName)
+				{
+					customNode = cn.get();
+					break;
+				}
+			}
+		}
+
+		if (customNode != nullptr)
+		{
+			customNode->GetNodeGraph()->RefreshCustomNodes();
+			m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ customNode });
+		}
+		else if (request.ChangeMode.CustomNodeName == "")
+		{
+			m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ });
+		}
+		else
+		{
+			m_Console.Log("[Internal error][App::ProcessChangeModeRequest] Cannot find custom node by name " + request.ChangeMode.CustomNodeName);
+		}
+	}
+	else if(m_Mode == AppMode::Editor)
+	{
+		m_CustomNodeEditor = nullptr;
+		m_NodeGraph->RefreshCustomNodes();
+	}
+	else if (m_Mode == AppMode::Run)
+	{
+		m_CustomNodeEditor = nullptr;
+	}
 }
 

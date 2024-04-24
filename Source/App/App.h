@@ -2,11 +2,14 @@
 
 #include <string>
 #include <vector>
+#include <queue>
 
 #include "../Common.h"
+#include "../IDGen.h"
 #include "AppConsole.h"
 #include "IInputListener.h"
 
+class EditorErrorHandler;
 class RenderPipelineEditor;
 class RenderPipelineExecutor;
 class CustomNodePipelineEditor;
@@ -26,6 +29,32 @@ enum class AppMode
 };
 
 using CustomNodeList = std::vector<Ptr<CustomEditorNode>>;
+
+enum class AppRequestType
+{
+	ChangeMode,
+};
+
+struct ChangeModeAppRequest
+{
+	AppMode Mode;
+	std::string CustomNodeName;
+};
+
+struct AppRequest
+{
+	AppRequestType Type;
+	ChangeModeAppRequest ChangeMode;
+
+	static AppRequest ChangeModeRequest(AppMode mode, std::string customNodeName = "")
+	{
+		AppRequest req;
+		req.Type = AppRequestType::ChangeMode;
+		req.ChangeMode.Mode = mode;
+		req.ChangeMode.CustomNodeName = customNodeName;
+		return req;
+	}
+};
 
 class App
 {
@@ -51,12 +80,12 @@ private:
 public:
 	void Run();
 
-	void RenderMenuBar();
-	void RenderFrame();
+	void AddRequest(const AppRequest& request) { m_Requests.push(request); }
+
 	void HandleInputAction(int key, int mods, int action);
 
 	void AddCustomNode(CustomEditorNode* node);
-	void OpenCustomNode(CustomEditorNode* node);
+	void OpenCustomNode(const std::string& name);
 
 	CustomNodeList* GetCustomNodes() { return &m_CustomNodeList; }
 
@@ -64,6 +93,8 @@ public:
 	void UnsubscribeToInput(IInputListener* lisnener);
 
 	AppConsole& GetConsole() { return m_Console; }
+	EditorErrorHandler& GetErrorHandler() { return *m_ErrorHandler; }
+
 private:
 	void NewDocument();
 	void LoadDocument();
@@ -72,8 +103,14 @@ private:
 
 	void CompileAndRun();
 
-	std::string GetWindowTitle();
+private:
+	void RenderMenuBar();
+	void RenderFrame();
 
+	void ProcessRequests();
+	void ProcessChangeModeRequest(const AppRequest& request);
+
+	std::string GetWindowTitle();
 private:
 
 	// Window
@@ -96,6 +133,7 @@ private:
 	Ptr<RenderPipelineExecutor> m_Executor;
 	Ptr<NodeGraphSerializer> m_Serializer;
 
+	Ptr<EditorErrorHandler> m_ErrorHandler;
 	Ptr<RenderPipelineEditor> m_Editor;
 	Ptr<NodeGraph> m_NodeGraph;
 
@@ -104,4 +142,6 @@ private:
 	CustomNodeList m_CustomNodeList;
 
 	AppConsole m_Console;
+
+	std::queue<AppRequest> m_Requests;
 };

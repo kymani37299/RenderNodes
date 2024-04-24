@@ -1,7 +1,10 @@
 #pragma once
 
+#include <vector>
+
 #include "../Util/Hash.h"
 #include "ExecuteContext.h"
+#include "ExecutorScene.h"
 
 struct ValueNodeExtraInfo
 {
@@ -41,6 +44,8 @@ using TextureValueNode = ValueNode<Texture*>;
 using MeshValueNode = ValueNode<Mesh*>;
 using BufferValueNode = ValueNode<Buffer*>;
 using ShaderValueNode = ValueNode<Shader*>;
+using SceneObjectValueNode = ValueNode<SceneObject*>;
+using SceneValueNode = ValueNode<Scene*>;
 
 struct BindTable
 {
@@ -414,4 +419,22 @@ private:
 	Ptr<FloatValueNode> m_AspectNode;
 	Ptr<FloatValueNode> m_ZNearNode;
 	Ptr<FloatValueNode> m_ZFarNode;
+};
+
+class GetMeshValueNode : public MeshValueNode
+{
+public:
+	GetMeshValueNode(SceneObjectValueNode* sceneObjectNode, const ValueNodeExtraInfo& extraInfo):
+		MeshValueNode(extraInfo),
+		m_SceneObjectNode(sceneObjectNode)
+	{}
+
+	Mesh* GetValue(ExecuteContext& context) const override
+	{
+		SceneObject* sceneObject = m_SceneObjectNode->GetValue(context);
+		return &sceneObject->MeshData;
+	}
+
+private:
+	Ptr<SceneObjectValueNode> m_SceneObjectNode;
 };

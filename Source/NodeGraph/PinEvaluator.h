@@ -104,6 +104,8 @@ public:
 	ShaderValueNode* EvaluateShader(EditorNodePin pin);
 	BindTableValueNode* EvaluateBindTable(EditorNodePin pin);
 	RenderStateValueNode* EvaluateRenderState(EditorNodePin pin);
+	SceneObjectValueNode* EvaluateSceneObject(EditorNodePin pin);
+	SceneValueNode* EvaluateScene(EditorNodePin pin);
 
 	template<typename ReturnType> ReturnType* EvaluatePin(EditorNodePin pin);
 	template<> BoolValueNode* EvaluatePin<BoolValueNode>(EditorNodePin pin) { return EvaluateBool(pin); }
@@ -120,6 +122,8 @@ public:
 	template<> ShaderValueNode* EvaluatePin<ShaderValueNode>(EditorNodePin pin) { return EvaluateShader(pin); }
 	template<> BindTableValueNode* EvaluatePin<BindTableValueNode>(EditorNodePin pin) { return EvaluateBindTable(pin); }
 	template<> RenderStateValueNode* EvaluatePin<RenderStateValueNode>(EditorNodePin pin) { return EvaluateRenderState(pin); }
+	template<> SceneObjectValueNode* EvaluatePin<SceneObjectValueNode>(EditorNodePin pin) { return EvaluateSceneObject(pin); }
+	template<> SceneValueNode* EvaluatePin<SceneValueNode>(EditorNodePin pin) { return EvaluateScene(pin); }
 
 private:
 	BoolValueNode* EvaluateBool(BoolEditorNode* node);
@@ -160,13 +164,11 @@ private:
 	Float4x4ValueNode* EvaluateFloat4x4(Float4x4EditorNode* node);
 	Float4x4ValueNode* EvaluateVarFloat4x4(VarFloat4x4EditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4BinaryOperator(Float4x4BinaryOperatorEditorNode* node);
-	Float4x4ValueNode* GetLastTransformValue(MatrixTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Rotate(Float4x4RotationTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Translate(Float4x4TranslationTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Scale(Float4x4ScaleTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4LookAt(Float4x4LookAtTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Perspective(Float4x4PerspectiveTransformEditorNode* node);
-
 
 	TextureValueNode* EvaluateGetTexture(GetTextureEditorNode* node);
 
@@ -178,6 +180,10 @@ private:
 	BindTableValueNode* EvaluateBindTable(BindTableEditorNode* node);
 
 	RenderStateValueNode* EvaluateRenderState(RenderStateEditorNode* node);
+
+	SceneObjectValueNode* EvaluateForEachSceneObject(ForEachSceneObjectEditorNode* node);
+
+	SceneValueNode* EvaluateGetScene(GetSceneEditorNode* node);
 
 private:
 	const NodeGraph* GetNodeGraph() const { return m_ContextStack.top().Graph; }

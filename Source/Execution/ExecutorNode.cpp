@@ -170,7 +170,7 @@ namespace
 			unsigned uniformSlot;
 			if (GetUniformIndex(shader, binding.Name, uniformSlot))
 			{
-				GL_CALL(glUniformMatrix4fv(uniformSlot, 1, GL_FALSE, glm::value_ptr(value)));
+				GL_CALL(glUniformMatrix4fv(uniformSlot, 1, GL_FALSE, glm::value_ptr(glm::transpose(value))));
 			}
 			else
 			{
@@ -398,12 +398,12 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
-void LoadMeshExecutorNode::Execute(ExecuteContext& context)
+void LoadSceneExecutorNode::Execute(ExecuteContext& context)
 {
 	SceneLoading::Loader l{};
-	Ptr<SceneLoading::Scene> scene = l.Load(m_MeshPath);
+	Ptr<SceneLoading::Scene> loadedScene = l.Load(m_MeshPath);
 
-	if (scene->Objects.empty() || l.HasErrors() || !m_NameNode)
+	if (loadedScene->Objects.empty() || l.HasErrors() || !m_NameNode)
 	{
 		l.PrintErrors();
 		Failure("LoadMeshExecutorNode", "Failed to load scene");
@@ -414,15 +414,34 @@ void LoadMeshExecutorNode::Execute(ExecuteContext& context)
 	const std::string name = m_NameNode->GetValue(context);
 	const unsigned varKey = Hash::Crc32(name);
 
-	auto& objectMesh = scene->Objects[0].Mesh;
+	Scene* scene = new Scene{};
+	for (SceneLoading::SceneObject& loadedObject : loadedScene->Objects)
+	{
+		auto& objectMesh = loadedObject.Mesh;
 
-	Mesh* mesh = new Mesh{};
-	mesh->NumPrimitives = objectMesh.PrimitiveCount;
-	mesh->Positions = std::move(objectMesh.Positions);
-	mesh->Texcoords = std::move(objectMesh.Texcoords);
-	mesh->Normals = std::move(objectMesh.Normals);
-	mesh->Tangents = std::move(objectMesh.Tangents);
-	mesh->Indices = std::move(objectMesh.Indices);
+		SceneObject sceneObject;
+		sceneObject.Albedo = std::move(loadedObject.Material.Albedo);
+		sceneObject.ModelTransform = loadedObject.ModelTransform;
 
-	context.Variables.Meshes[varKey] = AddToPtrVector(context.RenderResources.Meshes, Ptr<Mesh>(mesh));
+		Mesh& mesh = sceneObject.MeshData;
+		mesh.NumPrimitives = objectMesh.PrimitiveCount;
+		mesh.Positions = std::move(objectMesh.Positions);
+		mesh.Texcoords = std::move(objectMesh.Texcoords);
+		mesh.Normals = std::move(objectMesh.Normals);
+		mesh.Tangents = std::move(objectMesh.Tangents);
+		mesh.Indices = std::move(objectMesh.Indices);
+
+		scene->SceneObjects.push_back(std::move(sceneObject));
+	}
+	context.Variables.Scenes[varKey] = AddToPtrVector(context.RenderResources.Scenes, Ptr<Scene>(scene));
+}
+
+void ForEachSceneObjectExecutorNode::Execute(ExecuteContext& context)
+{
+	Scene* scene = m_SceneNode->GetValue(context);
+	for (SceneObject& sceneObject : scene->SceneObjects)
+	{
+		context.Variables.SceneObjects[m_SceneObjectIteratorHash] = &sceneObject;
+		m_LoopExecutorNode->ExecuteNodePath(context);
+	}
 }

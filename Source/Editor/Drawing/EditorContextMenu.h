@@ -6,9 +6,11 @@
 
 #include "../../Common.h"
 #include "../../IDGen.h"
+#include "EditorWidgets.h"
 
 class NodeGraphCommandExecutor;
 class CustomEditorNode;
+class EditorNode;
 
 class EditorContextMenu
 {
@@ -60,22 +62,34 @@ public:
 		EditorContextMenu(id),
 		m_CommandExecutor(commandExecutor),
 		m_CustomNodeEditor(customNodeEditor)
-	{}
+	{
+	}
 
 	void Open() = delete;
 	void Open(PinID draggedPin)
 	{
 		EditorContextMenu::Open();
 		m_DraggedPin = draggedPin;
+		m_ShouldRebuildMenus = true;
+		m_SearchFilter = "";
 	}
 
 protected:
 	void DrawContent() override;
 
 private:
+	void RebuildMenus();
+
+private:
+	bool m_ShouldRebuildMenus = true;
 	bool m_CustomNodeEditor;
 	NodeGraphCommandExecutor* m_CommandExecutor;
 	PinID m_DraggedPin = 0;
+
+	EditorNode* m_NewNode = nullptr;
+	EditorWidgets::Menu m_CreationMenu{ "", true };
+
+	std::string m_SearchFilter = "";
 };
 
 class NodeContextMenu : public EditorContextMenu

@@ -1,6 +1,7 @@
 #include "RenderPipelineExecutor.h"
 
 #include "../App/App.h"
+#include "../Editor/EditorErrorHandler.h"
 #include "ExecutorNode.h"
 
 void InitStaticResources(ExecuteContext& context)
@@ -52,15 +53,6 @@ void InitStaticResources(ExecuteContext& context)
 	context.RenderResources.CubeMeshIndex = context.RenderResources.Meshes.size() - 1;
 }
 
-static void ExecuteNodePath(ExecuteContext& context, ExecutorNode* node)
-{
-	while (node)
-	{
-		node->Execute(context);
-		node = node->GetNextNode();
-	}
-}
-
 uint32_t ExecutorInputState::GetInputHash(int key, int mods)
 {
 	uint32_t hash = Hash::Crc32(key);
@@ -72,19 +64,20 @@ void RenderPipelineExecutor::OnStart()
 {
 	// Init context
 	m_Context = ExecuteContext{};
+	m_Context.EditorLinks = m_Pipeline.EditorLinks;
 	InitStaticResources(m_Context);
 
 	// Clear console
 	App::Get()->GetConsole().Clear();
 
 	// Execute
-	ExecuteNodePath(m_Context, m_Pipeline.OnStartNode);
+	m_Pipeline.OnStartNode->ExecuteNodePath(m_Context);
+
+	HandleErrors();
 }
 
 void RenderPipelineExecutor::OnUpdate(float dt)
 {
-	if (m_Context.Failure) return;
-
 	const std::string dtVar = "DT";
 	m_Context.Variables.GetMapFromType<float>()[Hash::Crc32(dtVar)] = dt;
 
@@ -95,7 +88,7 @@ void RenderPipelineExecutor::OnUpdate(float dt)
 		{
 			if (map.find(key) != map.end())
 			{
-				ExecuteNodePath(m_Context, map[key]);
+				map[key]->ExecuteNodePath(m_Context);
 			}
 		}
 	};
@@ -103,10 +96,12 @@ void RenderPipelineExecutor::OnUpdate(float dt)
 	processInputNodes(m_Context.InputState.ReleasedKeys, m_Pipeline.OnKeyReleasedNodes);
 	processInputNodes(m_Context.InputState.PressedKeys, m_Pipeline.OnKeyPressedNodes);
 
-	ExecuteNodePath(m_Context, m_Pipeline.OnUpdateNode);
+	m_Pipeline.OnUpdateNode->ExecuteNodePath(m_Context);
 
 	m_Context.InputState.PressedKeys.clear();
 	m_Context.InputState.ReleasedKeys.clear();
+
+	HandleErrors();
 }
 
 void RenderPipelineExecutor::Render()
@@ -119,8 +114,6 @@ void RenderPipelineExecutor::Render()
 
 void RenderPipelineExecutor::HandleKeyPressed(int key, int mods)
 {
-	if (m_Context.Failure) return;
-
 	const uint32_t inputHash = ExecutorInputState::GetInputHash(key, mods);
 	m_Context.InputState.DownKeys.insert(inputHash);
 	m_Context.InputState.PressedKeys.insert(inputHash);
@@ -128,8 +121,6 @@ void RenderPipelineExecutor::HandleKeyPressed(int key, int mods)
 
 void RenderPipelineExecutor::HandleKeyReleased(int key, int mods)
 {
-	if (m_Context.Failure) return;
-
 	const uint32_t inputHash = ExecutorInputState::GetInputHash(key, mods);
 	m_Context.InputState.DownKeys.erase(inputHash);
 	m_Context.InputState.ReleasedKeys.insert(inputHash);
@@ -144,4 +135,12 @@ void RenderPipelineExecutor::SetCompiledPipeline(CompiledPipeline pipeline)
 	for (auto& it : m_Pipeline.OnKeyDownNodes) delete it.second;
 
 	m_Pipeline = pipeline;
+}
+
+void RenderPipelineExecutor::HandleErrors()
+{
+	if (m_Context.Failure && m_Context.FailedNode != 0)
+	{
+		App::Get()->GetErrorHandler().MarkErrorNode(m_Context.FailedNode);
+	}
 }

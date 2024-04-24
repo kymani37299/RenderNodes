@@ -359,6 +359,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::VarFloat4x4:
 	case EditorNodeType::VarBool:
 	case EditorNodeType::VarInt:
+	case EditorNodeType::GetScene:
 	case EditorNodeType::GetTexture:
 	case EditorNodeType::GetShader:
 	case EditorNodeType::CreateTexture:
@@ -367,6 +368,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::Transform_Scale_Float4x4:
 	case EditorNodeType::Transform_LookAt_Float4x4:
 	case EditorNodeType::Transform_PerspectiveProjection_Float4x4:
+	case EditorNodeType::ForEachSceneObject:
 	{
 		READ_EDITOR_NODE(EditorNode);
 	} break;
@@ -380,7 +382,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	} break;
 	case EditorNodeType::LoadShader:
 	case EditorNodeType::LoadTexture:
-	case EditorNodeType::LoadMesh:
+	case EditorNodeType::LoadScene:
 	{
 		READ_EDITOR_NODE(NameAndPathExecutionEditorNode);
 		WriteAttribute("Path", readNode->m_Path);
@@ -560,6 +562,7 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_SIMPLE_NODE(VarFloat3, VarFloat3EditorNode);
 		INIT_SIMPLE_NODE(VarFloat4, VarFloat4EditorNode);
 		INIT_SIMPLE_NODE(VarFloat4x4, VarFloat4x4EditorNode);
+		INIT_SIMPLE_NODE(GetScene, GetSceneEditorNode);
 		INIT_SIMPLE_NODE(GetTexture, GetTextureEditorNode);
 		INIT_SIMPLE_NODE(GetShader, GetShaderEditorNode);
 		INIT_SIMPLE_NODE(GetCubeMesh, GetCubeMeshEditorNode);
@@ -573,6 +576,7 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_SIMPLE_NODE(Transform_Scale_Float4x4, Float4x4ScaleTransformEditorNode);
 		INIT_SIMPLE_NODE(Transform_LookAt_Float4x4, Float4x4LookAtTransformEditorNode);
 		INIT_SIMPLE_NODE(Transform_PerspectiveProjection_Float4x4, Float4x4PerspectiveTransformEditorNode);
+		INIT_SIMPLE_NODE(ForEachSceneObject, ForEachSceneObjectEditorNode);
 
 		INIT_FLOAT_NODE(Float, FloatEditorNode);
 		INIT_FLOAT_NODE(Float2, Float2EditorNode);
@@ -593,7 +597,7 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 
 		INIT_NAME_AND_PATH_NODE(LoadTexture, LoadTextureEditorNode);
 		INIT_NAME_AND_PATH_NODE(LoadShader, LoadShaderEditorNode);
-		INIT_NAME_AND_PATH_NODE(LoadMesh, LoadMeshEditorNode);
+		INIT_NAME_AND_PATH_NODE(LoadScene, LoadSceneEditorNode);
 
 		INIT_INPUT_NODE(OnKeyPressed, OnKeyPressedEditorNode);
 		INIT_INPUT_NODE(OnKeyReleased, OnKeyReleasedEditorNode);

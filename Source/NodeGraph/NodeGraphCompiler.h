@@ -15,34 +15,45 @@ struct CompiledPipeline;
 
 class NodeGraphCompiler
 {
+	struct CompilerError
+	{
+		std::string Message;
+		NodeID Node;
+	};
+
+	struct Context
+	{
+		std::unordered_map<ExecutorNode*, NodeID> EditorLinks;
+	};
+
 public:
 	CompiledPipeline Compile(const NodeGraph& graph);
-
-	const std::vector<std::string> GetErrorMessages() const { return m_ErrorMessages; }
+	const std::vector<CompilerError>& GetCompileErrors() const { return m_CompilationErrors; }
 
 private:
 	ExecutionEditorNode* GetNextExecutorNode(ExecutionEditorNode* executorNode);
 
-	ExecutorNode* Compile(ExecutionEditorNode* executorNode);
-	ExecutorNode* CompileExecutorNode(ExecutionEditorNode* executorNode);
+	ExecutorNode* Compile(ExecutionEditorNode* executorNode, Context& context);
+	ExecutorNode* CompileExecutorNode(ExecutionEditorNode* executorNode, Context& context);
 
-	ExecutorNode* CompileEmptyNode(ExecutionEditorNode* node);
-	ExecutorNode* CompileIfNode(IfEditorNode* ifNode);
-	ExecutorNode* CompilePrintNode(PrintEditorNode* printNode);
-	ExecutorNode* CompileAsignVariableNode(AsignVariableEditorNode* asignFloatNode);
-	ExecutorNode* CompileCreateTextureNode(CreateTextureEditorNode* createTextureNode);
-	ExecutorNode* CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode);
-	ExecutorNode* CompilePresentTextureTargetNode(PresentTextureEditorNode* presentTextureNode);
-	ExecutorNode* CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode);
-	ExecutorNode* CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode);
-	ExecutorNode* CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode);
-	ExecutorNode* CompileLoadMeshNode(LoadMeshEditorNode* loadMeshNode);
-
+	ExecutorNode* CompileEmptyNode(ExecutionEditorNode* node, Context& context);
+	ExecutorNode* CompileIfNode(IfEditorNode* ifNode, Context& context);
+	ExecutorNode* CompilePrintNode(PrintEditorNode* printNode, Context& context);
+	ExecutorNode* CompileAsignVariableNode(AsignVariableEditorNode* asignFloatNode, Context& context);
+	ExecutorNode* CompileCreateTextureNode(CreateTextureEditorNode* createTextureNode, Context& context);
+	ExecutorNode* CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode, Context& context);
+	ExecutorNode* CompilePresentTextureTargetNode(PresentTextureEditorNode* presentTextureNode, Context& context);
+	ExecutorNode* CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode, Context& context);
+	ExecutorNode* CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode, Context& context);
+	ExecutorNode* CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode, Context& context);
+	ExecutorNode* CompileLoadSceneNode(LoadSceneEditorNode* loadSceneObjectNode, Context& context);
+	ExecutorNode* CompileForEachSceneObjectNode(ForEachSceneObjectEditorNode* forEachSceneObjectNode, Context& context);
+	
 private:
 	const NodeGraph* GetNodeGraph() const { return m_ContextStack.top().Graph; }
 	CustomEditorNode* GetParentNode() const { return m_ContextStack.top().Parent; }
 
 private:
 	NodeGraphCompilerContextStack m_ContextStack;
-	std::vector<std::string> m_ErrorMessages;
+	std::vector<CompilerError> m_CompilationErrors;
 };

@@ -72,7 +72,7 @@ ExecutionEditorNode* NodeGraphCompiler::GetNextExecutorNode(ExecutionEditorNode*
 	{
 		ASSERT(0);
 		exNode = new AsignFloatEditorNode{}; // Some random node so we don't crash
-		m_ErrorMessages.push_back("Error in tracing flow of node execution.");
+		m_CompilationErrors.push_back({ "Error in tracing flow of node execution.", executorNode->GetID() });
 	}
 
 	return exNode;
@@ -80,15 +80,17 @@ ExecutionEditorNode* NodeGraphCompiler::GetNextExecutorNode(ExecutionEditorNode*
 
 CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph)
 {
-	m_ErrorMessages.clear();
+	m_CompilationErrors.clear();
+
+	Context context;
 
 	m_ContextStack.push(NodeGraphCompilerContext{ &graph });
 
 	CompiledPipeline pipeline{};
-	pipeline.OnStartNode = Compile(GetNodeGraph()->GetOnStartNode());
-	pipeline.OnUpdateNode = Compile(GetNodeGraph()->GetOnUpdateNode());
+	pipeline.OnStartNode = Compile(GetNodeGraph()->GetOnStartNode(), context);
+	pipeline.OnUpdateNode = Compile(GetNodeGraph()->GetOnUpdateNode(), context);
 
-	const auto compileInputNodes = [this, &graph](
+	const auto compileInputNodes = [this, &graph, &context](
 		EditorNodeType nodeType,
 		std::unordered_map<uint32_t, ExecutorNode*>& inputMap)
 	{
@@ -108,7 +110,7 @@ CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph)
 		for (const auto& inputNode : inputNodes)
 		{
 			const uint32_t inputHash = ExecutorInputState::GetInputHash(inputNode->GetKey(), inputNode->GetMods());
-			inputMap[inputHash] = Compile(inputNode);
+			inputMap[inputHash] = Compile(inputNode, context);
 		}
 	};
 
@@ -118,10 +120,11 @@ CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph)
 
 	m_ContextStack.pop();
 
+	pipeline.EditorLinks = context.EditorLinks;
 	return pipeline;
 }
 
-ExecutorNode* NodeGraphCompiler::Compile(ExecutionEditorNode* executorNode)
+ExecutorNode* NodeGraphCompiler::Compile(ExecutionEditorNode* executorNode, Context& context)
 {
 	ExecutorNode* firstNode = new EmptyExecutorNode();
 	ExecutorNode* currentNode = firstNode;
@@ -129,7 +132,7 @@ ExecutorNode* NodeGraphCompiler::Compile(ExecutionEditorNode* executorNode)
 
 	while (currentEditorNode)
 	{
-		ExecutorNode* nextNode = CompileExecutorNode(currentEditorNode);
+		ExecutorNode* nextNode = CompileExecutorNode(currentEditorNode, context);
 		currentNode->SetNextNode(nextNode);
 		currentNode = nextNode;
 		currentEditorNode = GetNextExecutorNode(currentEditorNode);
@@ -137,10 +140,11 @@ ExecutorNode* NodeGraphCompiler::Compile(ExecutionEditorNode* executorNode)
 	return firstNode;
 }
 
-#define COMPILE_NODE(NodeType, Compiler, SpecificType) case EditorNodeType::NodeType: return Compiler(static_cast<SpecificType*>(executorNode))
+#define COMPILE_NODE(NodeType, Compiler, SpecificType) case EditorNodeType::NodeType: compiledNode = Compiler(static_cast<SpecificType*>(executorNode), context); break
 
-ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* executorNode)
+ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* executorNode, Context& context)
 {
+	ExecutorNode* compiledNode = nullptr;
 	switch (executorNode->GetType())
 	{
 		COMPILE_NODE(Print, CompilePrintNode, PrintEditorNode);
@@ -158,7 +162,8 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 		COMPILE_NODE(LoadShader, CompileLoadShaderNode, LoadShaderEditorNode);
 		COMPILE_NODE(PresentTexture, CompilePresentTextureTargetNode, PresentTextureEditorNode);
 		COMPILE_NODE(DrawMesh, CompileDrawMeshNode, DrawMeshEditorNode);
-		COMPILE_NODE(LoadMesh, CompileLoadMeshNode, LoadMeshEditorNode);
+		COMPILE_NODE(LoadScene, CompileLoadSceneNode, LoadSceneEditorNode);
+		COMPILE_NODE(ForEachSceneObject, CompileForEachSceneObjectNode, ForEachSceneObjectEditorNode);
 		COMPILE_NODE(OnStart, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(OnUpdate, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(OnKeyPressed, CompileEmptyNode, ExecutionEditorNode);
@@ -167,13 +172,17 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 		COMPILE_NODE(Pin, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(Custom, CompileEmptyNode, ExecutionEditorNode);
 	default:
-		m_ErrorMessages.push_back("[NodeGraphCompiler::CompileExecutorNode] internal error!");
+		compiledNode = new EmptyExecutorNode();
+		m_CompilationErrors.push_back({ "[NodeGraphCompiler::CompileExecutorNode] internal error!", executorNode->GetID() });
 		NOT_IMPLEMENTED;
 	}
-	return new EmptyExecutorNode();
+
+	context.EditorLinks[compiledNode] = executorNode->GetID();
+
+	return compiledNode;
 }
 
-ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode)
+ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 
@@ -190,7 +199,7 @@ ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode)
 		if (exElseEditorNode)
 		{
 			const auto contextStack = m_ContextStack;
-			elseBranch = Compile(exElseEditorNode);
+			elseBranch = Compile(exElseEditorNode, context);
 			m_ContextStack = contextStack;
 		}
 
@@ -198,7 +207,7 @@ ExecutorNode* NodeGraphCompiler::CompileIfNode(IfEditorNode* ifNode)
 	return new IfExecutorNode{ conditionNode, elseBranch };
 }
 
-ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
+ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode, Context& context)
 {
 	const auto getValuePin = [this](const EditorNodePin& pin)
 	{
@@ -207,17 +216,11 @@ ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 		return GetNodeGraph()->GetOutputPinForInput(pin.ID);
 	};
 
-	PinID inputPinID = getValuePin(printNode->GetFloatInputPin());
-	if (!inputPinID) inputPinID = getValuePin(printNode->GetFloat2InputPin());
-	if (!inputPinID) inputPinID = getValuePin(printNode->GetFloat3InputPin());
-	if (!inputPinID) inputPinID = getValuePin(printNode->GetFloat4InputPin());
-	if (!inputPinID) inputPinID = getValuePin(printNode->GetIntInputPin());
-	if (!inputPinID) inputPinID = getValuePin(printNode->GetBoolInputPin());
-	if (!inputPinID) inputPinID = getValuePin(printNode->GetStringInputPin());
+	PinID inputPinID = GetNodeGraph()->GetOutputPinForInput(printNode->GetInputPin().ID);
 
 	if (!inputPinID)
 	{
-		m_ErrorMessages.push_back("Print node missing outputs!");
+		m_CompilationErrors.push_back({ "Print node missing outputs!", printNode->GetID() });
 		return new EmptyExecutorNode{};
 	}
 
@@ -233,12 +236,12 @@ ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode)
 	case PinType::Bool: return new PrintExecutorNode{ pinEvaluator.EvaluateBool(inputPin) };
 	case PinType::String: return new PrintExecutorNode{ pinEvaluator.EvaluateString(inputPin) };
 	default:
-		NOT_IMPLEMENTED;
+		m_CompilationErrors.push_back({ "Not supported type for printing!", printNode->GetID() });
 	}
 	return new EmptyExecutorNode{};
 }
 
-ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNode* node)
+ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNode* node, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	StringValueNode* nameNode = pinEvaluator.EvaluateString(node->GetNamePin());
@@ -259,7 +262,7 @@ ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNod
 	return new EmptyExecutorNode{};
 }
 
-ExecutorNode* NodeGraphCompiler::CompileCreateTextureNode(CreateTextureEditorNode* createTextureNode)
+ExecutorNode* NodeGraphCompiler::CompileCreateTextureNode(CreateTextureEditorNode* createTextureNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	StringValueNode* nameNode = pinEvaluator.EvaluateString(createTextureNode->GetNamePin());
@@ -270,7 +273,7 @@ ExecutorNode* NodeGraphCompiler::CompileCreateTextureNode(CreateTextureEditorNod
 	return new CreateTextureExecutorNode{ nameNode, widthNode, heightNode, framebufferNode, depthStencilNode };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode)
+ExecutorNode* NodeGraphCompiler::CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	TextureValueNode* textureNode = pinEvaluator.EvaluateTexture(clearRtNode->GetTargeteTexturePin());
@@ -278,28 +281,28 @@ ExecutorNode* NodeGraphCompiler::CompileClearRenderTargetNode(ClearRenderTargetE
 	return new ClearRenderTargetExecutorNode{ textureNode, clearColorNode };
 }
 
-ExecutorNode* NodeGraphCompiler::CompilePresentTextureTargetNode(PresentTextureEditorNode* presentTextureNode)
+ExecutorNode* NodeGraphCompiler::CompilePresentTextureTargetNode(PresentTextureEditorNode* presentTextureNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	TextureValueNode* textureNode = pinEvaluator.EvaluateTexture(presentTextureNode->GetTexturePin());
 	return new PresentTextureExecutorNode{ textureNode };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode)
+ExecutorNode* NodeGraphCompiler::CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadTextureNode->GetNamePin());
 	return new LoadTextureExecutorNode{ nameNode, loadTextureNode->GetPath() };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode)
+ExecutorNode* NodeGraphCompiler::CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadShaderNode->GetNamePin());
 	return new LoadShaderExecutorNode{ nameNode, loadShaderNode->GetPath() };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode)
+ExecutorNode* NodeGraphCompiler::CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
 	TextureValueNode* framebufferNode = pinEvaluator.EvaluateTexture(drawMeshNode->GetFrameBufferPin());
@@ -311,14 +314,38 @@ ExecutorNode* NodeGraphCompiler::CompileDrawMeshNode(DrawMeshEditorNode* drawMes
 	return new DrawMeshExecutorNode{ framebufferNode, shaderNode, meshNode, bindTableNode, renderStateNode };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileLoadMeshNode(LoadMeshEditorNode* loadMeshNode)
+ExecutorNode* NodeGraphCompiler::CompileLoadSceneNode(LoadSceneEditorNode* loadSceneObjectNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
-	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadMeshNode->GetNamePin());
-	return new LoadMeshExecutorNode{ nameNode, loadMeshNode->GetPath() };
+	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadSceneObjectNode->GetNamePin());
+	return new LoadSceneExecutorNode{ nameNode, loadSceneObjectNode->GetPath() };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileEmptyNode(ExecutionEditorNode* node)
+ExecutorNode* NodeGraphCompiler::CompileForEachSceneObjectNode(ForEachSceneObjectEditorNode* forEachSceneObjectNode, Context& context)
+{
+	PinEvaluator pinEvaluator{ m_ContextStack };
+
+	const NodeID executionLoopOutput = GetNodeGraph()->GetInputPinFromOutput(forEachSceneObjectNode->GetLoopPin().ID);
+	if (!executionLoopOutput)
+		return new EmptyExecutorNode{};
+
+	EditorNode* executionLoopFirstNode = GetNodeGraph()->GetPinOwner(executionLoopOutput);
+	ExecutionEditorNode* exExecutionLoopFirstNode = dynamic_cast<ExecutionEditorNode*>(executionLoopFirstNode);
+	ASSERT(exExecutionLoopFirstNode);
+
+	if (!exExecutionLoopFirstNode)
+		return new EmptyExecutorNode{};
+
+	SceneValueNode* sceneNode = pinEvaluator.EvaluateScene(forEachSceneObjectNode->GetScenePin());
+
+	const auto contextStack = m_ContextStack;
+	ExecutorNode* executionLoopNode = Compile(exExecutionLoopFirstNode, context);
+	m_ContextStack = contextStack;
+
+	return new ForEachSceneObjectExecutorNode{ sceneNode, forEachSceneObjectNode->GetSceneObjectPin().ID, executionLoopNode };
+}
+
+ExecutorNode* NodeGraphCompiler::CompileEmptyNode(ExecutionEditorNode* node, Context& context)
 {
 	return new EmptyExecutorNode{};
 }

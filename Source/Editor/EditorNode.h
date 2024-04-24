@@ -49,7 +49,7 @@ enum class EditorNodeType
     GetShader,
     BindTable,
     GetMesh,
-    LoadMesh,
+    LoadScene,
     FloatComparisonOperator,
     CreateFloat2,
     CreateFloat3,
@@ -82,6 +82,8 @@ enum class EditorNodeType
 	Transform_LookAt_Float4x4,
 	Transform_PerspectiveProjection_Float4x4,
     Float4x4BinaryOperator,
+    GetScene,
+    ForEachSceneObject,
 };
 
 // DO NOT CHANGE ORDER OF VALUES
@@ -106,6 +108,9 @@ enum class PinType
     String,
     Int,
     Float4x4,
+    SceneObject,
+    Scene,
+    Any,
     
     Count
 };
@@ -130,6 +135,9 @@ static const std::string ToString(PinType pinType)
     case PinType::String: return "String";
     case PinType::Int: return "Int";
     case PinType::Float4x4: return "Float4x4";
+    case PinType::SceneObject: return "SceneObject";
+    case PinType::Scene: return "Scene";
+    case PinType::Any: return "Any";
     default: NOT_IMPLEMENTED;
     }
     return "<unknown>";
@@ -155,6 +163,9 @@ static ImColor GetPinColor(PinType type)
     case PinType::String: return ImColor(192, 110, 82);
     case PinType::Int: return ImColor(200, 100, 100);
     case PinType::Float4x4: return ImColor(184, 240, 153);
+    case PinType::SceneObject: return ImColor(255, 153, 51);
+    case PinType::Scene: return ImColor(240, 120, 51);
+    case PinType::Any: return ImColor(100, 100, 100);
     default:
         NOT_IMPLEMENTED;
         break;
@@ -219,7 +230,9 @@ struct EditorNodePin
 
     static EditorNodePin CreateConstantInputPin(const std::string& label, PinType type);
     static EditorNodePin CreateInputPin(const std::string& label, PinType type);
-    static EditorNodePin CreateOutputPin(const std::string& label, PinType type);	
+    static EditorNodePin CreateOutputPin(const std::string& label, PinType type);
+
+    static bool CanBeLinked(const EditorNodePin& a, const EditorNodePin& b);
 };
 
 struct EditorNodeLink
