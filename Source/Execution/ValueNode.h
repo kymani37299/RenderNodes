@@ -224,6 +224,59 @@ private:
 };
 
 template<typename T>
+class NormalizeVectorValueNode : public ValueNode<T>
+{
+public:
+	NormalizeVectorValueNode(ValueNode<T>* input):
+		m_Input(input)
+	{
+
+	}
+
+	virtual T GetValue(ExecuteContext& context) const
+	{
+		if (!m_Input)
+		{
+			ExecutionPrivate::Failure("NormalizeVectorValueNode", "Normalize operator has missing values!");
+			context.Failure = true;
+			return T{};
+		}
+		return glm::normalize(m_Input->GetValue(context));
+	}
+
+private:
+	Ptr<ValueNode<T>> m_Input;
+};
+
+class CrossProductValueNode : public Float3ValueNode
+{
+public:
+	CrossProductValueNode(Float3ValueNode* a, Float3ValueNode* b):
+		m_A(a),
+		m_B(b)
+	{ }
+
+	virtual Float3 GetValue(ExecuteContext& context) const
+	{
+		if (!m_A || !m_B)
+		{
+			ExecutionPrivate::Failure("CrossProductValueNode", "Missing operands!");
+			context.Failure = true;
+			return Float3{};
+		}
+
+		const Float3 a = m_A->GetValue(context);
+		const Float3 b = m_B->GetValue(context);
+
+		return glm::cross(a, b);
+	}
+
+private:
+	Ptr<Float3ValueNode> m_A;
+	Ptr<Float3ValueNode> m_B;
+};
+
+template<typename T>
 class VariableValueNode : public ValueNode<T>
 {
 public:

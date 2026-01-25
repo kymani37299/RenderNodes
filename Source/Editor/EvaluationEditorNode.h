@@ -534,6 +534,54 @@ private:
 	unsigned m_ZFarPin;
 };
 
+template<EditorNodeType nodeType, PinType pinType>
+class NormalizeEditorNode : public EvaluationEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	NormalizeEditorNode() :
+		EvaluationEditorNode("Normalize", nodeType)
+	{
+		m_InputPin = AddPin(EditorNodePin::CreateInputPin("", pinType));
+		AddPin(EditorNodePin::CreateOutputPin("", pinType));
+	}
+
+	EditorNode* Clone() const override
+	{
+		return new NormalizeEditorNode<nodeType, pinType>{};
+	}
+
+	const EditorNodePin& GetInputPin() const { return GetPins()[m_InputPin]; }
+
+private:
+	unsigned m_InputPin;
+};
+
+class CrossProductOperationEditorNode : public EvaluationEditorNode
+{
+	SERIALIZEABLE_EDITOR_NODE();
+public:
+	CrossProductOperationEditorNode() :
+		EvaluationEditorNode("Cross product", EditorNodeType::CrossProductOperation)
+	{
+		m_A = AddPin(EditorNodePin::CreateInputPin("A", PinType::Float3));
+		m_B = AddPin(EditorNodePin::CreateInputPin("B", PinType::Float3));
+		AddPin(EditorNodePin::CreateOutputPin("Result", PinType::Float3));
+	}
+
+	EditorNode* Clone() const override
+	{
+		return new CrossProductOperationEditorNode{};
+	}
+
+	const EditorNodePin& GetAPin() const { return GetPins()[m_A]; }
+	const EditorNodePin& GetBPin() const { return GetPins()[m_B]; }
+
+private:
+	unsigned m_A;
+	unsigned m_B;
+};
+
 using VarBoolEditorNode = VariableEditorNodeT<EditorNodeType::VarBool, PinType::Bool>;
 using BoolBinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::BoolBinaryOperator, BinaryOperatorType::Logic, PinType::Bool, PinType::Bool>;
 
@@ -567,6 +615,10 @@ using Float4BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType:
 using Float4x4EditorNode = FloatNxNEditorNodeT<EditorNodeType::Float4x4, PinType::Float4x4, 4, 4>;
 using VarFloat4x4EditorNode = VariableEditorNodeT<EditorNodeType::VarFloat4x4, PinType::Float4x4>;
 using Float4x4BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::Float4x4BinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float4x4, PinType::Float4x4>;
+
+using NormalizeFloat2EditorNode = NormalizeEditorNode<EditorNodeType::NormalizeFloat2, PinType::Float2>;
+using NormalizeFloat3EditorNode = NormalizeEditorNode<EditorNodeType::NormalizeFloat3, PinType::Float3>;
+using NormalizeFloat4EditorNode = NormalizeEditorNode<EditorNodeType::NormalizeFloat4, PinType::Float4>;
 
 using GetTextureEditorNode = VariableEditorNodeT<EditorNodeType::GetTexture, PinType::Texture>;
 using GetShaderEditorNode = VariableEditorNodeT<EditorNodeType::GetShader, PinType::Shader>;

@@ -84,6 +84,10 @@ enum class EditorNodeType
     Float4x4BinaryOperator,
     GetScene,
     ForEachSceneObject,
+    NormalizeFloat2,
+    NormalizeFloat3,
+    NormalizeFloat4,
+    CrossProductOperation,
 };
 
 // DO NOT CHANGE ORDER OF VALUES

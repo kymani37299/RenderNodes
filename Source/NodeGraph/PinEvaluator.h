@@ -150,16 +150,20 @@ private:
 	Float2ValueNode* EvaluateCreateFloat2(CreateFloat2EditorNode* node);
 	Float2ValueNode* EvaluateVarFloat2(VarFloat2EditorNode* node);
 	Float2ValueNode* EvaluateFloat2BinaryOperator(Float2BinaryOperatorEditorNode* node);
+	Float2ValueNode* EvaluateNormalizeFloat2(NormalizeFloat2EditorNode* node);
 
 	Float3ValueNode* EvaluateFloat3(Float3EditorNode* node);
 	Float3ValueNode* EvaluateCreateFloat3(CreateFloat3EditorNode* node);
 	Float3ValueNode* EvaluateVarFloat3(VarFloat3EditorNode* node);
 	Float3ValueNode* EvaluateFloat3BinaryOperator(Float3BinaryOperatorEditorNode* node);
+	Float3ValueNode* EvaluateNormalizeFloat3(NormalizeFloat3EditorNode* node);
+	Float3ValueNode* EvaluateCrossProductOperation(CrossProductOperationEditorNode* node);
 
 	Float4ValueNode* EvaluateFloat4(Float4EditorNode* node);
 	Float4ValueNode* EvaluateCreateFloat4(CreateFloat4EditorNode* node);
 	Float4ValueNode* EvaluateVarFloat4(VarFloat4EditorNode* node);
 	Float4ValueNode* EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* node);
+	Float4ValueNode* EvaluateNormalizeFloat4(NormalizeFloat4EditorNode* node);
 
 	Float4x4ValueNode* EvaluateFloat4x4(Float4x4EditorNode* node);
 	Float4x4ValueNode* EvaluateVarFloat4x4(VarFloat4x4EditorNode* node);

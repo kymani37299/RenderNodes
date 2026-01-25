@@ -136,6 +136,7 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 	case EditorNodeType::CreateFloat2: return EvaluateCreateFloat2(static_cast<CreateFloat2EditorNode*>(node));
 	case EditorNodeType::VarFloat2: return EvaluateVarFloat2(static_cast<VarFloat2EditorNode*>(node));
 	case EditorNodeType::Float2BinaryOperator: return EvaluateFloat2BinaryOperator(static_cast<Float2BinaryOperatorEditorNode*>(node));
+	case EditorNodeType::NormalizeFloat2: return EvaluateNormalizeFloat2(static_cast<NormalizeFloat2EditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<Float2ValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float2ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
@@ -165,6 +166,8 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 	case EditorNodeType::CreateFloat3: return EvaluateCreateFloat3(static_cast<CreateFloat3EditorNode*>(node));
 	case EditorNodeType::VarFloat3: return EvaluateVarFloat3(static_cast<VarFloat3EditorNode*>(node));
 	case EditorNodeType::Float3BinaryOperator: return EvaluateFloat3BinaryOperator(static_cast<Float3BinaryOperatorEditorNode*>(node));
+	case EditorNodeType::NormalizeFloat3: return EvaluateNormalizeFloat3(static_cast<NormalizeFloat3EditorNode*>(node));
+	case EditorNodeType::CrossProductOperation: return EvaluateCrossProductOperation(static_cast<CrossProductOperationEditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<Float3ValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float3ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
@@ -194,6 +197,7 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 	case EditorNodeType::CreateFloat4: return EvaluateCreateFloat4(static_cast<CreateFloat4EditorNode*>(node));
 	case EditorNodeType::VarFloat4: return EvaluateVarFloat4(static_cast<VarFloat4EditorNode*>(node));
 	case EditorNodeType::Float4BinaryOperator: return EvaluateFloat4BinaryOperator(static_cast<Float4BinaryOperatorEditorNode*>(node));
+	case EditorNodeType::NormalizeFloat4: return EvaluateNormalizeFloat4(static_cast<NormalizeFloat4EditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<Float4ValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float4ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
@@ -562,6 +566,12 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2BinaryOperator(Float2BinaryOperator
 	return new BinaryArithmeticOperatorValueNode<Float2>{ a, b, node->GetOp()[0]};
 }
 
+Float2ValueNode* PinEvaluator::EvaluateNormalizeFloat2(NormalizeFloat2EditorNode* node)
+{
+	Float2ValueNode* a = EvaluateFloat2(node->GetInputPin());
+	return new NormalizeVectorValueNode<Float2>(a);
+}
+
 Float3ValueNode* PinEvaluator::EvaluateFloat3(Float3EditorNode* node)
 {
 	return new ConstantValueNode<Float3>(node->GetFloat3());
@@ -588,6 +598,19 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3BinaryOperator(Float3BinaryOperator
 	return new BinaryArithmeticOperatorValueNode<Float3>{ a, b, node->GetOp()[0]};
 }
 
+Float3ValueNode* PinEvaluator::EvaluateNormalizeFloat3(NormalizeFloat3EditorNode* node)
+{
+	Float3ValueNode* a = EvaluateFloat3(node->GetInputPin());
+	return new NormalizeVectorValueNode<Float3>(a);
+}
+
+Float3ValueNode* PinEvaluator::EvaluateCrossProductOperation(CrossProductOperationEditorNode* node)
+{
+	Float3ValueNode* a = EvaluateFloat3(node->GetAPin());
+	Float3ValueNode* b = EvaluateFloat3(node->GetBPin());
+	return new CrossProductValueNode(a, b);
+}
+
 Float4ValueNode* PinEvaluator::EvaluateFloat4(Float4EditorNode* node)
 {
 	return new ConstantValueNode<Float4>(node->GetFloat4());
@@ -604,6 +627,12 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4BinaryOperator(Float4BinaryOperator
 	Float4ValueNode* a = EvaluateFloat4(node->GetAPin());
 	Float4ValueNode* b = EvaluateFloat4(node->GetBPin());
 	return new BinaryArithmeticOperatorValueNode<Float4>{ a, b, node->GetOp()[0] };
+}
+
+Float4ValueNode* PinEvaluator::EvaluateNormalizeFloat4(NormalizeFloat4EditorNode* node)
+{
+	Float4ValueNode* a = EvaluateFloat4(node->GetInputPin());
+	return new NormalizeVectorValueNode<Float4>(a);
 }
 
 Float4ValueNode* PinEvaluator::EvaluateCreateFloat4(CreateFloat4EditorNode* node)

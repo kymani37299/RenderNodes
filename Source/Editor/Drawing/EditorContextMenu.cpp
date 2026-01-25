@@ -304,6 +304,13 @@ void NewNodeContextMenu::RebuildMenus()
 	AddIfCompatible<Float4x4BinaryOperatorEditorNode>(operatorMenu, "Float4x4", &m_NewNode, nodePin);
 	m_CreationMenu.AddMenu(operatorMenu);
 
+	EditorWidgets::Menu vectorsMenu{ "Vectors" };
+	AddIfCompatible<NormalizeFloat2EditorNode>(vectorsMenu, "Normalize Float2", &m_NewNode, nodePin);
+	AddIfCompatible<NormalizeFloat3EditorNode>(vectorsMenu, "Normalize Float3", &m_NewNode, nodePin);
+	AddIfCompatible<NormalizeFloat4EditorNode>(vectorsMenu, "Normalize Float4", &m_NewNode, nodePin);
+	AddIfCompatible<CrossProductOperationEditorNode>(vectorsMenu, "Cross product Float3", &m_NewNode, nodePin);
+	m_CreationMenu.AddMenu(vectorsMenu);
+
 	EditorWidgets::Menu transformMenu{ "Transform" };
 	AddIfCompatible<Float4x4RotationTransformEditorNode>(transformMenu, "Float4x4: Rotate", &m_NewNode, nodePin);
 	AddIfCompatible<Float4x4TranslationTransformEditorNode>(transformMenu, "Float4x4: Translate", &m_NewNode, nodePin);

@@ -368,6 +368,10 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::Transform_Scale_Float4x4:
 	case EditorNodeType::Transform_LookAt_Float4x4:
 	case EditorNodeType::Transform_PerspectiveProjection_Float4x4:
+	case EditorNodeType::NormalizeFloat2:
+	case EditorNodeType::NormalizeFloat3:
+	case EditorNodeType::NormalizeFloat4:
+	case EditorNodeType::CrossProductOperation:
 	case EditorNodeType::ForEachSceneObject:
 	{
 		READ_EDITOR_NODE(EditorNode);
@@ -576,6 +580,10 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_SIMPLE_NODE(Transform_Scale_Float4x4, Float4x4ScaleTransformEditorNode);
 		INIT_SIMPLE_NODE(Transform_LookAt_Float4x4, Float4x4LookAtTransformEditorNode);
 		INIT_SIMPLE_NODE(Transform_PerspectiveProjection_Float4x4, Float4x4PerspectiveTransformEditorNode);
+		INIT_SIMPLE_NODE(NormalizeFloat2, NormalizeFloat2EditorNode);
+		INIT_SIMPLE_NODE(NormalizeFloat3, NormalizeFloat3EditorNode);
+		INIT_SIMPLE_NODE(NormalizeFloat4, NormalizeFloat4EditorNode);
+		INIT_SIMPLE_NODE(CrossProductOperation, CrossProductOperationEditorNode);
 		INIT_SIMPLE_NODE(ForEachSceneObject, ForEachSceneObjectEditorNode);
 
 		INIT_FLOAT_NODE(Float, FloatEditorNode);
