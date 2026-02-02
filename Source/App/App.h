@@ -8,6 +8,7 @@
 #include "../IDGen.h"
 #include "AppConsole.h"
 #include "IInputListener.h"
+#include "../NodeGraph/VariablePool.h"
 
 class EditorErrorHandler;
 class RenderPipelineEditor;
@@ -94,6 +95,7 @@ public:
 
 	AppConsole& GetConsole() { return m_Console; }
 	EditorErrorHandler& GetErrorHandler() { return *m_ErrorHandler; }
+	VariablePool& GetVariablePool() { return m_VariablePool; }
 
 private:
 	void NewDocument();
@@ -136,6 +138,8 @@ private:
 	Ptr<EditorErrorHandler> m_ErrorHandler;
 	Ptr<RenderPipelineEditor> m_Editor;
 	Ptr<NodeGraph> m_NodeGraph;
+
+	VariablePool m_VariablePool;
 
 	Ptr<CustomNodePipelineEditor> m_CustomNodeEditor;
 

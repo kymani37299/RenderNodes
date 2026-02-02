@@ -280,37 +280,38 @@ template<typename T>
 class VariableValueNode : public ValueNode<T>
 {
 public:
-	VariableValueNode(StringValueNode* nameNode, const ValueNodeExtraInfo& extraInfo):
-		ValueNode<T>(extraInfo),
-		m_NameNode(nameNode) {}
-
-	VariableValueNode(StringValueNode* nameNode) :
-		m_NameNode(nameNode) {}
+	VariableValueNode(VariableID variableID) :
+		m_VariableID(variableID) {}
 
 	virtual T GetValue(ExecuteContext& context) const override
 	{
-		if (!m_NameNode)
-		{
-			ExecutionPrivate::Failure("VariableValueNode", "Variable name not defined");
-			context.Failure = true;
-			return T{};
-		}
-
-		const std::string name = m_NameNode->GetValue(context);
-		const unsigned varKey = Hash::Crc32(name);
-
-		auto& variableMap = context.Variables.GetMapFromType<T>();
-		if (variableMap.find(varKey) == variableMap.end())
+		const Variable& variable = context.VariablePool.GetRef(m_VariableID);
+		if (variable.Type == VariableType::Invalid)
 		{
 			ExecutionPrivate::Failure("VariableValueNode", "Variable not declared");
 			context.Failure = true;
 			return T{};
 		}
-		return variableMap[varKey];
+		return variable.Get<T>();
 	}
 
 private:
-	Ptr<StringValueNode> m_NameNode;
+	VariableID m_VariableID = 0;
+};
+
+template<typename T>
+class IteratorValueNode : public ValueNode<T>
+{
+public:
+	IteratorValueNode(PinID iteratorPin):
+		m_IteratorPin(iteratorPin) {}
+
+	virtual T GetValue(ExecuteContext& context) const override
+	{
+		return context.Iterators.Get<T>(m_IteratorPin);
+	}
+private:
+	PinID m_IteratorPin = 0;
 };
 
 template<typename T, typename U, unsigned vecSize>
@@ -490,4 +491,21 @@ public:
 
 private:
 	Ptr<SceneObjectValueNode> m_SceneObjectNode;
+};
+
+template<typename T>
+class RenderResourceVariableValueNodeT : public ValueNode<T>
+{
+public:
+	RenderResourceVariableValueNodeT(VariableID variableID) :
+		m_VariableID(variableID)
+	{}
+
+	T GetValue(ExecuteContext& context) const override
+	{
+		return context.RenderResources.GetResource<T>(m_VariableID);
+	}
+
+private:
+	VariableID m_VariableID;
 };

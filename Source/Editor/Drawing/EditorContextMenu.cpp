@@ -105,10 +105,10 @@ static bool IsCompatible(const EditorNodePin& nodePin)
 }
 
 template<typename T>
-class NewNodeMenuItem : public EditorWidgets::MenuItem
+class NewNodeMenuItemT : public EditorWidgets::MenuItem
 {
 public:
-	NewNodeMenuItem(const std::string& label, EditorNode** newNodePtr) :
+	NewNodeMenuItemT(const std::string& label, EditorNode** newNodePtr) :
 		EditorWidgets::MenuItem(label),
 		m_NewNodePtr(newNodePtr) {}
 
@@ -142,6 +142,30 @@ private:
 	NodeGraph* m_ParentGraph;
 };
 
+template<typename T>
+class NewVariableNodeMenuItemT : public EditorWidgets::MenuItem
+{
+public:
+	NewVariableNodeMenuItemT(const std::string& label, EditorNode** newNodePtr, VariableID id, VariableType type):
+		EditorWidgets::MenuItem(label),
+		m_VarID(id),
+		m_VarType(type),
+		m_NewNodePtr(newNodePtr) {}
+
+	virtual void OnClick() const override
+	{
+		*m_NewNodePtr = new T{ m_VarID, m_VarType };
+	}
+
+private:
+	EditorNode** m_NewNodePtr;
+	VariableID m_VarID;
+	VariableType m_VarType;
+};
+
+using NewGetVariableNodeMenu = NewVariableNodeMenuItemT<VariableEditorNode>;
+using NewSetVariableNodeMenu = NewVariableNodeMenuItemT<AsignVariableEditorNode>;
+
 class NewPinNodeMenuItem : public EditorWidgets::MenuItem
 {
 public:
@@ -167,7 +191,7 @@ template<typename T>
 void AddIfCompatible(EditorWidgets::Menu& menu, const std::string& label, EditorNode** newNode, const EditorNodePin& nodePin)
 {
 	if (IsCompatible<T>(nodePin))
-		menu.AddItem(new NewNodeMenuItem<T>(label, newNode));
+		menu.AddItem(new NewNodeMenuItemT<T>(label, newNode));
 }
 
 void NewNodeContextMenu::DrawContent()
@@ -274,25 +298,27 @@ void NewNodeContextMenu::RebuildMenus()
 	AddIfCompatible<Float4x4EditorNode>(constantsMenu, "Float4x4", &m_NewNode, nodePin);
 	m_CreationMenu.AddMenu(constantsMenu);
 
-	EditorWidgets::Menu assignMenu{ "Assign variable" };
-	AddIfCompatible<AsignBoolEditorNode>(assignMenu, "Bool", &m_NewNode, nodePin);
-	AddIfCompatible<AsignIntEditorNode>(assignMenu, "Int", &m_NewNode, nodePin);
-	AddIfCompatible<AsignFloatEditorNode>(assignMenu, "Float", &m_NewNode, nodePin);
-	AddIfCompatible<AsignFloat2EditorNode>(assignMenu, "Float2", &m_NewNode, nodePin);
-	AddIfCompatible<AsignFloat3EditorNode>(assignMenu, "Float3", &m_NewNode, nodePin);
-	AddIfCompatible<AsignFloat4EditorNode>(assignMenu, "Float4", &m_NewNode, nodePin);
-	AddIfCompatible<AsignFloat4x4EditorNode>(assignMenu, "Float4x4", &m_NewNode, nodePin);
-	m_CreationMenu.AddMenu(assignMenu);
-
 	EditorWidgets::Menu getVarMenu{ "Get variable" };
-	AddIfCompatible<VarBoolEditorNode>(getVarMenu, "Bool", &m_NewNode, nodePin);
-	AddIfCompatible<VarIntEditorNode>(getVarMenu, "Int", &m_NewNode, nodePin);
-	AddIfCompatible<VarFloatEditorNode>(getVarMenu, "Float", &m_NewNode, nodePin);
-	AddIfCompatible<VarFloat2EditorNode>(getVarMenu, "Float2", &m_NewNode, nodePin);
-	AddIfCompatible<VarFloat3EditorNode>(getVarMenu, "Float3", &m_NewNode, nodePin);
-	AddIfCompatible<VarFloat4EditorNode>(getVarMenu, "Float4", &m_NewNode, nodePin);
-	AddIfCompatible<VarFloat4x4EditorNode>(getVarMenu, "Float4x4", &m_NewNode, nodePin);
+	const auto renderGetVarItem = [this, &nodePin, &getVarMenu](VariableID id, const Variable& variable) {
+		const PinType pinType = ToPinType(variable.Type);
+		if (nodePin.Type == PinType::Invalid || (pinType == nodePin.Type && nodePin.IsInput) || (nodePin.Type == PinType::Any && nodePin.IsInput))
+		{
+			getVarMenu.AddItem(new NewGetVariableNodeMenu("Get " + variable.Name, &m_NewNode, id, variable.Type));
+		}
+	};
+	m_CommandExecutor->GetContext().VariablePool->ForEachVariable(renderGetVarItem);
 	m_CreationMenu.AddMenu(getVarMenu);
+
+	EditorWidgets::Menu setVarMenu{ "Set variable" };
+	const auto renderSetVarItem = [this, &nodePin, &setVarMenu](VariableID id, const Variable& variable) {
+		const PinType pinType = ToPinType(variable.Type);
+		if (nodePin.Type == PinType::Invalid || (pinType == nodePin.Type && !nodePin.IsInput) || (nodePin.Type == PinType::Execution))
+		{
+			setVarMenu.AddItem(new NewSetVariableNodeMenu("Set " + variable.Name, &m_NewNode, id, variable.Type));
+		}
+	};
+	m_CommandExecutor->GetContext().VariablePool->ForEachVariable(renderSetVarItem);
+	m_CreationMenu.AddMenu(setVarMenu);
 
 	EditorWidgets::Menu operatorMenu{ "Operator" };
 	AddIfCompatible<BoolBinaryOperatorEditorNode>(operatorMenu, "Bool", &m_NewNode, nodePin);
@@ -325,7 +351,6 @@ void NewNodeContextMenu::RebuildMenus()
 	m_CreationMenu.AddMenu(compareMenu);
 
 	EditorWidgets::Menu createMenu{ "Create" };
-	AddIfCompatible<CreateTextureEditorNode>(createMenu, "Texture", &m_NewNode, nodePin);
 	AddIfCompatible<CreateFloat2EditorNode>(createMenu, "Float2", &m_NewNode, nodePin);
 	AddIfCompatible<CreateFloat3EditorNode>(createMenu, "Float3", &m_NewNode, nodePin);
 	AddIfCompatible<CreateFloat4EditorNode>(createMenu, "Float4", &m_NewNode, nodePin);
@@ -337,18 +362,9 @@ void NewNodeContextMenu::RebuildMenus()
 	AddIfCompatible<SplitFloat4EditorNode>(splitMenu, "Float4", &m_NewNode, nodePin);
 	m_CreationMenu.AddMenu(splitMenu);
 
-	EditorWidgets::Menu loadMenu{ "Load" };
-	AddIfCompatible<LoadTextureEditorNode>(loadMenu, "Texture", &m_NewNode, nodePin);
-	AddIfCompatible<LoadShaderEditorNode>(loadMenu, "Shader", &m_NewNode, nodePin);
-	AddIfCompatible<LoadSceneEditorNode>(loadMenu, "Scene object", &m_NewNode, nodePin);
-	m_CreationMenu.AddMenu(loadMenu);
-
 	EditorWidgets::Menu getMenu{ "Get" };
-	AddIfCompatible<GetTextureEditorNode>(getMenu, "Texture", &m_NewNode, nodePin);
-	AddIfCompatible<GetShaderEditorNode>(getMenu, "Shader", &m_NewNode, nodePin);
 	AddIfCompatible<GetMeshEditorNode>(getMenu, "Mesh", &m_NewNode, nodePin);
 	AddIfCompatible<GetCubeMeshEditorNode>(getMenu, "Cube mesh", &m_NewNode, nodePin);
-	AddIfCompatible<GetSceneEditorNode>(getMenu, "Scene", &m_NewNode, nodePin);
 	m_CreationMenu.AddMenu(getMenu);
 
 	EditorWidgets::Menu renderMenu{ "Render" };

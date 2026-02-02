@@ -45,6 +45,8 @@ void RenderPipelineEditor::Render()
 
     ImNode::End();
     ImNode::SetCurrentEditor(nullptr);
+
+    RenderVariableWindow();
 }
 
 void RenderPipelineEditor::HandleKeyPressed(int key, int mods)
@@ -83,13 +85,18 @@ void RenderPipelineEditor::Unload()
 {
     ImNode::DestroyEditor(m_EditorContext);
     m_CommandExecutor->SetNodeGraph(nullptr);
+    m_CommandExecutor->SetVariablePool(nullptr);
     m_NodeGraph = nullptr;
+    m_VariablePool = nullptr;
 }
 
-void RenderPipelineEditor::Load(NodeGraph* nodeGraph)
+void RenderPipelineEditor::Load(NodeGraph* nodeGraph, VariablePool* variablePool)
 {
 	m_NodeGraph = nodeGraph;
 	m_CommandExecutor->SetNodeGraph(m_NodeGraph);
+	m_CommandExecutor->SetVariablePool(variablePool);
+
+    m_VariablePool = variablePool;
 
 	m_NewNodeMenu = Ptr<NewNodeContextMenu>(new NewNodeContextMenu{ "New node menu", m_CommandExecutor.get(), m_CustomNodeEditor});
 	m_NodeMenu = Ptr<NodeContextMenu>(new NodeContextMenu{ "Node menu", m_CommandExecutor.get()});
@@ -253,6 +260,15 @@ void RenderPipelineEditor::RenderContextMenus()
     m_NodeMenu->Draw();
     m_LinkMenu->Draw();
     m_PinMenu->Draw();
+
+    if (m_CurrentDialog)
+    {
+        const bool stillOpen = m_CurrentDialog->Draw();
+        if (!stillOpen)
+        {
+            m_CurrentDialog = nullptr;
+        }
+    }
 }
 
 void RenderPipelineEditor::RenderNodePopups()
@@ -267,20 +283,67 @@ void RenderPipelineEditor::RenderNodePopups()
     ImNode::Resume();
 }
 
-CustomNodePipelineEditor::CustomNodePipelineEditor():
+void RenderPipelineEditor::RenderVariableWindow()
+{
+    if (m_VariablePool == nullptr)
+        return;
+
+    ImGui::SetNextWindowSize(ImVec2(420, 500), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("Variables");
+    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+    if (ImGui::Button("Add..."))
+    {
+        m_CurrentDialog = Ptr<NewVariableDialog>(new NewVariableDialog{});
+        m_CurrentDialog->Open();
+    }
+
+    ImGui::Separator();
+
+    ImGui::BeginChild("Variable pool");
+    const auto renderVariable = [this](VariableID id ,Variable& var) {
+        ImGui::PushID(id);
+        if (ImGui::Button("Get"))
+        {
+            VariableEditorNode* newNode = new VariableEditorNode{ id, var.Type };
+            newNode->RefreshLabel(*m_VariablePool);
+			m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ newNode });
+        }
+		if (ImGui::Button("Set"))
+		{
+            AsignVariableEditorNode* newNode = new AsignVariableEditorNode{ id, var.Type };
+            newNode->RefreshLabel(*m_VariablePool);
+			m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ newNode });
+		}
+        ImGui::SameLine();
+        ImGui::Text("%s", var.Name.c_str());
+		EditorWidgets::InputVariable("", var);
+        ImGui::Separator();
+        ImGui::PopID();
+    };
+    m_VariablePool->ForEachVariable(renderVariable);
+
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+CustomNodePipelineEditor::CustomNodePipelineEditor(VariablePool* variablePool):
     RenderPipelineEditor(new NodeGraphCommandExecutor{})
 {
     m_CustomNodeEditor = true;
-    Load(new NodeGraph{});
+    Load(new NodeGraph{}, variablePool);
 }
 
-CustomNodePipelineEditor::CustomNodePipelineEditor(CustomEditorNode* node):
+CustomNodePipelineEditor::CustomNodePipelineEditor(CustomEditorNode* node, VariablePool* variablePool):
     RenderPipelineEditor(new NodeGraphCommandExecutor{})
 {
     m_CustomNodeEditor = true;
     m_ShouldLoadPositions = true;
     m_Node = node;
-    Load(node->GetNodeGraph());
+    Load(node->GetNodeGraph(), variablePool);
 }
 
 CustomNodePipelineEditor::~CustomNodePipelineEditor()

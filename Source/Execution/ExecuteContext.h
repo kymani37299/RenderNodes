@@ -9,6 +9,7 @@
 #include "../Render/Shader.h"
 #include "../Render/Buffer.h"
 #include "ExecutorScene.h"
+#include "../NodeGraph/VariablePool.h"
 
 namespace ExecutionPrivate
 {
@@ -22,36 +23,6 @@ namespace ExecutionPrivate
 
 }
 
-struct ExecutorVariableBlock
-{
-	std::unordered_map<uint32_t, bool> Bools;
-	std::unordered_map<uint32_t, int> Ints;
-	std::unordered_map<uint32_t, float> Floats;
-	std::unordered_map<uint32_t, Float2> Float2s;
-	std::unordered_map<uint32_t, Float3> Float3s;
-	std::unordered_map<uint32_t, Float4> Float4s;
-	std::unordered_map<uint32_t, Float4x4> Float4x4s;
-	std::unordered_map<uint32_t, Texture*> Textures;
-	std::unordered_map<uint32_t, Buffer*> Buffers;
-	std::unordered_map<uint32_t, Shader*> Shaders;
-	std::unordered_map<uint32_t, Scene*> Scenes;
-	std::unordered_map<uint32_t, SceneObject*> SceneObjects;
-
-	template<typename T> std::unordered_map<uint32_t, T>& GetMapFromType();
-	template<> std::unordered_map<uint32_t, bool>& GetMapFromType<bool>() { return Bools; }
-	template<> std::unordered_map<uint32_t, int>& GetMapFromType<int>() { return Ints; }
-	template<> std::unordered_map<uint32_t, float>& GetMapFromType<float>() { return Floats; }
-	template<> std::unordered_map<uint32_t, Float2>& GetMapFromType<Float2>() { return Float2s; }
-	template<> std::unordered_map<uint32_t, Float3>& GetMapFromType<Float3>() { return Float3s; }
-	template<> std::unordered_map<uint32_t, Float4>& GetMapFromType<Float4>() { return Float4s; }
-	template<> std::unordered_map<uint32_t, Float4x4>& GetMapFromType<Float4x4>() { return Float4x4s; }
-	template<> std::unordered_map<uint32_t, Texture*>& GetMapFromType<Texture*>() { return Textures; }
-	template<> std::unordered_map<uint32_t, Shader*>& GetMapFromType<Shader*>() { return Shaders; }
-	template<> std::unordered_map<uint32_t, Buffer*>& GetMapFromType<Buffer*>() { return Buffers; }
-	template<> std::unordered_map<uint32_t, Scene*>& GetMapFromType<Scene*>() { return Scenes; }
-	template<> std::unordered_map<uint32_t, SceneObject*>& GetMapFromType<SceneObject*>() { return SceneObjects; }
-};
-
 enum class ExecutorStaticResource
 {
 	CubeMesh,
@@ -59,16 +30,36 @@ enum class ExecutorStaticResource
 
 struct ExecutorRenderResources
 {
-	unsigned CubeMeshIndex = 0;
-
-	std::vector<Ptr<Texture>> Textures;
-	std::vector<Ptr<Buffer>> Buffers;
-	std::vector<Ptr<Mesh>> Meshes;
-	std::vector<Ptr<Shader>> Shaders;
-	std::vector<Ptr<Scene>> Scenes;
+	std::unordered_map<VariableID, Ptr<Texture>> Textures;
+	std::unordered_map<VariableID, Ptr<Buffer>> Buffers;
+	std::unordered_map<VariableID, Ptr<Mesh>> Meshes;
+	std::unordered_map<VariableID, Ptr<Shader>> Shaders;
+	std::unordered_map<VariableID, Ptr<Scene>> Scenes;
 
 	template<typename T, ExecutorStaticResource staticResource>  T GetStaticResource();
-	template<> Mesh* GetStaticResource<Mesh*, ExecutorStaticResource::CubeMesh>() { return Meshes[CubeMeshIndex].get(); }
+	template<> Mesh* GetStaticResource<Mesh*, ExecutorStaticResource::CubeMesh>() { return Meshes[VariablePool::ID_CubeMesh].get(); }
+
+	template<typename T> T GetResource(VariableID id);
+	template<> Texture* GetResource(VariableID id) { return Textures[id].get(); }
+	template<> Buffer* GetResource(VariableID id) { return Buffers[id].get(); }
+	template<> Mesh* GetResource(VariableID id) { return Meshes[id].get(); }
+	template<> Shader* GetResource(VariableID id) { return Shaders[id].get(); }
+	template<> Scene* GetResource(VariableID id) { return Scenes[id].get(); }
+};
+
+struct ExecutorIterators
+{
+	using IteratorType = std::variant<
+		SceneObject*
+	>;
+
+	std::unordered_map<PinID, IteratorType> Data{};
+
+	template<typename T>
+	T& Get(PinID pinID)
+	{
+		return std::get<T>(Data[pinID]);
+	}
 };
 
 struct ExecutorInputState
@@ -85,7 +76,8 @@ class ExecutorNode;
 struct ExecuteContext
 {
 	Texture* RenderTarget = nullptr;
-	ExecutorVariableBlock Variables;
+	VariablePool VariablePool;
+	ExecutorIterators Iterators;
 	ExecutorRenderResources RenderResources;
 	ExecutorInputState InputState;
 	
@@ -103,6 +95,8 @@ struct CompiledPipeline
 	std::unordered_map<uint32_t, ExecutorNode*> OnKeyPressedNodes;
 	std::unordered_map<uint32_t, ExecutorNode*> OnKeyDownNodes;
 	std::unordered_map<uint32_t, ExecutorNode*> OnKeyReleasedNodes;
+
+	VariablePool VariablePool;
 
 	std::unordered_map<ExecutorNode*, NodeID> EditorLinks;
 };

@@ -8,7 +8,7 @@
 #include "../Editor/RenderPipelineEditor.h"
 
 // #define ENABLE_TOKEN_VERIFICATION
-// #define ASSERT_ON_LOAD_FAILED
+#define ASSERT_ON_LOAD_FAILED
 
 #ifdef ASSERT_ON_LOAD_FAILED
 #define LOAD_ASSERT() ASSERT(0)
@@ -30,8 +30,12 @@ static const std::string BEGIN_PIN_LIST_TOKEN = "BEGIN_PIN_LIST";
 static const std::string END_PIN_LIST_TOKEN = "END_PIN_LIST";
 static const std::string BEGIN_NODE_POSITIONS_TOKEN = "BEGIN_NODE_POSITIONS";
 static const std::string END_NODE_POSITIONS_TOKEN = "END_NODE_POSITIONS";
+static const std::string BEGIN_VARIABLE_POOL_TOKEN = "BEGIN_VARIABLE_POOL";
+static const std::string END_VARIABLE_POOL_TOKEN = "END_VARIABLE_POOL";
+static const std::string BEGIN_VARIABLE_TOKEN = "BEGIN_VARIABLE";
+static const std::string END_VARIABLE_TOKEN = "END_VARIABLE";
 
-void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& nodeGraph)
+void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& nodeGraph, const VariablePool& variablePool)
 {
 	m_Output.open(path);
 
@@ -47,13 +51,14 @@ void NodeGraphSerializer::Serialize(const std::string& path, const NodeGraph& no
 	WriteAttribute("UseTokens", m_UseTokens);
 	WriteAttribute("FirstID", IDGen::Generate());
 
+	WriteVariablePool(variablePool);
 	WriteCustomNodeList();
 	WriteNodeGraph(nodeGraph);
 
 	m_Output.close();
 }
 
-UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGraph, std::vector<CustomEditorNode*>& customNodes)
+UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& nodeGraph, VariablePool& variablePool, std::vector<CustomEditorNode*>& customNodes)
 {
 	m_OperationSuccess = true;
 	
@@ -72,6 +77,12 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 	m_UseTokens = ReadIntAttr("UseTokens");
 	unsigned firstID = ReadIntAttr("FirstID");
 
+	variablePool = {};
+	if (m_Version >= 9)
+	{
+		ReadVariablePool(variablePool);
+	}
+	
 	customNodes = ReadCustomNodeList();
 	ReadNodeGraph(nodeGraph, customNodes);
 
@@ -85,6 +96,85 @@ UniqueID NodeGraphSerializer::Deserialize(const std::string& path, NodeGraph& no
 //////////////////////////////
 
 #pragma region(WRITING)
+
+void NodeGraphSerializer::WriteVariablePool(const VariablePool& variablePool)
+{
+	WriteToken(BEGIN_VARIABLE_POOL_TOKEN);
+
+	uint32_t variableCount = 0;
+	const auto countVariables = [&variableCount](VariableID id, const Variable& variable) {
+		variableCount++;
+	};
+	variablePool.ForEachVariable(countVariables);
+
+	WriteAttribute("Count", variableCount);
+
+	uint32_t writtenCount = 0;
+	const auto writeVariable = [this, &writtenCount, variableCount](VariableID id, const Variable& variable) {
+		if (writtenCount < variableCount)
+		{
+			WriteVariable(id, variable);
+		}
+		else
+		{
+			ASSERT_M(0, "Internal error while serializing variable pool");
+		}
+		writtenCount++;
+	};
+	variablePool.ForEachVariable(writeVariable);
+
+	WriteToken(END_VARIABLE_POOL_TOKEN);
+}
+
+void NodeGraphSerializer::WriteVariable(VariableID id, const Variable& variable)
+{
+	WriteToken(BEGIN_VARIABLE_TOKEN);
+
+	WriteAttribute("ID", id);
+	WriteAttribute("Name", variable.Name);
+	WriteAttribute("Type", EnumToInt(variable.Type));
+	switch (variable.Type)
+	{
+	case VariableType::Bool:
+		WriteAttribute("ValueBool", variable.Get<bool>());
+		break;
+	case VariableType::Int:
+		WriteAttribute("ValueInt", variable.Get<int>());
+		break;
+	case VariableType::Float:
+		WriteAttribute("ValueFloat", variable.Get<float>());
+		break;
+	case VariableType::Float2:
+		WriteAttribute("ValueFloat2", variable.Get<Float2>());
+		break;
+	case VariableType::Float3:
+		WriteAttribute("ValueFloat3", variable.Get<Float3>());
+		break;
+	case VariableType::Float4:
+		WriteAttribute("ValueFloat4", variable.Get<Float4>());
+		break;
+	case VariableType::Float4x4:
+		WriteAttribute("ValueFloat4x4", variable.Get<Float4x4>());
+		break;
+	case VariableType::Shader:
+		WriteAttribute("ValueShaderData", variable.Get<ShaderData>());
+		break;
+	case VariableType::Texture:
+		WriteAttribute("ValueTextureData", variable.Get<TextureData>());
+		break;
+	case VariableType::Scene:
+		WriteAttribute("ValueSceneData", variable.Get<SceneData>());
+		break;
+	case VariableType::Invalid:
+	case VariableType::Count:
+		break;
+	default:
+		NOT_IMPLEMENTED;
+		break;
+	}
+
+	WriteToken(END_VARIABLE_TOKEN);
+}
 
 void NodeGraphSerializer::WriteNodeGraph(const NodeGraph& nodeGraph)
 {
@@ -208,7 +298,7 @@ void NodeGraphSerializer::WritePin(const EditorNodePin& pin, bool custom)
 	
 	if (custom)
 	{
-		WriteAttribute("IsInput", pin.IsInput ? 1 : 0);
+		WriteAttribute("IsInput", pin.IsInput);
 		WriteAttribute("Type", EnumToInt(pin.Type));
 		WriteAttribute("Label", pin.Label);
 		WriteAttribute("LinkedNode", pin.LinkedNode);
@@ -280,7 +370,7 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::Bool:
 	{
 		READ_EDITOR_NODE(BoolEditorNode);
-		WriteAttribute("Value", readNode->m_Value ? 1 : 0);
+		WriteAttribute("Value", readNode->m_Value);
 	} break;
 	case EditorNodeType::Int:
 	{
@@ -345,24 +435,6 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::SplitFloat4:
 	case EditorNodeType::OnUpdate:
 	case EditorNodeType::OnStart:
-	case EditorNodeType::AsignFloat:
-	case EditorNodeType::AsignFloat2:
-	case EditorNodeType::AsignFloat3:
-	case EditorNodeType::AsignFloat4:
-	case EditorNodeType::AsignFloat4x4:
-	case EditorNodeType::AsignBool:
-	case EditorNodeType::AsignInt:
-	case EditorNodeType::VarFloat:
-	case EditorNodeType::VarFloat2:
-	case EditorNodeType::VarFloat3:
-	case EditorNodeType::VarFloat4:
-	case EditorNodeType::VarFloat4x4:
-	case EditorNodeType::VarBool:
-	case EditorNodeType::VarInt:
-	case EditorNodeType::GetScene:
-	case EditorNodeType::GetTexture:
-	case EditorNodeType::GetShader:
-	case EditorNodeType::CreateTexture:
 	case EditorNodeType::Transform_Rotate_Float4x4:
 	case EditorNodeType::Transform_Translate_Float4x4:
 	case EditorNodeType::Transform_Scale_Float4x4:
@@ -379,22 +451,15 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	case EditorNodeType::GetMesh:
 	{
 		READ_EDITOR_NODE(GetMeshEditorNode);
-		WriteAttribute("PositionBit", readNode->m_PositionBit ? 1 : 0);
-		WriteAttribute("TexcoordBit", readNode->m_TexcoordBit ? 1 : 0);
-		WriteAttribute("NormalBit", readNode->m_NormalBit ? 1 : 0);
-		WriteAttribute("TangentBit", readNode->m_TangentBit ? 1 : 0);
-	} break;
-	case EditorNodeType::LoadShader:
-	case EditorNodeType::LoadTexture:
-	case EditorNodeType::LoadScene:
-	{
-		READ_EDITOR_NODE(NameAndPathExecutionEditorNode);
-		WriteAttribute("Path", readNode->m_Path);
+		WriteAttribute("PositionBit", readNode->m_PositionBit);
+		WriteAttribute("TexcoordBit", readNode->m_TexcoordBit);
+		WriteAttribute("NormalBit", readNode->m_NormalBit);
+		WriteAttribute("TangentBit", readNode->m_TangentBit);
 	} break;
 	case EditorNodeType::RenderState:
 	{
 		READ_EDITOR_NODE(RenderStateEditorNode);
-		WriteAttribute("DepthWrite", readNode->m_DepthWrite ? 1 : 0);
+		WriteAttribute("DepthWrite", readNode->m_DepthWrite);
 		WriteAttribute("DepthTest", readNode->m_DepthTestMode);
 	} break;
 	case EditorNodeType::Pin:
@@ -412,10 +477,50 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 		WriteAttribute("Key", readNode->GetKey());
 		WriteAttribute("Mods", readNode->GetMods());
 	} break;
+	case EditorNodeType::Variable:
+	{
+		READ_EDITOR_NODE(VariableEditorNode);
+		WriteAttribute("ID", readNode->m_VarID);
+		WriteAttribute("Type", EnumToInt(readNode->m_VarType));
+	} break;
+	case EditorNodeType::AsignVariable:
+	{
+		READ_EDITOR_NODE(AsignVariableEditorNode);
+		WriteAttribute("ID", readNode->m_VarID);
+		WriteAttribute("Type", EnumToInt(readNode->m_VarType));
+	} break;
 	case EditorNodeType::Custom:
 	{
 		READ_EDITOR_NODE(CustomEditorNode);
 		WriteAttribute("CustomNodeName", readNode->GetName());
+	} break;
+	case EditorNodeType::DEPRECATED_VarFloat:
+	case EditorNodeType::DEPRECATED_VarFloat2:
+	case EditorNodeType::DEPRECATED_VarFloat3:
+	case EditorNodeType::DEPRECATED_VarFloat4:
+	case EditorNodeType::DEPRECATED_VarFloat4x4:
+	case EditorNodeType::DEPRECATED_VarBool:
+	case EditorNodeType::DEPRECATED_VarInt:
+	case EditorNodeType::DEPRECATED_GetScene:
+	case EditorNodeType::DEPRECATED_GetTexture:
+	case EditorNodeType::DEPRECATED_GetShader:
+	case EditorNodeType::DEPRECATED_LoadShader:
+	case EditorNodeType::DEPRECATED_LoadTexture:
+	case EditorNodeType::DEPRECATED_LoadScene:
+	case EditorNodeType::DEPRECATED_AsignFloat:
+	case EditorNodeType::DEPRECATED_AsignFloat2:
+	case EditorNodeType::DEPRECATED_AsignFloat3:
+	case EditorNodeType::DEPRECATED_AsignFloat4:
+	case EditorNodeType::DEPRECATED_AsignFloat4x4:
+	case EditorNodeType::DEPRECATED_AsignBool:
+	case EditorNodeType::DEPRECATED_AsignInt:
+	case EditorNodeType::DEPRECATED_CreateTexture:
+	{
+		ASSERT_M(0, "Trying to save deprecated node");
+	} break;
+	case EditorNodeType::Deprecated:
+	{
+		// Do nothing we dont want to save this nodes
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -449,6 +554,66 @@ void NodeGraphSerializer::WriteLink(const EditorNodeLink& link)
 
 #pragma region READING
 
+void NodeGraphSerializer::ReadVariablePool(VariablePool& variablePool)
+{
+	EatToken(BEGIN_VARIABLE_POOL_TOKEN);
+
+	const int variableCount = ReadIntAttr("Count");
+
+	for (int i = 0; i < variableCount; i++)
+	{
+		EatToken(BEGIN_VARIABLE_TOKEN);
+
+		const VariableID id = ReadIntAttr("ID");
+		const std::string name = ReadStrAttr("Name");
+		const VariableType type = IntToEnum<VariableType>(ReadIntAttr("Type"));
+		Variable& var = variablePool.GetRefOrCreate(id, type, name);
+
+		switch (var.Type)
+		{
+		case VariableType::Bool:
+			var.Get<bool>() = ReadBoolAttr("ValueBool");
+			break;
+		case VariableType::Int:
+			var.Get<int>() = ReadIntAttr("ValueInt");
+			break;
+		case VariableType::Float:
+			var.Get<float>() = ReadFloatAttr("ValueFloat");
+			break;
+		case VariableType::Float2:
+			var.Get<Float2>() = ReadFloat2Attr("ValueFloat2");
+			break;
+		case VariableType::Float3:
+			var.Get<Float3>() = ReadFloat3Attr("ValueFloat3");
+			break;
+		case VariableType::Float4:
+			var.Get<Float4>() = ReadFloat4Attr("ValueFloat4");
+			break;
+		case VariableType::Float4x4:
+			var.Get<Float4x4>() = ReadFloat4x4Attr("ValueFloat4x4");
+			break;
+		case VariableType::Shader:
+			var.Get<ShaderData>() = ReadShaderDataAttr("ValueShaderData");
+			break;
+		case VariableType::Texture:
+			var.Get<TextureData>() = ReadTextureDataAttr("ValueTextureData");
+			break;
+		case VariableType::Scene:
+			var.Get<SceneData>() = ReadSceneDataAttr("ValueSceneData");
+			break;
+		case VariableType::Count:
+		case VariableType::Invalid:
+			break;
+		default:
+			NOT_IMPLEMENTED;
+			break;
+		}
+
+		EatToken(END_VARIABLE_TOKEN);
+	}
+	EatToken(END_VARIABLE_POOL_TOKEN);
+}
+
 void NodeGraphSerializer::ReadNodeGraph(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
 {
 	EatToken(BEGIN_NODE_GRAPH_TOKEN);
@@ -456,6 +621,7 @@ void NodeGraphSerializer::ReadNodeGraph(NodeGraph& nodeGraph, const std::vector<
 	ReadNodeList(nodeGraph, customNodes);
 	ReadLinkList(nodeGraph);
 	ReadNodePositions(nodeGraph);
+	CleanupDeprecatedNodes(nodeGraph);
 
 	EatToken(END_NODE_GRAPH_TOKEN);
 }
@@ -496,6 +662,23 @@ void NodeGraphSerializer::ReadNodePositions(NodeGraph& nodeGraph)
 	EatToken(END_NODE_POSITIONS_TOKEN);
 }
 
+void NodeGraphSerializer::CleanupDeprecatedNodes(NodeGraph& nodeGraph)
+{
+	std::vector<NodeID> deprecatedNodes{};
+	const auto fn = [&deprecatedNodes](EditorNode* node) {
+		if (node->GetType() == EditorNodeType::Deprecated)
+		{
+			deprecatedNodes.push_back(node->GetID());
+		}
+	};
+	nodeGraph.ForEachNode(fn);
+
+	for (const auto node : deprecatedNodes)
+	{
+		nodeGraph.RemoveAllPins(node);
+	}
+}
+
 std::vector<CustomEditorNode*> NodeGraphSerializer::ReadCustomNodeList()
 {
 	std::vector<CustomEditorNode*> customNodes;
@@ -530,7 +713,6 @@ void NodeGraphSerializer::ReadLinkList(NodeGraph& nodeGraph)
 #define INIT_FLOAT_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); const unsigned numFloats = ReadIntAttr("NumFloats"); for (unsigned i = 0; i < numFloats; i++) { newNode->m_Values[i] = ReadFloatAttr("Value" + std::to_string(i)); }  } break;
 #define INIT_FLOAT_MATRIX_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); const unsigned numFloatsX = ReadIntAttr("NumFloatsX"); const unsigned numFloatsY = ReadIntAttr("NumFloatsY"); for (unsigned i = 0; i < numFloatsX; i++) { for(unsigned j = 0; j < numFloatsY; j++) { newNode->m_Values[i][j] = ReadFloatAttr("Value" + std::to_string(i) + std::to_string(j)); } }  } break;
 #define INIT_BIN_OP_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Op = ReadStrAttr("OP"); } break;
-#define INIT_NAME_AND_PATH_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Path = ReadStrAttr("Path"); } break;
 #define INIT_INPUT_NODE(NodeEnum, NodeClass) case EditorNodeType::NodeEnum: { INIT_NODE(NodeClass); newNode->m_Key = ReadIntAttr("Key"); newNode->m_Mods = ReadIntAttr("Mods"); } break
 
 EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vector<CustomEditorNode*>& customNodes)
@@ -552,29 +734,11 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_SIMPLE_NODE(Print, PrintEditorNode);
 		INIT_SIMPLE_NODE(OnUpdate, OnUpdateEditorNode);
 		INIT_SIMPLE_NODE(OnStart, OnStartEditorNode);
-		INIT_SIMPLE_NODE(AsignBool, AsignBoolEditorNode);
-		INIT_SIMPLE_NODE(AsignInt, AsignIntEditorNode);
-		INIT_SIMPLE_NODE(AsignFloat, AsignFloatEditorNode);
-		INIT_SIMPLE_NODE(AsignFloat2, AsignFloat2EditorNode);
-		INIT_SIMPLE_NODE(AsignFloat3, AsignFloat3EditorNode);
-		INIT_SIMPLE_NODE(AsignFloat4, AsignFloat4EditorNode);
-		INIT_SIMPLE_NODE(AsignFloat4x4, AsignFloat4x4EditorNode);
-		INIT_SIMPLE_NODE(VarBool, VarBoolEditorNode);
-		INIT_SIMPLE_NODE(VarInt, VarIntEditorNode);
-		INIT_SIMPLE_NODE(VarFloat, VarFloatEditorNode);
-		INIT_SIMPLE_NODE(VarFloat2, VarFloat2EditorNode);
-		INIT_SIMPLE_NODE(VarFloat3, VarFloat3EditorNode);
-		INIT_SIMPLE_NODE(VarFloat4, VarFloat4EditorNode);
-		INIT_SIMPLE_NODE(VarFloat4x4, VarFloat4x4EditorNode);
-		INIT_SIMPLE_NODE(GetScene, GetSceneEditorNode);
-		INIT_SIMPLE_NODE(GetTexture, GetTextureEditorNode);
-		INIT_SIMPLE_NODE(GetShader, GetShaderEditorNode);
 		INIT_SIMPLE_NODE(GetCubeMesh, GetCubeMeshEditorNode);
 		INIT_SIMPLE_NODE(ClearRenderTarget, ClearRenderTargetEditorNode);
 		INIT_SIMPLE_NODE(DrawMesh, DrawMeshEditorNode);
 		INIT_SIMPLE_NODE(BindTable, BindTableEditorNode);
 		INIT_SIMPLE_NODE(PresentTexture, PresentTextureEditorNode);
-		INIT_SIMPLE_NODE(CreateTexture, CreateTextureEditorNode);
 		INIT_SIMPLE_NODE(Transform_Rotate_Float4x4, Float4x4RotationTransformEditorNode);
 		INIT_SIMPLE_NODE(Transform_Translate_Float4x4, Float4x4TranslationTransformEditorNode);
 		INIT_SIMPLE_NODE(Transform_Scale_Float4x4, Float4x4ScaleTransformEditorNode);
@@ -602,10 +766,6 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		INIT_BIN_OP_NODE(BoolBinaryOperator, BoolBinaryOperatorEditorNode);
 		INIT_BIN_OP_NODE(IntBinaryOperator, IntBinaryOperatorEditorNode);
 		INIT_BIN_OP_NODE(IntComparisonOperator, IntComparisonOperatorEditorNode);
-
-		INIT_NAME_AND_PATH_NODE(LoadTexture, LoadTextureEditorNode);
-		INIT_NAME_AND_PATH_NODE(LoadShader, LoadShaderEditorNode);
-		INIT_NAME_AND_PATH_NODE(LoadScene, LoadSceneEditorNode);
 
 		INIT_INPUT_NODE(OnKeyPressed, OnKeyPressedEditorNode);
 		INIT_INPUT_NODE(OnKeyReleased, OnKeyReleasedEditorNode);
@@ -649,6 +809,18 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 
 		node = newNode;
 	} break;
+	case EditorNodeType::Variable:
+	{
+		const VariableID id = ReadIntAttr("ID");
+		const VariableType type = IntToEnum<VariableType>(ReadIntAttr("Type"));
+		node = new VariableEditorNode(id, type);
+	} break;
+	case EditorNodeType::AsignVariable:
+	{
+		const VariableID id = ReadIntAttr("ID");
+		const VariableType type = IntToEnum<VariableType>(ReadIntAttr("Type"));
+		node = new AsignVariableEditorNode(id, type);
+	} break;
 	case EditorNodeType::Custom:
 	{
 		CustomEditorNode* customNodeClass = nullptr;
@@ -668,6 +840,35 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 			return nullptr;
 		}
 		node = new CustomEditorNode(&nodeGraph, customNodeName, customNodeClass->GetNodeGraph(), false);
+	} break;
+	case EditorNodeType::DEPRECATED_VarBool:
+	case EditorNodeType::DEPRECATED_VarInt:
+	case EditorNodeType::DEPRECATED_VarFloat:
+	case EditorNodeType::DEPRECATED_VarFloat2:
+	case EditorNodeType::DEPRECATED_VarFloat3:
+	case EditorNodeType::DEPRECATED_VarFloat4:
+	case EditorNodeType::DEPRECATED_VarFloat4x4:
+	case EditorNodeType::DEPRECATED_GetScene:
+	case EditorNodeType::DEPRECATED_GetTexture:
+	case EditorNodeType::DEPRECATED_GetShader:
+	case EditorNodeType::DEPRECATED_AsignBool:
+	case EditorNodeType::DEPRECATED_AsignInt:
+	case EditorNodeType::DEPRECATED_AsignFloat:
+	case EditorNodeType::DEPRECATED_AsignFloat2:
+	case EditorNodeType::DEPRECATED_AsignFloat3:
+	case EditorNodeType::DEPRECATED_AsignFloat4:
+	case EditorNodeType::DEPRECATED_AsignFloat4x4:
+	case EditorNodeType::DEPRECATED_CreateTexture:
+	case EditorNodeType::Deprecated:
+	{
+		node = new DeprecatedEditorNode(nodeType);
+	} break;
+	case EditorNodeType::DEPRECATED_LoadScene:
+	case EditorNodeType::DEPRECATED_LoadTexture:
+	case EditorNodeType::DEPRECATED_LoadShader:
+	{
+		ReadStrAttr("Path");
+		node = new DeprecatedEditorNode(nodeType);
 	} break;
 	default:
 		NOT_IMPLEMENTED;
@@ -815,11 +1016,6 @@ void NodeGraphSerializer::ReadBinaryOperatorNode(BinaryOperatorEditorNode* binOp
 	binOpNode->m_Op = ReadStrAttr("OP");
 }
 
-void NodeGraphSerializer::ReadNamePathPathNode(NameAndPathExecutionEditorNode* nameAndPathNode)
-{
-	nameAndPathNode->m_Path = ReadStrAttr("Path");
-}
-
 #pragma endregion // READING
 
 //////////////////////////////
@@ -871,8 +1067,8 @@ std::string NodeGraphSerializer::ReadAttribute(const std::string& name)
 	if (attrName != name)
 	{
 		LOAD_ASSERT();
-		m_OperationSuccess = false;
-		return "";
+		// m_OperationSuccess = false;
+		// return "";
 	}
 
 	// Skip before separator space
@@ -1000,5 +1196,45 @@ Float4 NodeGraphSerializer::ReadFloat4Attr(const std::string& name)
 	value.y = ReadFloatAttr(name + ".Y");
 	value.z = ReadFloatAttr(name + ".Z");
 	value.w = ReadFloatAttr(name + ".W");
+	return value;
+}
+
+Float4x4 NodeGraphSerializer::ReadFloat4x4Attr(const std::string& name)
+{
+	Float4x4 value;
+	value[0][0] = ReadFloatAttr(name + ".00");
+	value[0][1] = ReadFloatAttr(name + ".01");
+	value[0][2] = ReadFloatAttr(name + ".02");
+	value[1][0] = ReadFloatAttr(name + ".10");
+	value[1][1] = ReadFloatAttr(name + ".11");
+	value[1][2] = ReadFloatAttr(name + ".12");
+	value[2][0] = ReadFloatAttr(name + ".20");
+	value[2][1] = ReadFloatAttr(name + ".21");
+	value[2][2] = ReadFloatAttr(name + ".22");
+	return value;
+}
+
+TextureData NodeGraphSerializer::ReadTextureDataAttr(const std::string& name)
+{
+	TextureData value;
+	value.Path = ReadStrAttr(name + ".Path");
+	value.Width = ReadIntAttr(name + ".Width");
+	value.Height = ReadIntAttr(name + ".Height");
+	value.Framebuffer = ReadBoolAttr(name + ".Framebuffer");
+	value.DepthStencil = ReadBoolAttr(name + ".DepthStencil");
+	return value;
+}
+
+SceneData NodeGraphSerializer::ReadSceneDataAttr(const std::string& name)
+{
+	SceneData value;
+	value.Path = ReadStrAttr(name + ".Path");
+	return value;
+}
+
+ShaderData NodeGraphSerializer::ReadShaderDataAttr(const std::string& name)
+{
+	ShaderData value;
+	value.Path = ReadStrAttr(name + ".Path");
 	return value;
 }

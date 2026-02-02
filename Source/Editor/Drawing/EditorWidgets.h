@@ -2,10 +2,17 @@
 
 #include <string>
 #include <vector>
+#include <functional>
+
+struct Variable;
 
 namespace EditorWidgets
 {
 	void InputText(const char* label, std::string& text, bool disabled = false);
+	bool ComboBox(const char* label, uint32_t& selectedItem, uint32_t minValue, uint32_t maxValue, const std::function<const char* (uint32_t)>& toString);
+
+	void DrawVariable(const char* label, const Variable& variable);
+	void InputVariable(const char* label, Variable& variable);
 
 	class MenuItem
 	{

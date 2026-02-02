@@ -279,31 +279,30 @@ class VariableEditorNode : public EvaluationEditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
 public:
-	VariableEditorNode(EditorNodeType nodeType, PinType outputType) :
-		EvaluationEditorNode("Get " + ToString(outputType), nodeType)
+	VariableEditorNode(VariableID id, VariableType varType):
+		EvaluationEditorNode("Get ", EditorNodeType::Variable),
+		m_VarID(id),
+		m_VarType(varType)
 	{
-		AddPin(EditorNodePin::CreateOutputPin(ToString(outputType), outputType));
-		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		PinType pinType = ToPinType(m_VarType);
+		AddPin(EditorNodePin::CreateOutputPin(ToString(pinType), pinType));
 	}
 
-	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }
+	void RefreshLabel(const VariablePool& variablePool)
+	{
+		ChangeLabel("Get " + variablePool.GetRef(m_VarID).Name);
+	}
+
+	VariableID GetVariableID() const { return m_VarID; }
+	
+	VariableEditorNode* Clone() const override
+	{
+		return new VariableEditorNode(m_VarID, m_VarType);
+	}
 
 private:
-	unsigned m_NamePin;
-};
-
-template<EditorNodeType nodeType, PinType outputType>
-class VariableEditorNodeT : public VariableEditorNode
-{
-public:
-	VariableEditorNodeT() :
-		VariableEditorNode(nodeType, outputType) {}
-
-	// Check other inherited classes if changing this method
-	EditorNode* Clone() const override
-	{
-		return new VariableEditorNodeT<nodeType, outputType>();
-	}
+	VariableID m_VarID;
+	VariableType m_VarType;
 };
 
 enum class BinaryOperatorType
@@ -582,47 +581,36 @@ private:
 	unsigned m_B;
 };
 
-using VarBoolEditorNode = VariableEditorNodeT<EditorNodeType::VarBool, PinType::Bool>;
 using BoolBinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::BoolBinaryOperator, BinaryOperatorType::Logic, PinType::Bool, PinType::Bool>;
 
-using VarIntEditorNode = VariableEditorNodeT<EditorNodeType::VarInt, PinType::Int>;
 using IntBinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::IntBinaryOperator, BinaryOperatorType::Arithemtic, PinType::Int, PinType::Int>;
 using IntComparisonOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::IntComparisonOperator, BinaryOperatorType::Comparison, PinType::Int, PinType::Bool>;
 
 using FloatEditorNode = FloatNEditorNodeT<EditorNodeType::Float, PinType::Float, 1>;
-using VarFloatEditorNode = VariableEditorNodeT<EditorNodeType::VarFloat, PinType::Float>;
 using FloatBinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::FloatBinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float, PinType::Float>;
 using FloatComparisonOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::FloatComparisonOperator, BinaryOperatorType::Comparison, PinType::Float, PinType::Bool>;
 
 using Float2EditorNode = FloatNEditorNodeT<EditorNodeType::Float2, PinType::Float2, 2>;
 using CreateFloat2EditorNode = CreateVectorEditorNodeT<EditorNodeType::CreateFloat2, PinType::Float, PinType::Float2, 2>;
 using SplitFloat2EditorNode = SplitVectorEditorNodeT<EditorNodeType::SplitFloat2, PinType::Float2, PinType::Float, 2>;
-using VarFloat2EditorNode = VariableEditorNodeT<EditorNodeType::VarFloat2, PinType::Float2>;
 using Float2BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::Float2BinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float2, PinType::Float2>;
 
 using Float3EditorNode = FloatNEditorNodeT<EditorNodeType::Float3, PinType::Float3, 3>;
 using CreateFloat3EditorNode = CreateVectorEditorNodeT<EditorNodeType::CreateFloat3, PinType::Float, PinType::Float3, 3>;
 using SplitFloat3EditorNode = SplitVectorEditorNodeT<EditorNodeType::SplitFloat3, PinType::Float3, PinType::Float, 3>;
-using VarFloat3EditorNode = VariableEditorNodeT<EditorNodeType::VarFloat3, PinType::Float3>;
 using Float3BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::Float3BinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float3, PinType::Float3>;
 
 using Float4EditorNode = FloatNEditorNodeT<EditorNodeType::Float4, PinType::Float4, 4>;
 using CreateFloat4EditorNode = CreateVectorEditorNodeT<EditorNodeType::CreateFloat4, PinType::Float, PinType::Float4, 4>;
 using SplitFloat4EditorNode = SplitVectorEditorNodeT<EditorNodeType::SplitFloat4, PinType::Float4, PinType::Float, 4>;
-using VarFloat4EditorNode = VariableEditorNodeT<EditorNodeType::VarFloat4, PinType::Float4>;
 using Float4BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::Float4BinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float4, PinType::Float4>;
 
 using Float4x4EditorNode = FloatNxNEditorNodeT<EditorNodeType::Float4x4, PinType::Float4x4, 4, 4>;
-using VarFloat4x4EditorNode = VariableEditorNodeT<EditorNodeType::VarFloat4x4, PinType::Float4x4>;
 using Float4x4BinaryOperatorEditorNode = BinaryOperatorEditorNodeT<EditorNodeType::Float4x4BinaryOperator, BinaryOperatorType::Arithemtic, PinType::Float4x4, PinType::Float4x4>;
 
 using NormalizeFloat2EditorNode = NormalizeEditorNode<EditorNodeType::NormalizeFloat2, PinType::Float2>;
 using NormalizeFloat3EditorNode = NormalizeEditorNode<EditorNodeType::NormalizeFloat3, PinType::Float3>;
 using NormalizeFloat4EditorNode = NormalizeEditorNode<EditorNodeType::NormalizeFloat4, PinType::Float4>;
-
-using GetTextureEditorNode = VariableEditorNodeT<EditorNodeType::GetTexture, PinType::Texture>;
-using GetShaderEditorNode = VariableEditorNodeT<EditorNodeType::GetShader, PinType::Shader>;
-using GetSceneEditorNode = VariableEditorNodeT<EditorNodeType::GetScene, PinType::Scene>;
 
 class GetMeshEditorNode : public EvaluationEditorNode
 {

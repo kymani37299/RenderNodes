@@ -4,7 +4,9 @@
 
 #include "../Common.h"
 #include "../NodeGraph/NodeGraph.h"
+#include "../NodeGraph/VariablePool.h"
 #include "Drawing/EditorContextMenu.h"
+#include "Drawing/EditorDialog.h"
 
 class NodeGraphCommandExecutor;
 
@@ -20,7 +22,7 @@ public:
     void HandleKeyPressed(int key, int mods);
 
     void Unload();
-    void Load(NodeGraph* nodeGraph);
+    void Load(NodeGraph* nodeGraph, VariablePool* variablePool);
 
     void LoadNodePositions();
     void SaveNodePositions();
@@ -33,7 +35,8 @@ private:
 
     void RenderContextMenus();
     void RenderNodePopups();
-
+    
+    void RenderVariableWindow();
 private:
     ImNode::EditorContext* m_EditorContext = nullptr;
 
@@ -42,18 +45,20 @@ private:
     Ptr<LinkContextMenu> m_LinkMenu;
     Ptr<PinContextMenu> m_PinMenu;
 
+    Ptr<EditorDialog> m_CurrentDialog;
+
 protected:
     bool m_CustomNodeEditor = false;
     NodeGraph* m_NodeGraph = nullptr;
+    VariablePool* m_VariablePool = nullptr;
     Ptr<NodeGraphCommandExecutor> m_CommandExecutor;
 };
-
 
 class CustomNodePipelineEditor : public RenderPipelineEditor
 {
 public:
-    CustomNodePipelineEditor(); // Init for new node
-    CustomNodePipelineEditor(CustomEditorNode* node); // Init for edit node
+    CustomNodePipelineEditor(VariablePool* variablePool); // Init for new node
+    CustomNodePipelineEditor(CustomEditorNode* node, VariablePool* variablePool); // Init for edit node
     
     ~CustomNodePipelineEditor();
 

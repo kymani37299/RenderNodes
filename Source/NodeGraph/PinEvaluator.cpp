@@ -1,5 +1,17 @@
 #include "PinEvaluator.h"
 
+template<typename VariableTypeT>
+ValueNode<VariableTypeT>* EvaluateVariable(VariableEditorNode* node)
+{
+	return new VariableValueNode<VariableTypeT>(node->GetVariableID());
+}
+
+template<typename RenderResourceTypeT>
+ValueNode<RenderResourceTypeT>* EvaluateRenderResourceVariable(VariableEditorNode* node)
+{
+	return new RenderResourceVariableValueNodeT<RenderResourceTypeT>(node->GetVariableID());
+}
+
 BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<bool>{ pin.ConstantValue.B };
@@ -17,7 +29,7 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 	switch (node->GetType())
 	{
 	case EditorNodeType::Bool: return EvaluateBool(static_cast<BoolEditorNode*>(node));
-	case EditorNodeType::VarBool: return EvaluateVarBool(static_cast<VarBoolEditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<bool>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::BoolBinaryOperator: return EvaluateBoolBinaryOperator(static_cast<BoolBinaryOperatorEditorNode*>(node));
 	case EditorNodeType::IntComparisonOperator: return EvaluateIntComparisonOperator(static_cast<IntComparisonOperatorEditorNode*>(node));
 	case EditorNodeType::FloatComparisonOperator: return EvaluateFloatComparisonOperator(static_cast<FloatComparisonOperatorEditorNode*>(node));
@@ -47,7 +59,7 @@ IntValueNode* PinEvaluator::EvaluateInt(EditorNodePin pin)
 	switch (node->GetType())
 	{
 	case EditorNodeType::Int: return EvaluateInt(static_cast<IntEditorNode*>(node));
-	case EditorNodeType::VarInt: return EvaluateVarInt(static_cast<VarIntEditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<int>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::IntBinaryOperator: return EvaluateIntBinaryOperator(static_cast<IntBinaryOperatorEditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<IntValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<IntValueNode>(static_cast<CustomEditorNode*>(node), pin);
@@ -103,7 +115,7 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 	case EditorNodeType::OnUpdate: return EvaluateDeltaTime(static_cast<OnUpdateEditorNode*>(node));
 	case EditorNodeType::Float: return EvaluateFloat(static_cast<FloatEditorNode*>(node));
 	case EditorNodeType::FloatBinaryOperator: return EvaluateFloatBinaryOperator(static_cast<FloatBinaryOperatorEditorNode*>(node));
-	case EditorNodeType::VarFloat: return EvaluateVarFloat(static_cast<VarFloatEditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<float>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::SplitFloat2: return EvaluateSplitFloat2(static_cast<SplitFloat2EditorNode*>(node), pin);
 	case EditorNodeType::SplitFloat3: return EvaluateSplitFloat3(static_cast<SplitFloat3EditorNode*>(node), pin);
 	case EditorNodeType::SplitFloat4: return EvaluateSplitFloat4(static_cast<SplitFloat4EditorNode*>(node), pin);
@@ -134,7 +146,7 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 	{
 	case EditorNodeType::Float2: return EvaluateFloat2(static_cast<Float2EditorNode*>(node));
 	case EditorNodeType::CreateFloat2: return EvaluateCreateFloat2(static_cast<CreateFloat2EditorNode*>(node));
-	case EditorNodeType::VarFloat2: return EvaluateVarFloat2(static_cast<VarFloat2EditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<Float2>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Float2BinaryOperator: return EvaluateFloat2BinaryOperator(static_cast<Float2BinaryOperatorEditorNode*>(node));
 	case EditorNodeType::NormalizeFloat2: return EvaluateNormalizeFloat2(static_cast<NormalizeFloat2EditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<Float2ValueNode>(static_cast<PinEditorNode*>(node));
@@ -164,7 +176,7 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 	{
 	case EditorNodeType::Float3: return EvaluateFloat3(static_cast<Float3EditorNode*>(node));
 	case EditorNodeType::CreateFloat3: return EvaluateCreateFloat3(static_cast<CreateFloat3EditorNode*>(node));
-	case EditorNodeType::VarFloat3: return EvaluateVarFloat3(static_cast<VarFloat3EditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<Float3>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Float3BinaryOperator: return EvaluateFloat3BinaryOperator(static_cast<Float3BinaryOperatorEditorNode*>(node));
 	case EditorNodeType::NormalizeFloat3: return EvaluateNormalizeFloat3(static_cast<NormalizeFloat3EditorNode*>(node));
 	case EditorNodeType::CrossProductOperation: return EvaluateCrossProductOperation(static_cast<CrossProductOperationEditorNode*>(node));
@@ -195,7 +207,7 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 	{
 	case EditorNodeType::Float4: return EvaluateFloat4(static_cast<Float4EditorNode*>(node));
 	case EditorNodeType::CreateFloat4: return EvaluateCreateFloat4(static_cast<CreateFloat4EditorNode*>(node));
-	case EditorNodeType::VarFloat4: return EvaluateVarFloat4(static_cast<VarFloat4EditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<Float4>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Float4BinaryOperator: return EvaluateFloat4BinaryOperator(static_cast<Float4BinaryOperatorEditorNode*>(node));
 	case EditorNodeType::NormalizeFloat4: return EvaluateNormalizeFloat4(static_cast<NormalizeFloat4EditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<Float4ValueNode>(static_cast<PinEditorNode*>(node));
@@ -224,7 +236,7 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(EditorNodePin pin)
 	switch (node->GetType())
 	{
 	case EditorNodeType::Float4x4: return EvaluateFloat4x4(static_cast<Float4x4EditorNode*>(node));
-	case EditorNodeType::VarFloat4x4: return EvaluateVarFloat4x4(static_cast<VarFloat4x4EditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateVariable<Float4x4>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Float4x4BinaryOperator: return EvaluateFloat4x4BinaryOperator(static_cast<Float4x4BinaryOperatorEditorNode*>(node));
 	case EditorNodeType::Transform_Rotate_Float4x4: return EvaluateFloat4x4Rotate(static_cast<Float4x4RotationTransformEditorNode*>(node));
 	case EditorNodeType::Transform_Translate_Float4x4: return EvaluateFloat4x4Translate(static_cast<Float4x4TranslationTransformEditorNode*>(node));
@@ -254,7 +266,7 @@ TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
-	case EditorNodeType::GetTexture: return EvaluateGetTexture(static_cast<GetTextureEditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateRenderResourceVariable<Texture*>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<TextureValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<TextureValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
@@ -327,7 +339,7 @@ ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
-	case EditorNodeType::GetShader: return EvaluateGetShader(static_cast<GetShaderEditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateRenderResourceVariable<Shader*>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<ShaderValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<ShaderValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
@@ -423,7 +435,7 @@ SceneValueNode* PinEvaluator::EvaluateScene(EditorNodePin pin)
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
 	{
-	case EditorNodeType::GetScene: return EvaluateGetScene(static_cast<GetSceneEditorNode*>(node));
+	case EditorNodeType::Variable: return EvaluateRenderResourceVariable<Scene*>(static_cast<VariableEditorNode*>(node));
 	case EditorNodeType::Pin: return EvaluatePinNode<SceneValueNode>(static_cast<PinEditorNode*>(node));
 	case EditorNodeType::Custom: return EvaluateCustomNode<SceneValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
@@ -438,12 +450,6 @@ IntValueNode* PinEvaluator::EvaluateInt(IntEditorNode* node)
 	return new ConstantValueNode<int>(node->GetValue());
 }
 
-IntValueNode* PinEvaluator::EvaluateVarInt(VarIntEditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<int>(nameNode);
-}
-
 IntValueNode* PinEvaluator::EvaluateIntBinaryOperator(IntBinaryOperatorEditorNode* node)
 {
 	IntValueNode* a = EvaluateInt(node->GetAPin());
@@ -456,12 +462,6 @@ BoolValueNode* PinEvaluator::EvaluateIntComparisonOperator(IntComparisonOperator
 	IntValueNode* a = EvaluateInt(node->GetAPin());
 	IntValueNode* b = EvaluateInt(node->GetBPin());
 	return new ComparisonValueNode<int>{ a, b, node->GetOp() };
-}
-
-BoolValueNode* PinEvaluator::EvaluateVarBool(VarBoolEditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<bool>(nameNode);
 }
 
 BoolValueNode* PinEvaluator::EvaluateBoolBinaryOperator(BoolBinaryOperatorEditorNode* node)
@@ -491,12 +491,6 @@ BoolValueNode* PinEvaluator::EvaluateBool(BoolEditorNode* node)
 FloatValueNode* PinEvaluator::EvaluateFloat(FloatEditorNode* node)
 {
 	return new ConstantValueNode<float>(node->GetFloat());
-}
-
-FloatValueNode* PinEvaluator::EvaluateVarFloat(VarFloatEditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<float>(nameNode);
 }
 
 FloatValueNode* PinEvaluator::EvaluateSplitFloat2(SplitFloat2EditorNode* node, const EditorNodePin& pin)
@@ -538,7 +532,7 @@ FloatValueNode* PinEvaluator::EvaluateFloatBinaryOperator(FloatBinaryOperatorEdi
 
 FloatValueNode* PinEvaluator::EvaluateDeltaTime(OnUpdateEditorNode* node)
 {
-	return new VariableValueNode<float>(new ConstantValueNode<std::string>("DT"));
+	return new VariableValueNode<float>(VariablePool::ID_DT);
 }
 
 Float2ValueNode* PinEvaluator::EvaluateFloat2(Float2EditorNode* node)
@@ -551,12 +545,6 @@ Float2ValueNode* PinEvaluator::EvaluateCreateFloat2(CreateFloat2EditorNode* node
 	ValueNode<float>* x = EvaluateFloat(node->GetInputPin(0));
 	ValueNode<float>* y = EvaluateFloat(node->GetInputPin(1));
 	return new CreateVectorValueNode<Float2, float, 2>({ x,y });
-}
-
-Float2ValueNode* PinEvaluator::EvaluateVarFloat2(VarFloat2EditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Float2>(nameNode);
 }
 
 Float2ValueNode* PinEvaluator::EvaluateFloat2BinaryOperator(Float2BinaryOperatorEditorNode* node)
@@ -585,12 +573,6 @@ Float3ValueNode* PinEvaluator::EvaluateCreateFloat3(CreateFloat3EditorNode* node
 	return new CreateVectorValueNode<Float3, float, 3>({ x,y, z });
 }
 
-Float3ValueNode* PinEvaluator::EvaluateVarFloat3(VarFloat3EditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Float3>(nameNode);
-}
-
 Float3ValueNode* PinEvaluator::EvaluateFloat3BinaryOperator(Float3BinaryOperatorEditorNode* node)
 {
 	Float3ValueNode* a = EvaluateFloat3(node->GetAPin());
@@ -614,12 +596,6 @@ Float3ValueNode* PinEvaluator::EvaluateCrossProductOperation(CrossProductOperati
 Float4ValueNode* PinEvaluator::EvaluateFloat4(Float4EditorNode* node)
 {
 	return new ConstantValueNode<Float4>(node->GetFloat4());
-}
-
-Float4ValueNode* PinEvaluator::EvaluateVarFloat4(VarFloat4EditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Float4>(nameNode);
 }
 
 Float4ValueNode* PinEvaluator::EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* node)
@@ -647,12 +623,6 @@ Float4ValueNode* PinEvaluator::EvaluateCreateFloat4(CreateFloat4EditorNode* node
 Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(Float4x4EditorNode* node)
 {
 	return new ConstantValueNode<Float4x4>(node->GetFloat4x4());
-}
-
-Float4x4ValueNode* PinEvaluator::EvaluateVarFloat4x4(VarFloat4x4EditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Float4x4>(nameNode);
 }
 
 Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4BinaryOperator(Float4x4BinaryOperatorEditorNode* node)
@@ -702,12 +672,6 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4Perspective(Float4x4Perspective
 	return new Float4x4PerspectiveValueNode{ fov, aspect, znear, zfar };
 }
 
-TextureValueNode* PinEvaluator::EvaluateGetTexture(GetTextureEditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Texture*>(nameNode);
-}
-
 MeshValueNode* PinEvaluator::EvaluateGetCubeMesh(GetCubeMeshEditorNode* node)
 {
 	ValueNodeExtraInfo extraInfo;
@@ -728,12 +692,6 @@ MeshValueNode* PinEvaluator::EvaluateGetMesh(GetMeshEditorNode* node)
 	extraInfo.MeshVertexBits.Normal = node->GetNormalBit();
 	extraInfo.MeshVertexBits.Tangent = node->GetTangentBit();
 	return new GetMeshValueNode(sceneObjectNode, extraInfo);
-}
-
-ShaderValueNode* PinEvaluator::EvaluateGetShader(GetShaderEditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Shader*>(nameNode);
 }
 
 BindTableValueNode* PinEvaluator::EvaluateBindTable(BindTableEditorNode* node)
@@ -791,13 +749,6 @@ RenderStateValueNode* PinEvaluator::EvaluateRenderState(RenderStateEditorNode* n
 
 SceneObjectValueNode* PinEvaluator::EvaluateForEachSceneObject(ForEachSceneObjectEditorNode* node)
 {
-	const std::string iteratorName = ExecutionPrivate::GetIteratorName(node->GetSceneObjectPin().ID);
-	StringValueNode* iteratorNameNode = new ConstantValueNode<std::string>{ iteratorName };
-	return new VariableValueNode<SceneObject*>{ iteratorNameNode };
-}
-
-SceneValueNode* PinEvaluator::EvaluateGetScene(GetSceneEditorNode* node)
-{
-	StringValueNode* nameNode = EvaluateString(node->GetNamePin());
-	return new VariableValueNode<Scene*>(nameNode);
+	const PinID sceneObjectiteratorPin = node->GetSceneObjectPin().ID;
+	return new IteratorValueNode<SceneObject*>{ sceneObjectiteratorPin };
 }

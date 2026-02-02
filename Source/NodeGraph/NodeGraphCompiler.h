@@ -27,7 +27,7 @@ class NodeGraphCompiler
 	};
 
 public:
-	CompiledPipeline Compile(const NodeGraph& graph);
+	CompiledPipeline Compile(const NodeGraph& graph, const VariablePool& variablePool);
 	const std::vector<CompilerError>& GetCompileErrors() const { return m_CompilationErrors; }
 
 private:
@@ -40,17 +40,14 @@ private:
 	ExecutorNode* CompileIfNode(IfEditorNode* ifNode, Context& context);
 	ExecutorNode* CompilePrintNode(PrintEditorNode* printNode, Context& context);
 	ExecutorNode* CompileAsignVariableNode(AsignVariableEditorNode* asignFloatNode, Context& context);
-	ExecutorNode* CompileCreateTextureNode(CreateTextureEditorNode* createTextureNode, Context& context);
 	ExecutorNode* CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode, Context& context);
 	ExecutorNode* CompilePresentTextureTargetNode(PresentTextureEditorNode* presentTextureNode, Context& context);
-	ExecutorNode* CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode, Context& context);
-	ExecutorNode* CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode, Context& context);
 	ExecutorNode* CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode, Context& context);
-	ExecutorNode* CompileLoadSceneNode(LoadSceneEditorNode* loadSceneObjectNode, Context& context);
 	ExecutorNode* CompileForEachSceneObjectNode(ForEachSceneObjectEditorNode* forEachSceneObjectNode, Context& context);
 	
 private:
 	const NodeGraph* GetNodeGraph() const { return m_ContextStack.top().Graph; }
+	const VariablePool* GetVariablePool() const { return m_ContextStack.top().VariablePool; }
 	CustomEditorNode* GetParentNode() const { return m_ContextStack.top().Parent; }
 
 private:

@@ -249,7 +249,7 @@ void App::RenderFrame()
 
 			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 			
-			m_NodeGraph->RefreshCustomNodes();
+			m_NodeGraph->RefreshNodes(m_VariablePool);
 		}
 
 		if (!canBeCreated && !editNode)
@@ -355,7 +355,8 @@ void App::NewDocument()
 
 	IDGen::Init(1);
 	m_NodeGraph = Ptr<NodeGraph>(NodeGraph::CreateDefaultNodeGraph());
-	m_Editor->Load(m_NodeGraph.get());
+	m_VariablePool = {};
+	m_Editor->Load(m_NodeGraph.get(), &m_VariablePool);
 	m_Editor->InitializeDefaultNodePositions();
 	
 	m_CurrentLoadedFile = "";
@@ -372,7 +373,8 @@ void App::LoadDocument()
 	{
 		NodeGraph* loadedNodeGraph = new NodeGraph{};
 		std::vector<CustomEditorNode*> customNodes{};
-		const UniqueID firstID = m_Serializer->Deserialize(path, *loadedNodeGraph, customNodes);
+		VariablePool loadedVariablePool{};
+		const UniqueID firstID = m_Serializer->Deserialize(path, *loadedNodeGraph, loadedVariablePool, customNodes);
 		IDGen::Init(firstID);
 
 		if (firstID)
@@ -384,9 +386,12 @@ void App::LoadDocument()
 
 			const std::string nodeEditorConfigPath = GetPathWithoutExtension(path) + ".json";
 			std::filesystem::copy(nodeEditorConfigPath, "NodeEditor.json", std::filesystem::copy_options::overwrite_existing);
-			m_Editor->Load(loadedNodeGraph);
+			
+			m_VariablePool = loadedVariablePool;
+			m_Editor->Load(loadedNodeGraph, &m_VariablePool);
 			m_CurrentLoadedFile = path;
 			m_NodeGraph = Ptr<NodeGraph>(loadedNodeGraph);
+			m_NodeGraph->RefreshNodes(m_VariablePool);
 			m_LastExecutedCommandCount = 0;
 			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 		}
@@ -413,7 +418,7 @@ void App::SaveDocument()
 
 	if (hasPath)
 	{
-		m_Serializer->Serialize(path, *m_NodeGraph);
+		m_Serializer->Serialize(path, *m_NodeGraph, m_VariablePool);
 
 		const std::string jsonDest = GetPathWithoutExtension(path) + ".json";
 		std::filesystem::copy("NodeEditor.json", jsonDest, std::filesystem::copy_options::overwrite_existing);
@@ -428,7 +433,7 @@ void App::SaveAsDocument()
 	std::string path;
 	if (FileDialog::SaveRenderNodeFile(path))
 	{
-		m_Serializer->Serialize(path, *m_NodeGraph);
+		m_Serializer->Serialize(path, *m_NodeGraph, m_VariablePool);
 
 		const std::string jsonDest = GetPathWithoutExtension(path) + ".json";
 		std::filesystem::copy("NodeEditor.json", jsonDest, std::filesystem::copy_options::overwrite_existing);
@@ -441,7 +446,7 @@ void App::CompileAndRun()
 {
 	m_ErrorHandler->Clear();
 
-	CompiledPipeline pipeline = m_Compiler->Compile(*m_NodeGraph);
+	CompiledPipeline pipeline = m_Compiler->Compile(*m_NodeGraph, m_VariablePool);
 	bool compilationSuccessful = m_Compiler->GetCompileErrors().empty();
 	if (compilationSuccessful)
 	{
@@ -511,12 +516,12 @@ void App::ProcessChangeModeRequest(const AppRequest& request)
 
 		if (customNode != nullptr)
 		{
-			customNode->GetNodeGraph()->RefreshCustomNodes();
-			m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ customNode });
+			customNode->GetNodeGraph()->RefreshNodes(m_VariablePool);
+			m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ customNode, &m_VariablePool });
 		}
 		else if (request.ChangeMode.CustomNodeName == "")
 		{
-			m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ });
+			m_CustomNodeEditor.reset(new CustomNodePipelineEditor{ &m_VariablePool });
 		}
 		else
 		{
@@ -526,7 +531,7 @@ void App::ProcessChangeModeRequest(const AppRequest& request)
 	else if(m_Mode == AppMode::Editor)
 	{
 		m_CustomNodeEditor = nullptr;
-		m_NodeGraph->RefreshCustomNodes();
+		m_NodeGraph->RefreshNodes(m_VariablePool);
 	}
 	else if (m_Mode == AppMode::Run)
 	{

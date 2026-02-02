@@ -24,7 +24,7 @@ ExecutionEditorNode* NodeGraphCompiler::GetNextExecutorNode(ExecutionEditorNode*
 		};
 		customNode->GetNodeGraph()->ForEachNode(fn);
 
-		m_ContextStack.push({ customNode->GetNodeGraph(), customNode });
+		m_ContextStack.push({ customNode->GetNodeGraph(), GetVariablePool(), customNode });
 	} break;
 	case EditorNodeType::Pin:
 	{
@@ -71,20 +71,20 @@ ExecutionEditorNode* NodeGraphCompiler::GetNextExecutorNode(ExecutionEditorNode*
 	if (!exNode)
 	{
 		ASSERT(0);
-		exNode = new AsignFloatEditorNode{}; // Some random node so we don't crash
+		exNode = new IfEditorNode{}; // Some random node so we don't crash
 		m_CompilationErrors.push_back({ "Error in tracing flow of node execution.", executorNode->GetID() });
 	}
 
 	return exNode;
 }
 
-CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph)
+CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph, const VariablePool& variablePool)
 {
 	m_CompilationErrors.clear();
 
 	Context context;
 
-	m_ContextStack.push(NodeGraphCompilerContext{ &graph });
+	m_ContextStack.push(NodeGraphCompilerContext{ &graph, &variablePool });
 
 	CompiledPipeline pipeline{};
 	pipeline.OnStartNode = Compile(GetNodeGraph()->GetOnStartNode(), context);
@@ -121,6 +121,7 @@ CompiledPipeline NodeGraphCompiler::Compile(const NodeGraph& graph)
 	m_ContextStack.pop();
 
 	pipeline.EditorLinks = context.EditorLinks;
+	pipeline.VariablePool = variablePool;
 	return pipeline;
 }
 
@@ -149,21 +150,11 @@ ExecutorNode* NodeGraphCompiler::CompileExecutorNode(ExecutionEditorNode* execut
 	{
 		COMPILE_NODE(Print, CompilePrintNode, PrintEditorNode);
 		COMPILE_NODE(If, CompileIfNode, IfEditorNode);
-		COMPILE_NODE(AsignFloat, CompileAsignVariableNode, AsignVariableEditorNode);
-		COMPILE_NODE(AsignFloat2, CompileAsignVariableNode, AsignVariableEditorNode);
-		COMPILE_NODE(AsignFloat3, CompileAsignVariableNode, AsignVariableEditorNode);
-		COMPILE_NODE(AsignFloat4, CompileAsignVariableNode, AsignVariableEditorNode);
-		COMPILE_NODE(AsignFloat4x4, CompileAsignVariableNode, AsignVariableEditorNode);
-		COMPILE_NODE(AsignBool, CompileAsignVariableNode, AsignVariableEditorNode);
-		COMPILE_NODE(AsignInt, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(ClearRenderTarget, CompileClearRenderTargetNode, ClearRenderTargetEditorNode);
-		COMPILE_NODE(CreateTexture, CompileCreateTextureNode, CreateTextureEditorNode);
-		COMPILE_NODE(LoadTexture, CompileLoadTextureNode, LoadTextureEditorNode);
-		COMPILE_NODE(LoadShader, CompileLoadShaderNode, LoadShaderEditorNode);
 		COMPILE_NODE(PresentTexture, CompilePresentTextureTargetNode, PresentTextureEditorNode);
 		COMPILE_NODE(DrawMesh, CompileDrawMeshNode, DrawMeshEditorNode);
-		COMPILE_NODE(LoadScene, CompileLoadSceneNode, LoadSceneEditorNode);
 		COMPILE_NODE(ForEachSceneObject, CompileForEachSceneObjectNode, ForEachSceneObjectEditorNode);
+		COMPILE_NODE(AsignVariable, CompileAsignVariableNode, AsignVariableEditorNode);
 		COMPILE_NODE(OnStart, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(OnUpdate, CompileEmptyNode, ExecutionEditorNode);
 		COMPILE_NODE(OnKeyPressed, CompileEmptyNode, ExecutionEditorNode);
@@ -244,33 +235,34 @@ ExecutorNode* NodeGraphCompiler::CompilePrintNode(PrintEditorNode* printNode, Co
 ExecutorNode* NodeGraphCompiler::CompileAsignVariableNode(AsignVariableEditorNode* node, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
-	StringValueNode* nameNode = pinEvaluator.EvaluateString(node->GetNamePin());
 
-	const auto& asignValuePin = node->GetValuePin();
-	switch (asignValuePin.Type)
+	const VariableID varID = node->GetVariableID();
+	const EditorNodePin& valuePin = node->GetValuePin();
+	const Variable& variable = GetVariablePool()->GetRef(varID);
+	ASSERT(variable.Type != VariableType::Invalid);
+
+	switch (variable.Type)
 	{
-	case PinType::Float: return new AsignVariableExecutorNode<float>(nameNode, pinEvaluator.EvaluateFloat(asignValuePin));
-	case PinType::Float2: return new AsignVariableExecutorNode<Float2>(nameNode, pinEvaluator.EvaluateFloat2(asignValuePin));
-	case PinType::Float3: return new AsignVariableExecutorNode<Float3>(nameNode, pinEvaluator.EvaluateFloat3(asignValuePin));
-	case PinType::Float4: return new AsignVariableExecutorNode<Float4>(nameNode, pinEvaluator.EvaluateFloat4(asignValuePin));
-	case PinType::Float4x4: return new AsignVariableExecutorNode<Float4x4>(nameNode, pinEvaluator.EvaluateFloat4x4(asignValuePin));
-	case PinType::Bool:	return new AsignVariableExecutorNode<bool>(nameNode, pinEvaluator.EvaluateBool(asignValuePin));
-	case PinType::Int:	return new AsignVariableExecutorNode<int>(nameNode, pinEvaluator.EvaluateInt(asignValuePin));
+	case VariableType::Bool:		return new AsignVariableExecutorNode<bool>(varID, pinEvaluator.EvaluateBool(valuePin));
+	case VariableType::Int:			return new AsignVariableExecutorNode<int>(varID, pinEvaluator.EvaluateInt(valuePin));
+	case VariableType::Float:		return new AsignVariableExecutorNode<float>(varID, pinEvaluator.EvaluateFloat(valuePin));
+	case VariableType::Float2:		return new AsignVariableExecutorNode<Float2>(varID, pinEvaluator.EvaluateFloat2(valuePin));
+	case VariableType::Float3:		return new AsignVariableExecutorNode<Float3>(varID, pinEvaluator.EvaluateFloat3(valuePin));
+	case VariableType::Float4:		return new AsignVariableExecutorNode<Float4>(varID, pinEvaluator.EvaluateFloat4(valuePin));
+	case VariableType::Float4x4:	return new AsignVariableExecutorNode<Float4x4>(varID, pinEvaluator.EvaluateFloat4x4(valuePin));
+
+	case VariableType::Shader:
+	case VariableType::Texture:
+	case VariableType::Scene:
+		ASSERT_M(0, "Tring to compile AsignVariableEditorNode for the variable types that shouldn't be asigned.");
+		break;
+	case VariableType::Invalid:
+		break;
 	default:
 		NOT_IMPLEMENTED;
+		break;
 	}
 	return new EmptyExecutorNode{};
-}
-
-ExecutorNode* NodeGraphCompiler::CompileCreateTextureNode(CreateTextureEditorNode* createTextureNode, Context& context)
-{
-	PinEvaluator pinEvaluator{ m_ContextStack };
-	StringValueNode* nameNode = pinEvaluator.EvaluateString(createTextureNode->GetNamePin());
-	IntValueNode* widthNode = pinEvaluator.EvaluateInt(createTextureNode->GetWidthPin());
-	IntValueNode* heightNode = pinEvaluator.EvaluateInt(createTextureNode->GetHeightPin());
-	BoolValueNode* framebufferNode = pinEvaluator.EvaluateBool(createTextureNode->GetFramebufferPin());
-	BoolValueNode* depthStencilNode = pinEvaluator.EvaluateBool(createTextureNode->GetDepthStencilPin());
-	return new CreateTextureExecutorNode{ nameNode, widthNode, heightNode, framebufferNode, depthStencilNode };
 }
 
 ExecutorNode* NodeGraphCompiler::CompileClearRenderTargetNode(ClearRenderTargetEditorNode* clearRtNode, Context& context)
@@ -288,20 +280,6 @@ ExecutorNode* NodeGraphCompiler::CompilePresentTextureTargetNode(PresentTextureE
 	return new PresentTextureExecutorNode{ textureNode };
 }
 
-ExecutorNode* NodeGraphCompiler::CompileLoadTextureNode(LoadTextureEditorNode* loadTextureNode, Context& context)
-{
-	PinEvaluator pinEvaluator{ m_ContextStack };
-	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadTextureNode->GetNamePin());
-	return new LoadTextureExecutorNode{ nameNode, loadTextureNode->GetPath() };
-}
-
-ExecutorNode* NodeGraphCompiler::CompileLoadShaderNode(LoadShaderEditorNode* loadShaderNode, Context& context)
-{
-	PinEvaluator pinEvaluator{ m_ContextStack };
-	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadShaderNode->GetNamePin());
-	return new LoadShaderExecutorNode{ nameNode, loadShaderNode->GetPath() };
-}
-
 ExecutorNode* NodeGraphCompiler::CompileDrawMeshNode(DrawMeshEditorNode* drawMeshNode, Context& context)
 {
 	PinEvaluator pinEvaluator{ m_ContextStack };
@@ -312,13 +290,6 @@ ExecutorNode* NodeGraphCompiler::CompileDrawMeshNode(DrawMeshEditorNode* drawMes
 	RenderStateValueNode* renderStateNode = pinEvaluator.EvaluatePinOptional<RenderStateValueNode, &PinEvaluator::EvaluateRenderState>(drawMeshNode->GetRenderStatePin());
 
 	return new DrawMeshExecutorNode{ framebufferNode, shaderNode, meshNode, bindTableNode, renderStateNode };
-}
-
-ExecutorNode* NodeGraphCompiler::CompileLoadSceneNode(LoadSceneEditorNode* loadSceneObjectNode, Context& context)
-{
-	PinEvaluator pinEvaluator{ m_ContextStack };
-	StringValueNode* nameNode = pinEvaluator.EvaluateString(loadSceneObjectNode->GetNamePin());
-	return new LoadSceneExecutorNode{ nameNode, loadSceneObjectNode->GetPath() };
 }
 
 ExecutorNode* NodeGraphCompiler::CompileForEachSceneObjectNode(ForEachSceneObjectEditorNode* forEachSceneObjectNode, Context& context)

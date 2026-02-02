@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -104,6 +104,7 @@
     <ClCompile Include="Source\App\App.cpp" />
     <ClCompile Include="Source\App\AppConsole.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorContextMenu.cpp" />
+    <ClCompile Include="Source\Editor\Drawing\EditorDialog.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorWidgets.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
@@ -146,6 +147,7 @@
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\DataTypes.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorContextMenu.h" />
+    <ClInclude Include="Source\Editor\Drawing\EditorDialog.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorWidgets.h" />
     <ClInclude Include="Source\Editor\EditorErrorHandler.h" />
     <ClInclude Include="Source\Editor\EditorNode.h" />
@@ -165,6 +167,7 @@
     <ClInclude Include="Source\NodeGraph\NodeGraphSerializer.h" />
     <ClInclude Include="Source\IDGen.h" />
     <ClInclude Include="Source\NodeGraph\PinEvaluator.h" />
+    <ClInclude Include="Source\NodeGraph\VariablePool.h" />
     <ClInclude Include="Source\Render\Buffer.h" />
     <ClInclude Include="Source\Render\SceneLoading.h" />
     <ClInclude Include="Source\Render\Shader.h" />

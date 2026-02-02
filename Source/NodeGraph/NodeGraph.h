@@ -20,6 +20,9 @@ public:
     void RemoveNode(NodeID nodeID);
     void RemoveLink(LinkID linkID);
     void RemovePin(PinID pinID);
+
+    void RemoveAllLinks(NodeID nodeID);
+    void RemoveAllPins(NodeID nodeID);
     
     bool ContainsNode(NodeID nodeID) const;
 
@@ -38,7 +41,8 @@ public:
     OnStartEditorNode* GetOnStartNode() const;
     OnUpdateEditorNode* GetOnUpdateNode() const;
 
-    void RefreshCustomNodes();
+    void RefreshNodes(const VariablePool& variablePool);
+    void RefreshNode(EditorNode* node, const VariablePool& variablePool);
 
     template<typename Fn>
     void ForEachNode(Fn& fn) const

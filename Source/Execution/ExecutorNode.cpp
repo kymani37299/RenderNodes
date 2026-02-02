@@ -6,7 +6,6 @@
 #include "../Common.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
-#include "../Render/SceneLoading.h"
 
 namespace ExecutionPrivate
 {
@@ -262,7 +261,6 @@ void PresentTextureExecutorNode::Execute(ExecuteContext& context)
 {
 	Texture* texture = m_Texture->GetValue(context);
 	Warning(texture, "PresentTextureExecutorNode", "Input texture is null");
-	Warning(texture && texture->Flags & TF_Framebuffer, "PresentTextureExecutorNode", "Trying to present texture that doesn't have framebuffer enabled");
 	context.RenderTarget = texture;
 }
 
@@ -271,60 +269,6 @@ static T* AddToPtrVector(std::vector<Ptr<T>>& ptrVector, Ptr<T>&& ptrValue)
 {
 	ptrVector.push_back(std::move(ptrValue));
 	return ptrVector[ptrVector.size() - 1].get();
-}
-
-void LoadTextureExecutorNode::Execute(ExecuteContext& context)
-{
-	if (!m_NameNode)
-	{
-		Failure("LoadTextureExecutorNode", "Failed to load texture");
-		context.Failure = true;
-	}
-
-	const std::string name = m_NameNode->GetValue(context);
-	const unsigned varKey = Hash::Crc32(name);
-
-	SceneLoading::Loader l{};
-	context.Variables.Textures[varKey] = AddToPtrVector(context.RenderResources.Textures, l.LoadTexture(m_TexturePath, Float4{ 1.0, 0.0f, 0.25f, 1.0f }));
-}
-
-void LoadShaderExecutorNode::Execute(ExecuteContext& context)
-{
-	Shader* shader = AddToPtrVector(context.RenderResources.Shaders, Shader::Compile(m_ShaderPath));
-	if (!shader || !m_NameNode)
-	{
-		Failure("LoadShaderExecutorNode", "Failed to compile shader");
-		context.Failure = true;
-		return;
-	}
-
-	const std::string name = m_NameNode->GetValue(context);
-	const unsigned varKey = Hash::Crc32(name);
-
-	context.Variables.Shaders[varKey] = shader;
-}
-
-void CreateTextureExecutorNode::Execute(ExecuteContext& context)
-{
-	if (!m_NameNode)
-	{
-		Failure("CreateTextureExecutorNode", "Failed to get texture name");
-		context.Failure = true;
-		return;
-	}
-
-	const std::string name = m_NameNode->GetValue(context);
-	const unsigned varKey = Hash::Crc32(name);
-
-	const int width = m_WidthNode->GetValue(context);
-	const int height = m_HeightNode->GetValue(context);
-	const bool isFramebuffer = m_FramebufferNode->GetValue(context);
-	const bool isDepthStencil = m_DepthStencilNode->GetValue(context);
-
-	unsigned textureFlags = TF_None;
-	if (isFramebuffer) textureFlags |= TF_Framebuffer;
-	if (isDepthStencil) textureFlags |= TF_DepthStencil;
-	context.Variables.Textures[varKey] = AddToPtrVector(context.RenderResources.Textures, Texture::Create(width, height, textureFlags));
 }
 
 DrawMeshExecutorNode::~DrawMeshExecutorNode()
@@ -398,50 +342,12 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
-void LoadSceneExecutorNode::Execute(ExecuteContext& context)
-{
-	SceneLoading::Loader l{};
-	Ptr<SceneLoading::Scene> loadedScene = l.Load(m_MeshPath);
-
-	if (loadedScene->Objects.empty() || l.HasErrors() || !m_NameNode)
-	{
-		l.PrintErrors();
-		Failure("LoadMeshExecutorNode", "Failed to load scene");
-		context.Failure = true;
-		return;
-	}
-
-	const std::string name = m_NameNode->GetValue(context);
-	const unsigned varKey = Hash::Crc32(name);
-
-	Scene* scene = new Scene{};
-	for (SceneLoading::SceneObject& loadedObject : loadedScene->Objects)
-	{
-		auto& objectMesh = loadedObject.Mesh;
-
-		SceneObject sceneObject;
-		sceneObject.Albedo = std::move(loadedObject.Material.Albedo);
-		sceneObject.ModelTransform = loadedObject.ModelTransform;
-
-		Mesh& mesh = sceneObject.MeshData;
-		mesh.NumPrimitives = objectMesh.PrimitiveCount;
-		mesh.Positions = std::move(objectMesh.Positions);
-		mesh.Texcoords = std::move(objectMesh.Texcoords);
-		mesh.Normals = std::move(objectMesh.Normals);
-		mesh.Tangents = std::move(objectMesh.Tangents);
-		mesh.Indices = std::move(objectMesh.Indices);
-
-		scene->SceneObjects.push_back(std::move(sceneObject));
-	}
-	context.Variables.Scenes[varKey] = AddToPtrVector(context.RenderResources.Scenes, Ptr<Scene>(scene));
-}
-
 void ForEachSceneObjectExecutorNode::Execute(ExecuteContext& context)
 {
 	Scene* scene = m_SceneNode->GetValue(context);
 	for (SceneObject& sceneObject : scene->SceneObjects)
 	{
-		context.Variables.SceneObjects[m_SceneObjectIteratorHash] = &sceneObject;
+		context.Iterators.Data[m_IteratorPin] = &sceneObject;
 		m_LoopExecutorNode->ExecuteNodePath(context);
 	}
 }

@@ -69,8 +69,17 @@ void AddNodeNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& context, 
 	if (m_AttachedPin) nodePin = nodeGraph.GetPinByID(m_AttachedPin);
 
 	nodeGraph.AddNode(m_Node);
-	ImNode::SetNodePosition(m_Node->GetID(), { m_NodePosition.x, m_NodePosition.y });
+	if(context.VariablePool) nodeGraph.RefreshNode(m_Node, *context.VariablePool);
 
+	if (m_CenterOnScreen)
+	{
+		ImNode::CenterNodeOnScreen(m_Node->GetID());
+	}
+	else
+	{
+		ImNode::SetNodePosition(m_Node->GetID(), { m_NodePosition.x, m_NodePosition.y });
+	}
+	
 	if (nodePin.Type != PinType::Invalid)
 	{
 		EditorNodePin targetPin;
@@ -182,6 +191,7 @@ void RemoveSelectedNodesNodeGraphCommand::Undo(NodeGraphCommandExecutorContext& 
 		const Float2 nodePos = m_RemovedNodesLocations[i];
 
 		nodeGraph.AddNode(node);
+		if(context.VariablePool) nodeGraph.RefreshNode(node , *context.VariablePool);
 		ImNode::SetNodePosition(node->GetID(), { nodePos.x, nodePos.y });
 	}
 }
@@ -261,6 +271,8 @@ void PasteNodesNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& contex
 
 	for (const auto& link : linksToAdd)
 		nodeGraph.AddLink(link);
+
+	if (context.VariablePool) nodeGraph.RefreshNodes(*context.VariablePool);
 
 	// Select pasted nodes
 	ImNode::SelectNode(m_PastedNodes[0], false);

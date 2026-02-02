@@ -9,6 +9,7 @@ struct NodeGraphCommandExecutorContext
 {
 	Float2 RootCopyLocation{};
 	std::unordered_set<NodeID> CopiedNodes;
+	VariablePool* VariablePool;
 };
 
 class NodeGraphCommand
@@ -29,6 +30,8 @@ public:
 
 	NodeGraph* GetNodeGraph() { return m_NodeGraph; }
 	void SetNodeGraph(NodeGraph* nodeGraph);
+
+	void SetVariablePool(VariablePool* variablePool) { m_Context.VariablePool = variablePool; }
 
 	void ExecuteCommand(NodeGraphCommand* command);
 	void UndoCommand() { m_PerformUndo = true; }
@@ -55,6 +58,10 @@ public:
 		m_NodePosition(nodePosition),
 		m_AttachedPin(attachedPin) {}
 
+	AddNodeNodeGraphCommand(EditorNode* node):
+		m_Node(node),
+		m_CenterOnScreen(true) {}
+
 	void Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
 	void Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
 
@@ -62,6 +69,7 @@ private:
 	EditorNode* m_Node;
 	Float2 m_NodePosition;
 	PinID m_AttachedPin;
+	bool m_CenterOnScreen = false;
 };
 
 class AddLinkNodeGraphCommand : public NodeGraphCommand

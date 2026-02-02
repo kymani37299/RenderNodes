@@ -9,6 +9,7 @@
 
 #include "../Common.h"
 #include "../IDGen.h"
+#include "../NodeGraph/VariablePool.h"
 
 // DO NOT CHANGE ORDER OF VALUES
 // IT WILL AFFECT HOW WE LOAD OLD SAVE FILES
@@ -24,14 +25,14 @@ enum class EditorNodeType
 	Float2,
 	Float3,
 	Float4,
-    AsignFloat,
-    AsignFloat2,
-    AsignFloat3,
-    AsignFloat4,
-    VarFloat,
-    VarFloat2,
-    VarFloat3,
-    VarFloat4,
+    DEPRECATED_AsignFloat,
+    DEPRECATED_AsignFloat2,
+    DEPRECATED_AsignFloat3,
+    DEPRECATED_AsignFloat4,
+    DEPRECATED_VarFloat,
+    DEPRECATED_VarFloat2,
+    DEPRECATED_VarFloat3,
+    DEPRECATED_VarFloat4,
 	FloatBinaryOperator,
 	Float2BinaryOperator,
 	Float3BinaryOperator,
@@ -39,17 +40,17 @@ enum class EditorNodeType
 	If,
 	Print,
     ClearRenderTarget,
-    CreateTexture,
-    GetTexture,
+    DEPRECATED_CreateTexture,
+    DEPRECATED_GetTexture,
     PresentTexture,
-    LoadTexture,
-    LoadShader,
+    DEPRECATED_LoadTexture,
+    DEPRECATED_LoadShader,
     GetCubeMesh,
     DrawMesh,
-    GetShader,
+    DEPRECATED_GetShader,
     BindTable,
     GetMesh,
-    LoadScene,
+    DEPRECATED_LoadScene,
     FloatComparisonOperator,
     CreateFloat2,
     CreateFloat3,
@@ -58,8 +59,8 @@ enum class EditorNodeType
     SplitFloat3,
     SplitFloat4,
     BoolBinaryOperator,
-    VarBool,
-    AsignBool,
+    DEPRECATED_VarBool,
+    DEPRECATED_AsignBool,
     RenderState,
     String,
     Pin,
@@ -69,25 +70,28 @@ enum class EditorNodeType
     OnKeyReleased,
     OnKeyDown,
     Int,
-    VarInt,
-    AsignInt,
+    DEPRECATED_VarInt,
+    DEPRECATED_AsignInt,
     IntBinaryOperator,
     IntComparisonOperator,
     Float4x4,
     Transform_Rotate_Float4x4,
-    VarFloat4x4,
-    AsignFloat4x4,
+    DEPRECATED_VarFloat4x4,
+    DEPRECATED_AsignFloat4x4,
 	Transform_Translate_Float4x4,
 	Transform_Scale_Float4x4,
 	Transform_LookAt_Float4x4,
 	Transform_PerspectiveProjection_Float4x4,
     Float4x4BinaryOperator,
-    GetScene,
+    DEPRECATED_GetScene,
     ForEachSceneObject,
     NormalizeFloat2,
     NormalizeFloat3,
     NormalizeFloat4,
     CrossProductOperation,
+    Variable,
+    AsignVariable,
+    Deprecated,
 };
 
 // DO NOT CHANGE ORDER OF VALUES
@@ -175,6 +179,27 @@ static ImColor GetPinColor(PinType type)
         break;
     }
     return ImColor(0, 0, 0, 255);
+}
+
+inline PinType ToPinType(VariableType variableType)
+{
+    switch (variableType)
+    {
+	case VariableType::Invalid: return PinType::Invalid;
+    case VariableType::Bool:    return PinType::Bool;
+    case VariableType::Int:     return PinType::Int;
+    case VariableType::Float:   return PinType::Float;
+    case VariableType::Float2:  return PinType::Float2;
+    case VariableType::Float3:  return PinType::Float3;
+    case VariableType::Float4:  return PinType::Float4;
+    case VariableType::Float4x4:return PinType::Float4x4;
+    case VariableType::Shader:  return PinType::Shader;
+    case VariableType::Texture: return PinType::Texture;
+    case VariableType::Scene:   return PinType::Scene;
+    default:
+        NOT_IMPLEMENTED;
+    }
+    return PinType::Invalid;
 }
 
 struct EditorNodePinConstant
@@ -286,6 +311,7 @@ protected:
     virtual void RenderContent();
 
     unsigned AddPin(const EditorNodePin& pin);
+    void ChangeLabel(const std::string& newLabel) { m_Label = newLabel; }
 
 private:
     std::string m_Label;
@@ -293,4 +319,30 @@ private:
     NodeID m_ID = 0;
     std::vector<EditorNodePin> m_Pins;
     std::vector<EditorNodePin> m_CustomPins;
+};
+
+class DeprecatedEditorNode : public EditorNode
+{
+    SERIALIZEABLE_EDITOR_NODE();
+public:
+    DeprecatedEditorNode(EditorNodeType deprecatedType):
+        EditorNode("Deprecated", EditorNodeType::Deprecated),
+        m_DeprecatedType(deprecatedType)
+    {
+        for (const auto& pin : GetDeprecatedPins(deprecatedType))
+        {
+            AddPin(pin);
+        }
+    }
+
+    EditorNode* Clone() const override
+    {
+        return new DeprecatedEditorNode(m_DeprecatedType);
+    }
+
+private:
+    EditorNodeType m_DeprecatedType;
+
+private:
+    std::vector<EditorNodePin> GetDeprecatedPins(EditorNodeType nodeType);
 };

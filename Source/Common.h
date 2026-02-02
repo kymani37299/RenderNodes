@@ -11,6 +11,8 @@
 #define FORCE_CRASH *((unsigned int*)0) = 0xDEAD
 #define STATIC_ARRAY_SIZE(X) (sizeof(X)/(sizeof(X[0])))
 
+#define ENUM_STR_CASE(EnumClass, EnumType) case EnumClass::EnumType: return #EnumType;
+
 inline void GLClearError()
 {
 	while (glGetError());

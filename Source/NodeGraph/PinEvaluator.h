@@ -23,11 +23,13 @@ class PinEvaluator;
 
 struct NodeGraphCompilerContext
 {
-	NodeGraphCompilerContext(const NodeGraph* graph, CustomEditorNode* parent = nullptr):
+	NodeGraphCompilerContext(const NodeGraph* graph, const VariablePool* variablePool, CustomEditorNode* parent = nullptr):
 		Graph(graph),
+		VariablePool(variablePool),
 		Parent(parent) {}
 
 	const NodeGraph* Graph;
+	const VariablePool* VariablePool;
 	CustomEditorNode* Parent = nullptr;
 };
 using NodeGraphCompilerContextStack = std::stack<NodeGraphCompilerContext>;
@@ -40,9 +42,9 @@ public:
 		m_ContextStack = contextStack;
 	}
 
-	PinEvaluator(const NodeGraph& graph)
+	PinEvaluator(const NodeGraph& graph, const VariablePool& variablePool)
 	{
-		m_ContextStack.push({&graph});
+		m_ContextStack.push({ &graph, &variablePool });
 	}
 
 	template<typename ReturnType, ReturnType* (PinEvaluator::* func)(EditorNodePin)>
@@ -62,7 +64,7 @@ public:
 	template<typename ReturnType>
 	ReturnType* EvaluateCustomNode(CustomEditorNode* node, const EditorNodePin& pin)
 	{
-		m_ContextStack.push({ node->GetNodeGraph(), node });
+		m_ContextStack.push({ node->GetNodeGraph(), GetVariablePool(), node });
 
 		PinEditorNode* pinNode = static_cast<PinEditorNode*>(GetNodeGraph()->GetNodeByID(node->GetPinNode(pin.ID)));
 		ReturnType* returnValue = EvaluatePin<ReturnType>(pinNode->GetPin());
@@ -127,19 +129,16 @@ public:
 
 private:
 	BoolValueNode* EvaluateBool(BoolEditorNode* node);
-	BoolValueNode* EvaluateVarBool(VarBoolEditorNode* node);
 	BoolValueNode* EvaluateBoolBinaryOperator(BoolBinaryOperatorEditorNode* node);
 	BoolValueNode* EvaluateFloatComparisonOperator(FloatComparisonOperatorEditorNode* node);
 
 	IntValueNode* EvaluateInt(IntEditorNode* node);
-	IntValueNode* EvaluateVarInt(VarIntEditorNode* node);
 	IntValueNode* EvaluateIntBinaryOperator(IntBinaryOperatorEditorNode* node);
 	BoolValueNode* EvaluateIntComparisonOperator(IntComparisonOperatorEditorNode* node);
 
 	StringValueNode* EvaluateString(StringEditorNode* node);
 
 	FloatValueNode* EvaluateFloat(FloatEditorNode* node);
-	FloatValueNode* EvaluateVarFloat(VarFloatEditorNode* node);
 	FloatValueNode* EvaluateSplitFloat2(SplitFloat2EditorNode* node, const EditorNodePin& pin);
 	FloatValueNode* EvaluateSplitFloat3(SplitFloat3EditorNode* node, const EditorNodePin& pin);
 	FloatValueNode* EvaluateSplitFloat4(SplitFloat4EditorNode* node, const EditorNodePin& pin);
@@ -148,25 +147,21 @@ private:
 
 	Float2ValueNode* EvaluateFloat2(Float2EditorNode* node);
 	Float2ValueNode* EvaluateCreateFloat2(CreateFloat2EditorNode* node);
-	Float2ValueNode* EvaluateVarFloat2(VarFloat2EditorNode* node);
 	Float2ValueNode* EvaluateFloat2BinaryOperator(Float2BinaryOperatorEditorNode* node);
 	Float2ValueNode* EvaluateNormalizeFloat2(NormalizeFloat2EditorNode* node);
 
 	Float3ValueNode* EvaluateFloat3(Float3EditorNode* node);
 	Float3ValueNode* EvaluateCreateFloat3(CreateFloat3EditorNode* node);
-	Float3ValueNode* EvaluateVarFloat3(VarFloat3EditorNode* node);
 	Float3ValueNode* EvaluateFloat3BinaryOperator(Float3BinaryOperatorEditorNode* node);
 	Float3ValueNode* EvaluateNormalizeFloat3(NormalizeFloat3EditorNode* node);
 	Float3ValueNode* EvaluateCrossProductOperation(CrossProductOperationEditorNode* node);
 
 	Float4ValueNode* EvaluateFloat4(Float4EditorNode* node);
 	Float4ValueNode* EvaluateCreateFloat4(CreateFloat4EditorNode* node);
-	Float4ValueNode* EvaluateVarFloat4(VarFloat4EditorNode* node);
 	Float4ValueNode* EvaluateFloat4BinaryOperator(Float4BinaryOperatorEditorNode* node);
 	Float4ValueNode* EvaluateNormalizeFloat4(NormalizeFloat4EditorNode* node);
 
 	Float4x4ValueNode* EvaluateFloat4x4(Float4x4EditorNode* node);
-	Float4x4ValueNode* EvaluateVarFloat4x4(VarFloat4x4EditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4BinaryOperator(Float4x4BinaryOperatorEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Rotate(Float4x4RotationTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Translate(Float4x4TranslationTransformEditorNode* node);
@@ -174,12 +169,8 @@ private:
 	Float4x4ValueNode* EvaluateFloat4x4LookAt(Float4x4LookAtTransformEditorNode* node);
 	Float4x4ValueNode* EvaluateFloat4x4Perspective(Float4x4PerspectiveTransformEditorNode* node);
 
-	TextureValueNode* EvaluateGetTexture(GetTextureEditorNode* node);
-
 	MeshValueNode* EvaluateGetMesh(GetMeshEditorNode* node);
 	MeshValueNode* EvaluateGetCubeMesh(GetCubeMeshEditorNode* node);
-
-	ShaderValueNode* EvaluateGetShader(GetShaderEditorNode* node);
 
 	BindTableValueNode* EvaluateBindTable(BindTableEditorNode* node);
 
@@ -187,10 +178,9 @@ private:
 
 	SceneObjectValueNode* EvaluateForEachSceneObject(ForEachSceneObjectEditorNode* node);
 
-	SceneValueNode* EvaluateGetScene(GetSceneEditorNode* node);
-
 private:
 	const NodeGraph* GetNodeGraph() const { return m_ContextStack.top().Graph; }
+	const VariablePool* GetVariablePool() const { return m_ContextStack.top().VariablePool; }
 	CustomEditorNode* GetParentNode() const { return m_ContextStack.top().Parent; }
 
 private:

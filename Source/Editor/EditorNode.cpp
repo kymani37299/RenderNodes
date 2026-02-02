@@ -316,29 +316,6 @@ void BinaryOperatorEditorNode::RenderPopups()
     m_OperatorSelector.DrawSelectionMenu();
 }
 
-void NameAndPathExecutionEditorNode::RenderContent()
-{
-	ExecutionEditorNode::RenderContent();
-	if (ImGui::Button("Select file"))
-	{
-		std::string texPath;
-        bool fileOpened = false;
-        switch (GetType())
-        {
-        case EditorNodeType::LoadTexture: fileOpened = FileDialog::OpenTextureFile(texPath); break;
-        case EditorNodeType::LoadShader: fileOpened = FileDialog::OpenShaderFile(texPath); break;
-        case EditorNodeType::LoadScene: fileOpened = FileDialog::OpenSceneFile(texPath); break;
-        default: NOT_IMPLEMENTED;
-        }
-
-		if (fileOpened)
-		{
-			m_Path = texPath;
-		}
-	}
-	ImGui::Text(m_Path.c_str());
-}
-
 void BindTableEditorNode::RenderContent()
 {
     ImGui::Text("Binding name");
@@ -639,4 +616,123 @@ void CustomEditorNode::RegeneratePins()
         pinToAdd.LinkedNode = pinNode->GetID();
 		AddCustomPin(pinToAdd);
     }
+}
+
+std::vector<EditorNodePin> DeprecatedEditorNode::GetDeprecatedPins(EditorNodeType nodeType)
+{
+	std::vector<EditorNodePin> pins{};
+	switch (nodeType)
+	{
+    case EditorNodeType::Deprecated:
+        break;
+	case EditorNodeType::DEPRECATED_VarFloat:
+		pins.push_back(EditorNodePin::CreateOutputPin("Float", PinType::Float));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_VarFloat2:
+		pins.push_back(EditorNodePin::CreateOutputPin("Float2", PinType::Float2));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_VarFloat3:
+		pins.push_back(EditorNodePin::CreateOutputPin("Float3", PinType::Float3));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_VarFloat4:
+		pins.push_back(EditorNodePin::CreateOutputPin("Float4", PinType::Float4));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_VarFloat4x4:
+		pins.push_back(EditorNodePin::CreateOutputPin("Float4x4", PinType::Float4x4));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_VarBool:
+		pins.push_back(EditorNodePin::CreateOutputPin("Bool", PinType::Bool));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_VarInt:
+		pins.push_back(EditorNodePin::CreateOutputPin("Int", PinType::Int));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_GetScene:
+		pins.push_back(EditorNodePin::CreateOutputPin("Scene", PinType::Scene));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_GetTexture:
+		pins.push_back(EditorNodePin::CreateOutputPin("Texture", PinType::Texture));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+	case EditorNodeType::DEPRECATED_GetShader:
+		pins.push_back(EditorNodePin::CreateOutputPin("Shader", PinType::Shader));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		break;
+    case EditorNodeType::DEPRECATED_LoadScene:
+        pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+        pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_LoadTexture:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_LoadShader:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+    case EditorNodeType::DEPRECATED_AsignBool:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Bool));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_AsignInt:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Int));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_AsignFloat:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Float));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_AsignFloat2:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Float2));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_AsignFloat3:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Float3));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_AsignFloat4:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Float4));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+	case EditorNodeType::DEPRECATED_AsignFloat4x4:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateInputPin("Value", PinType::Float4x4));
+		pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        break;
+    case EditorNodeType::DEPRECATED_CreateTexture:
+		pins.push_back(EditorNodePin::CreateInputPin("", PinType::Execution));
+		pins.push_back(EditorNodePin::CreateOutputPin("", PinType::Execution));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Width", PinType::Int));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Height", PinType::Int));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("Framebuffer", PinType::Bool));
+        pins.push_back(EditorNodePin::CreateConstantInputPin("DepthStencil", PinType::Bool));
+        break;
+	default:
+		NOT_IMPLEMENTED;
+	}
+	return pins;
 }

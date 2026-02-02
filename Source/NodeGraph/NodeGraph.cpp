@@ -60,19 +60,7 @@ void NodeGraph::AddLink(const EditorNodeLink& link)
 
 void NodeGraph::RemoveNode(NodeID nodeID)
 {
-    EditorNode* node = m_Nodes[nodeID].get();
-
-    // Also remove all links that were attached to this node
-    std::vector<LinkID> linksToRemove;
-    for (const auto& it : m_Links)
-    {
-		const auto& link = it.second;
-        if (GetPinOwner(link.Start) == node || GetPinOwner(link.End) == node)
-            linksToRemove.push_back(link.ID);
-    }
-
-    for (const LinkID& linkID : linksToRemove)
-        RemoveLink(linkID);
+    RemoveAllLinks(nodeID);
 
     m_Nodes.erase(nodeID);
     m_NodePositions.erase(nodeID);
@@ -99,6 +87,39 @@ void NodeGraph::RemovePin(PinID pinID)
 
     EditorNode* node = GetPinOwner(pinID);
     node->RemovePin(pinID);
+}
+
+void NodeGraph::RemoveAllLinks(NodeID nodeID)
+{
+    EditorNode* node = m_Nodes[nodeID].get();
+
+	std::vector<LinkID> linksToRemove;
+	for (const auto& it : m_Links)
+	{
+		const auto& link = it.second;
+		if (GetPinOwner(link.Start) == node || GetPinOwner(link.End) == node)
+			linksToRemove.push_back(link.ID);
+	}
+
+	for (const LinkID& linkID : linksToRemove)
+		RemoveLink(linkID);
+}
+
+void NodeGraph::RemoveAllPins(NodeID nodeID)
+{
+    EditorNode* node = m_Nodes[nodeID].get();
+
+    std::vector<PinID> pinsToRemove{};
+    pinsToRemove.reserve(node->GetPins().size());
+    for (const auto& pin : node->GetPins())
+    {
+        pinsToRemove.push_back(pin.ID);
+    }
+
+    for (const auto& pin : pinsToRemove)
+    {
+        RemovePin(pin);
+    }
 }
 
 bool NodeGraph::ContainsNode(NodeID nodeID) const
@@ -223,14 +244,32 @@ OnUpdateEditorNode* NodeGraph::GetOnUpdateNode() const
     return nullptr;
 }
 
-void NodeGraph::RefreshCustomNodes()
+void NodeGraph::RefreshNodes(const VariablePool& variablePool)
 {
-    for (const auto& it : m_Nodes)
-    {
-        if (it.second->GetType() == EditorNodeType::Custom)
-        {
-            CustomEditorNode* node = static_cast<CustomEditorNode*>(it.second.get());
-            node->RegeneratePins();
-        }
-    }
+	for (auto& it : m_Nodes)
+	{
+        RefreshNode(it.second.get(), variablePool);
+	}
+}
+
+void NodeGraph::RefreshNode(EditorNode* editorNode, const VariablePool& variablePool)
+{
+	switch (editorNode->GetType())
+	{
+	case EditorNodeType::Custom:
+	{
+		CustomEditorNode* node = static_cast<CustomEditorNode*>(editorNode);
+		node->RegeneratePins();
+	} break;
+	case EditorNodeType::Variable:
+	{
+		VariableEditorNode* node = static_cast<VariableEditorNode*>(editorNode);
+		node->RefreshLabel(variablePool);
+	} break;
+	case EditorNodeType::AsignVariable:
+	{
+		AsignVariableEditorNode* node = static_cast<AsignVariableEditorNode*>(editorNode);
+		node->RefreshLabel(variablePool);
+	} break;
+	}
 }

@@ -211,41 +211,33 @@ class AsignVariableEditorNode : public ExecutionEditorNode
 {
 	SERIALIZEABLE_EDITOR_NODE();
 public:
-	AsignVariableEditorNode(EditorNodeType nodeType, PinType inputType) :
-		ExecutionEditorNode("Asign " + ToString(inputType), nodeType)
+	AsignVariableEditorNode(VariableID id, VariableType varType) :
+		ExecutionEditorNode("Asign ", EditorNodeType::AsignVariable),
+		m_VarID(id),
+		m_VarType(varType)
 	{
-		m_ValuePin = AddPin(EditorNodePin::CreateInputPin("Value", inputType));
-		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
+		PinType pinType = ToPinType(varType);
+		m_ValuePin = AddPin(EditorNodePin::CreateInputPin("Value", pinType));
 	}
 
+	void RefreshLabel(const VariablePool& variablePool)
+	{
+		ChangeLabel("Asign " + variablePool.GetRef(m_VarID).Name);
+	}
+
+	VariableID GetVariableID() const { return m_VarID; }
 	const EditorNodePin& GetValuePin() const { return GetPins()[m_ValuePin]; }
-	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }
 
-private:
-	unsigned m_ValuePin;
-	unsigned m_NamePin;
-};
-
-template<EditorNodeType nodeType, PinType pinType>
-class AsignVariableEditorNodeT : public AsignVariableEditorNode
-{
-public:
-	AsignVariableEditorNodeT() :
-		AsignVariableEditorNode(nodeType, pinType) {}
-
-	EditorNode* Clone() const override
+	EditorNode* Clone() const
 	{
-		return new AsignVariableEditorNodeT<nodeType, pinType>{};
+		return new AsignVariableEditorNode{ m_VarID, m_VarType };
 	}
+private:
+	VariableID m_VarID;
+	VariableType m_VarType;
+	
+	unsigned m_ValuePin;
 };
-
-using AsignBoolEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignBool, PinType::Bool>;
-using AsignIntEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignInt, PinType::Int>;
-using AsignFloatEditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat, PinType::Float>;
-using AsignFloat2EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat2, PinType::Float2>;
-using AsignFloat3EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat3, PinType::Float3>;
-using AsignFloat4EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat4, PinType::Float4>;
-using AsignFloat4x4EditorNode = AsignVariableEditorNodeT<EditorNodeType::AsignFloat4x4, PinType::Float4x4>;
 
 class IfEditorNode : public ExecutionEditorNode
 {
@@ -290,107 +282,6 @@ public:
 
 private:
 	unsigned m_InputPin;
-};
-
-class CreateTextureEditorNode : public ExecutionEditorNode
-{
-	SERIALIZEABLE_EDITOR_NODE();
-public:
-	CreateTextureEditorNode() :
-		ExecutionEditorNode("Create texture", EditorNodeType::CreateTexture) 
-	{
-		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
-		m_WidthPin = AddPin(EditorNodePin::CreateConstantInputPin("Width", PinType::Int));
-		m_HeightPin = AddPin(EditorNodePin::CreateConstantInputPin("Height", PinType::Int));
-		m_FramebufferPin = AddPin(EditorNodePin::CreateConstantInputPin("Framebuffer", PinType::Bool));
-		m_DepthStencilPin = AddPin(EditorNodePin::CreateConstantInputPin("DepthStencil", PinType::Bool));
-	}
-
-	EditorNode* Clone() const override
-	{
-		return new CreateTextureEditorNode{};
-	}
-
-	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }
-	const EditorNodePin& GetWidthPin() const { return GetPins()[m_WidthPin]; }
-	const EditorNodePin& GetHeightPin() const { return GetPins()[m_HeightPin]; }
-	const EditorNodePin& GetFramebufferPin() const { return GetPins()[m_FramebufferPin]; }
-	const EditorNodePin& GetDepthStencilPin() const { return GetPins()[m_DepthStencilPin]; }
-	
-private:
-	unsigned m_NamePin;
-	unsigned m_WidthPin;
-	unsigned m_HeightPin;
-	unsigned m_FramebufferPin;
-	unsigned m_DepthStencilPin;
-};
-
-class NameAndPathExecutionEditorNode : public ExecutionEditorNode
-{
-	SERIALIZEABLE_EDITOR_NODE();
-public:
-	NameAndPathExecutionEditorNode(const std::string& nodeLabel, EditorNodeType nodeType) :
-		ExecutionEditorNode(nodeLabel, nodeType) 
-	{
-		m_NamePin = AddPin(EditorNodePin::CreateConstantInputPin("Name", PinType::String));
-	}
-
-	const EditorNodePin& GetNamePin() const { return GetPins()[m_NamePin]; }
-	const std::string& GetPath() const { return m_Path; }
-
-protected:
-	virtual void RenderContent() override;
-
-private:
-	unsigned m_NamePin;
-
-protected: // Should be private
-	std::string m_Path = "";
-};
-
-class LoadTextureEditorNode : public NameAndPathExecutionEditorNode
-{
-	SERIALIZEABLE_EDITOR_NODE();
-public:
-	LoadTextureEditorNode() :
-		NameAndPathExecutionEditorNode("Load texture", EditorNodeType::LoadTexture) {}
-
-	EditorNode* Clone() const override
-	{
-		LoadTextureEditorNode* node = new LoadTextureEditorNode{};
-		node->m_Path = m_Path;
-		return node;
-	}
-};
-
-class LoadShaderEditorNode : public NameAndPathExecutionEditorNode
-{
-	SERIALIZEABLE_EDITOR_NODE();
-public:
-	LoadShaderEditorNode() :
-		NameAndPathExecutionEditorNode("Load shader", EditorNodeType::LoadShader) {}
-
-	EditorNode* Clone() const override
-	{
-		LoadShaderEditorNode* node = new LoadShaderEditorNode{};
-		node->m_Path = m_Path;
-		return node;
-	}
-};
-
-class LoadSceneEditorNode : public NameAndPathExecutionEditorNode
-{
-	SERIALIZEABLE_EDITOR_NODE();
-public:
-	LoadSceneEditorNode() :
-		NameAndPathExecutionEditorNode("Load scene", EditorNodeType::LoadScene) {}
-
-	EditorNode* Clone() const override
-	{
-		LoadSceneEditorNode* node = new LoadSceneEditorNode{};
-		node->m_Path = m_Path;
-		return node;
-	}
 };
 
 class ClearRenderTargetEditorNode : public ExecutionEditorNode
