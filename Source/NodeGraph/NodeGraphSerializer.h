@@ -105,12 +105,19 @@ private:
 		WriteAttribute(name + ".00", value[0][0]);
 		WriteAttribute(name + ".01", value[0][1]);
 		WriteAttribute(name + ".02", value[0][2]);
+		WriteAttribute(name + ".03", value[0][3]);
 		WriteAttribute(name + ".10", value[1][0]);
 		WriteAttribute(name + ".11", value[1][1]);
 		WriteAttribute(name + ".12", value[1][2]);
+		WriteAttribute(name + ".13", value[1][3]);
 		WriteAttribute(name + ".20", value[2][0]);
 		WriteAttribute(name + ".21", value[2][1]);
 		WriteAttribute(name + ".22", value[2][2]);
+		WriteAttribute(name + ".23", value[2][3]);
+		WriteAttribute(name + ".30", value[3][0]);
+		WriteAttribute(name + ".31", value[3][1]);
+		WriteAttribute(name + ".32", value[3][2]);
+		WriteAttribute(name + ".33", value[3][3]);
 	}
 
 	template<>

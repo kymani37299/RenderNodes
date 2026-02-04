@@ -418,6 +418,8 @@ void App::SaveDocument()
 
 	if (hasPath)
 	{
+		if (m_CustomNodeEditor) m_CustomNodeEditor->RewriteNode();
+		
 		m_Serializer->Serialize(path, *m_NodeGraph, m_VariablePool);
 
 		const std::string jsonDest = GetPathWithoutExtension(path) + ".json";
@@ -433,6 +435,8 @@ void App::SaveAsDocument()
 	std::string path;
 	if (FileDialog::SaveRenderNodeFile(path))
 	{
+		if (m_CustomNodeEditor) m_CustomNodeEditor->RewriteNode();
+
 		m_Serializer->Serialize(path, *m_NodeGraph, m_VariablePool);
 
 		const std::string jsonDest = GetPathWithoutExtension(path) + ".json";

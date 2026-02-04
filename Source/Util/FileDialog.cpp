@@ -80,7 +80,7 @@ namespace FileDialog
 
 	bool OpenTextureFile(std::string& path)
 	{
-		return OpenFile(path, { { "Texture file", "jpg,jpeg,png" } });
+		return OpenFile(path, { { "Texture file", "jpg,jpeg,png,hdr,bmp,gif,psd,pic,pnm,tga" } });
 	}
 
 	bool OpenShaderFile(std::string& path)

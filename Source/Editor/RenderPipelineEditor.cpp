@@ -305,22 +305,14 @@ void RenderPipelineEditor::RenderVariableWindow()
     ImGui::BeginChild("Variable pool");
     const auto renderVariable = [this](VariableID id ,Variable& var) {
         ImGui::PushID(id);
-        if (ImGui::Button("Get"))
-        {
-            VariableEditorNode* newNode = new VariableEditorNode{ id, var.Type };
-            newNode->RefreshLabel(*m_VariablePool);
-			m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ newNode });
-        }
-		if (ImGui::Button("Set"))
-		{
-            AsignVariableEditorNode* newNode = new AsignVariableEditorNode{ id, var.Type };
-            newNode->RefreshLabel(*m_VariablePool);
-			m_CommandExecutor->ExecuteCommand(new AddNodeNodeGraphCommand{ newNode });
-		}
-        ImGui::SameLine();
+		
         ImGui::Text("%s", var.Name.c_str());
-		EditorWidgets::InputVariable("", var);
+        ImGui::Dummy(ImVec2(15.0f, 15.0f));
+        EditorWidgets::InputVariable("", var);
+        ImGui::Dummy(ImVec2(15.0f, 15.0f));
+        
         ImGui::Separator();
+
         ImGui::PopID();
     };
     m_VariablePool->ForEachVariable(renderVariable);

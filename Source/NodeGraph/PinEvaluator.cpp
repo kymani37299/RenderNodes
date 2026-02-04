@@ -16,14 +16,13 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<bool>{ pin.ConstantValue.B };
 
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Bool);
-	
+	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Bool pin input missing link!");
 		return new ConstantValueNode<bool>(false);
 	}
+	ASSERT(pin.Type == PinType::Bool);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -47,13 +46,12 @@ IntValueNode* PinEvaluator::EvaluateInt(EditorNodePin pin)
 	if (pin.HasConstantValue) return new ConstantValueNode<int>{ pin.ConstantValue.I };
 
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Int);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Int pin input missing link!");
 		return new ConstantValueNode<int>(0);
 	}
+	ASSERT(pin.Type == PinType::Int);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -74,14 +72,13 @@ StringValueNode* PinEvaluator::EvaluateString(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<std::string>{ pin.ConstantValue.STR };
 	
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::String);
-
+	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("String pin input missing link!");
 		return new ConstantValueNode<std::string>("");
 	}
+	ASSERT(pin.Type == PinType::String);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -101,13 +98,12 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 	if (pin.HasConstantValue) return new ConstantValueNode<float>{ pin.ConstantValue.F };
 	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Float);
-	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float pin input missing link!");
 		return new ConstantValueNode<float>(0.0f);
 	}
+	ASSERT(pin.Type == PinType::Float);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -133,13 +129,12 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 	if (pin.HasConstantValue) return new ConstantValueNode<Float2>{ pin.ConstantValue.F2 };
 	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Float2);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float2 pin input missing link!");
 		return new ConstantValueNode<Float2>({});
 	}
+	ASSERT(pin.Type == PinType::Float2);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -163,13 +158,12 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 	if (pin.HasConstantValue) return new ConstantValueNode<Float3>{ pin.ConstantValue.F3 };
 	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Float3);
-	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float3 pin input missing link!");
 		return new ConstantValueNode<Float3>({});
 	}
+	ASSERT(pin.Type == PinType::Float3);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -194,13 +188,12 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 	if (pin.HasConstantValue) return new ConstantValueNode<Float4>{ pin.ConstantValue.F4 };
 	
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Float4);
-	
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float4 pin input missing link!");
 		return new ConstantValueNode<Float4>({});
 	}
+	ASSERT(pin.Type == PinType::Float4);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -224,13 +217,12 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(EditorNodePin pin)
 	// if (pin.HasConstantValue) return new ConstantValueNode<Float4x4>{ pin.ConstantValue.F4X4 };
 
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Float4x4);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Float4x4 pin input missing link!");
 		return new ConstantValueNode<Float4x4>(glm::identity<Float4x4>());
 	}
+	ASSERT(pin.Type == PinType::Float4x4);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -255,13 +247,12 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(EditorNodePin pin)
 TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Texture);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Texture pin input not linked!");
 		return new ConstantValueNode<Texture*>(nullptr);
 	}
+	ASSERT(pin.Type == PinType::Texture);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -279,13 +270,12 @@ TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 BufferValueNode* PinEvaluator::EvaluateBuffer(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Buffer);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Buffer pin input not linked!");
 		return new ConstantValueNode<Buffer*>(nullptr);
 	}
+	ASSERT(pin.Type == PinType::Buffer);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -302,13 +292,12 @@ BufferValueNode* PinEvaluator::EvaluateBuffer(EditorNodePin pin)
 MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Mesh);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Mesh pin input not linked!");
 		return new ConstantValueNode<Mesh*>(nullptr);
 	}
+	ASSERT(pin.Type == PinType::Mesh);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -328,13 +317,12 @@ MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Shader);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Shader pin input not linked!");
 		return new ConstantValueNode<Shader*>(nullptr);
 	}
+	ASSERT(pin.Type == PinType::Shader);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -352,13 +340,12 @@ ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 BindTableValueNode* PinEvaluator::EvaluateBindTable(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::BindTable);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("BindTable pin input not linked!");
 		return new ConstantValueNode<BindTable*>(nullptr);
 	}
+	ASSERT(pin.Type == PinType::BindTable);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -376,13 +363,12 @@ BindTableValueNode* PinEvaluator::EvaluateBindTable(EditorNodePin pin)
 RenderStateValueNode* PinEvaluator::EvaluateRenderState(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::RenderState);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("RenderState pin input not linked!");
 		return new ConstantValueNode<RenderState>({});
 	}
+	ASSERT(pin.Type == PinType::RenderState);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -424,13 +410,12 @@ SceneObjectValueNode* PinEvaluator::EvaluateSceneObject(EditorNodePin pin)
 SceneValueNode* PinEvaluator::EvaluateScene(EditorNodePin pin)
 {
 	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::Scene);
-
 	if (pin.Type == PinType::Invalid)
 	{
 		m_ErrorMessages.push_back("Scene pin input not linked!");
 		return new ConstantValueNode<Scene*>({});
 	}
+	ASSERT(pin.Type == PinType::Scene);
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())

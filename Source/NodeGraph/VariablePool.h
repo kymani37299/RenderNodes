@@ -102,7 +102,7 @@ struct Variable
 			Data = Float4{};
 			break;
 		case VariableType::Float4x4:
-			Data = Float4x4{};
+			Data = glm::identity<Float4x4>();
 			break;
 		case VariableType::Texture:
 			Data = TextureData{};
