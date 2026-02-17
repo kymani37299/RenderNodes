@@ -3,17 +3,16 @@
 #include "../Common.h"
 #include "ExecuteContext.h"
 
-class RenderPipelineExecutor
+class RenderPipelineExecutor : public IInputListener
 {
 public:
     void OnStart();
     void OnUpdate(float dt);
     void Render();
 
-    void HandleKeyPressed(int key, int mods);
-    void HandleKeyReleased(int key, int mods);
-
     void SetCompiledPipeline(CompiledPipeline pipeline);
+
+    void OnKeyInputEvent(const KeyInput& input) override;
 
 private:
     void HandleErrors();

@@ -7,15 +7,18 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
+#include "../CodeGenerator/RenderPipelineCodeGenerator.h"
 #include "../Editor/EditorErrorHandler.h"
 #include "../Editor/RenderPipelineEditor.h"
 #include "../Editor/Drawing/EditorWidgets.h"
+#include "../Editor/Drawing/EditorDialog.h"
 #include "../Execution/RenderPipelineExecutor.h"
 #include "../NodeGraph/NodeGraphCompiler.h"
 #include "../NodeGraph/NodeGraphSerializer.h"
 #include "../NodeGraph/NodeGraphCommands.h"
 
 #include "../Util/FileDialog.h"
+#include "../Util/FileUtils.h"
 
 // From IDGen.h
 std::atomic<UniqueID> IDGen::Allocator = 1;
@@ -27,7 +30,22 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-	App::Get()->HandleInputAction(key, mods, action);
+	KeyInput input{};
+	input.Key = key;
+	input.Mods = mods;
+	switch (action)
+	{
+	case GLFW_PRESS:
+		input.Action = KeyInputAction::Pressed;
+		break;
+	case GLFW_RELEASE:
+		input.Action = KeyInputAction::Released;
+		break;
+	case GLFW_REPEAT:
+		input.Action = KeyInputAction::Repeat;
+		break;
+	}
+	App::Get()->HandleInputAction(input);
 }
 
 App* App::s_Instance = nullptr;
@@ -206,7 +224,11 @@ void App::RenderFrame()
 	if (m_Mode == AppMode::Editor)
 	{
 		ImGui::SetNextItemWidth(ImGui::ConstantSize(250.0f));
+		
 		if (ImGui::Button("   Run   ")) CompileAndRun();
+		ImGui::SameLine();
+		if (ImGui::Button("Generate Code...")) m_Editor->PushDialog(new GenerateCodeDialog());
+
 		ImGui::Separator();
 
 		m_Editor->Render();
@@ -275,44 +297,27 @@ void App::RenderFrame()
 	m_Console.Draw();
 }
 
-void App::HandleInputAction(int key, int mods, int action)
+void App::HandleInputAction(const KeyInput& input)
 {
-	// TODO: Use IInputListeners
-	if (action == GLFW_PRESS)
+	// TODO: Manage subscriptions of IInputListeners , current problem is state of App needs to be in sync with subscriptions
+	if (m_Mode == AppMode::Editor)
 	{
-		if (m_Mode == AppMode::Editor)
-		{
-			m_Editor->HandleKeyPressed(key, mods);
+		m_Editor->OnKeyInputEvent(input);
 
-			if ((mods & GLFW_MOD_CONTROL) && key == GLFW_KEY_S)
-				SaveDocument();
-		}
-		else if (m_Mode == AppMode::CustomNode)
-		{
-			m_CustomNodeEditor->HandleKeyPressed(key, mods);
-		}
-		else if (m_Mode == AppMode::Run)
-		{
-			m_Executor->HandleKeyPressed(key, mods);
-		}
+		if ((input.Mods & GLFW_MOD_CONTROL) && input.Key == GLFW_KEY_S)
+			SaveDocument();
+	}
+	else if (m_Mode == AppMode::CustomNode)
+	{
+		m_CustomNodeEditor->OnKeyInputEvent(input);
+	}
+	else if (m_Mode == AppMode::Run)
+	{
+		m_Executor->OnKeyInputEvent(input);
 	}
 
-	if (action == GLFW_RELEASE)
-	{
-		m_Executor->HandleKeyReleased(key, mods);
-	}
-	
-	if (action == GLFW_PRESS)
-	{
-		for (IInputListener* listener : m_InputListeners)
-			listener->OnKeyPressed(key, mods);
-	}
-
-	if (action == GLFW_RELEASE)
-	{
-		for (IInputListener* listener : m_InputListeners)
-			listener->OnKeyReleased(key, mods);
-	}
+	for (IInputListener* listener : m_InputListeners)
+		listener->OnKeyInputEvent(input);
 }
 
 void App::AddCustomNode(CustomEditorNode* node)
@@ -471,6 +476,34 @@ void App::CompileAndRun()
 	}
 }
 
+void App::GenerateCode(const std::string& projectName)
+{	
+	CompiledPipeline pipeline = m_Compiler->Compile(*m_NodeGraph, m_VariablePool);
+	bool compilationSuccessful = m_Compiler->GetCompileErrors().empty();
+	if (compilationSuccessful)
+	{
+		RenderPipelineCodeGenerator codeGenerator{};
+		const bool compilationSuccess = codeGenerator.GenerateCode(projectName, pipeline);
+		if (compilationSuccess)
+		{
+			m_Console.Log("Compilation successful!");
+		}
+		else
+		{
+			m_Console.Log("[Compilation error] Failed to generate compiler pipeline!");
+		}
+	}
+	else
+	{
+		// Mark error nodes
+		for (const auto& err : m_Compiler->GetCompileErrors())
+		{
+			m_Console.Log("[Compilation error] " + err.Message);
+			m_ErrorHandler->MarkErrorNode(err.Node);
+		}
+	}
+}
+
 std::string App::GetWindowTitle()
 {
 	std::string windowTitle = "Render Nodes";
@@ -492,6 +525,9 @@ void App::ProcessRequests()
 		{
 		case AppRequestType::ChangeMode:
 			ProcessChangeModeRequest(request);
+			break;
+		case AppRequestType::GenerateCode:
+			GenerateCode(request.GenerateCode.ProjectName);
 			break;
 		}
 		m_Requests.pop();

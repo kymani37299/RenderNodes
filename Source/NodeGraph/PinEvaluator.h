@@ -20,6 +20,7 @@ inline EditorNodePin GetOutputPinIfInput(const NodeGraph& nodeGraph, EditorNodeP
 }
 
 class PinEvaluator;
+struct NodeCompilerError;
 
 struct NodeGraphCompilerContext
 {
@@ -37,12 +38,14 @@ using NodeGraphCompilerContextStack = std::stack<NodeGraphCompilerContext>;
 class PinEvaluator
 {
 public:
-	PinEvaluator(const NodeGraphCompilerContextStack& contextStack)
+	PinEvaluator(const NodeGraphCompilerContextStack& contextStack, std::vector<NodeCompilerError>& compilerErrors):
+		m_CompilerErrors(compilerErrors)
 	{
 		m_ContextStack = contextStack;
 	}
 
-	PinEvaluator(const NodeGraph& graph, const VariablePool& variablePool)
+	PinEvaluator(const NodeGraph& graph, const VariablePool& variablePool, std::vector<NodeCompilerError>& compilerErrors):
+		m_CompilerErrors(compilerErrors)
 	{
 		m_ContextStack.push({ &graph, &variablePool });
 	}
@@ -185,5 +188,5 @@ private:
 
 private:
 	NodeGraphCompilerContextStack m_ContextStack;
-	std::vector<std::string> m_ErrorMessages;
+	std::vector<NodeCompilerError>& m_CompilerErrors;
 };

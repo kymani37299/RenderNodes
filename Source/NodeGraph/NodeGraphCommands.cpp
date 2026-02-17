@@ -4,7 +4,7 @@
 
 #include "../Common.h"
 
-static std::unordered_set<EditorNode*> GetSelectedNodes(NodeGraph& nodeGraph)
+std::unordered_set<EditorNode*> GetSelectedNodes(const NodeGraph& nodeGraph)
 {
 	std::unordered_set<EditorNode*> selectedNodes{};
 	const auto fn = [&selectedNodes](EditorNode* node) {
@@ -274,10 +274,14 @@ void PasteNodesNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& contex
 
 	if (context.VariablePool) nodeGraph.RefreshNodes(*context.VariablePool);
 
-	// Select pasted nodes
-	ImNode::SelectNode(m_PastedNodes[0], false);
-	for (const auto& pastedNodeID : m_PastedNodes)
-		ImNode::SelectNode(pastedNodeID, true);
+	if (m_PastedNodes.size() > 0)
+	{
+		// Select pasted nodes
+		ImNode::SelectNode(m_PastedNodes[0], false);
+		for (const auto& pastedNodeID : m_PastedNodes)
+			ImNode::SelectNode(pastedNodeID, true);
+	}
+
 }
 
 void PasteNodesNodeGraphCommand::Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
@@ -333,4 +337,31 @@ void MakeConstantToPinCommand::Undo(NodeGraphCommandExecutorContext& context, No
 	pin.HasConstantValue = true;
 	pin.ConstantValue = m_Value;
 	nodeGraph.UpdatePin(pin);
+}
+
+void SetSelectedNodesEnabledNodeGraphCommand::Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
+{
+	const auto selectedNodes = GetSelectedNodes(nodeGraph);
+	for (EditorNode* node : selectedNodes)
+	{
+		if (node->GetType() == EditorNodeType::Pin) // We dont want to be able to disable pin nodes,
+			continue;
+
+		ExecutionEditorNode* exNode = dynamic_cast<ExecutionEditorNode*>(node);
+		if (exNode != nullptr && exNode->IsEnabled() != m_Enabled)
+		{
+			exNode->SetEnabled(m_Enabled);
+			m_EditedNodes.push_back(node->GetID());
+		}
+	}
+}
+
+void SetSelectedNodesEnabledNodeGraphCommand::Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph)
+{
+	for (NodeID nodeID : m_EditedNodes)
+	{
+		EditorNode* node = nodeGraph.GetNodeByID(nodeID);
+		ExecutionEditorNode* exNode = dynamic_cast<ExecutionEditorNode*>(node);
+		exNode->SetEnabled(!m_Enabled);
+	}
 }

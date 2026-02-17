@@ -103,13 +103,15 @@
     <ClCompile Include="External\NativeFileDialog\src\nfd_win.cpp" />
     <ClCompile Include="Source\App\App.cpp" />
     <ClCompile Include="Source\App\AppConsole.cpp" />
+    <ClCompile Include="Source\CodeGenerator\RenderPipelineCodeGenerator.cpp" />
+    <ClCompile Include="Source\CodeGenerator\WebGPU\ExecutorNodeVisitor_WebGPU.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorContextMenu.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorDialog.cpp" />
     <ClCompile Include="Source\Editor\Drawing\EditorWidgets.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
+    <ClCompile Include="Source\Execution\ExecutorNodeVisitor_InEditor.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
     <ClCompile Include="Source\Editor\RenderPipelineEditor.cpp" />
-    <ClCompile Include="Source\Execution\ExecutorNode.cpp" />
     <ClCompile Include="Source\Execution\RenderPipelineExecutor.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraphCommands.cpp" />
@@ -144,6 +146,8 @@
     <ClInclude Include="Source\App\App.h" />
     <ClInclude Include="Source\App\AppConsole.h" />
     <ClInclude Include="Source\App\IInputListener.h" />
+    <ClInclude Include="Source\CodeGenerator\CodeGenerator.h" />
+    <ClInclude Include="Source\CodeGenerator\RenderPipelineCodeGenerator.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\DataTypes.h" />
     <ClInclude Include="Source\Editor\Drawing\EditorContextMenu.h" />
@@ -154,8 +158,11 @@
     <ClInclude Include="Source\Editor\EvaluationEditorNode.h" />
     <ClInclude Include="Source\Editor\ExecutorEditorNode.h" />
     <ClInclude Include="Source\Execution\ExecuteContext.h" />
+    <ClInclude Include="Source\Execution\ExecutorNodeVisitor.h" />
     <ClInclude Include="Source\Execution\ExecutorScene.h" />
+    <ClInclude Include="Source\Execution\RenderStructs.h" />
     <ClInclude Include="Source\Execution\ValueNode.h" />
+    <ClInclude Include="Source\Execution\ValueNodeImpl.h" />
     <ClInclude Include="Source\imgui_rendernodes.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraph.h" />
     <ClInclude Include="Source\Editor\RenderPipelineEditor.h" />
@@ -173,6 +180,8 @@
     <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Util\FileDialog.h" />
+    <ClInclude Include="Source\Util\FileUtils.h" />
+    <ClInclude Include="Source\Util\GLFWUtils.h" />
     <ClInclude Include="Source\Util\Hash.h" />
   </ItemGroup>
   <ItemGroup>
@@ -185,4 +194,12 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyFilesAfterBuild" AfterTargets="Build">
+    <RemoveDir Directories="$(TargetDir)Data" />
+    <MakeDir Directories="$(TargetDir)Data" />
+    <ItemGroup>
+      <TemplateFiles Include="$(ProjectDir)Source\CodeGenerator\WebGPU\Template\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(TemplateFiles)" DestinationFiles="@(TemplateFiles->'$(TargetDir)Data\WebGPU_Template\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 </Project>

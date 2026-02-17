@@ -5,6 +5,7 @@
 #include "../App/App.h"
 #include "../Common.h"
 #include "../Util/FileDialog.h"
+#include "../Util/GLFWUtils.h"
 #include "Drawing/EditorWidgets.h"
 #include "RenderPipelineEditor.h"
 
@@ -165,6 +166,11 @@ void EditorNode::Render()
 
     ImNode::BeginNode(m_ID);
 
+    ExecutionEditorNode* exNode = dynamic_cast<ExecutionEditorNode*>(this);
+    const bool isEnabled = exNode == nullptr ? true : exNode->IsEnabled();
+
+    if(!isEnabled) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+
     ImGui::BeginVertical("Node");
     ImGui::Spring();
     {
@@ -236,6 +242,8 @@ void EditorNode::Render()
 	RenderContent();
 
     ImGui::EndVertical();
+
+    if(!isEnabled) ImGui::PopStyleVar();
 
     ImNode::EndNode();
 
@@ -433,85 +441,6 @@ void PinEditorNode::RenderContent()
     EditorWidgets::InputText("Name", m_Name);
 }
 
-static std::string GetInputName(int key, int mods)
-{
-    std::string prefix = "";
-    if (mods & GLFW_MOD_CONTROL) prefix += "Ctrl + ";
-    if (mods & GLFW_MOD_ALT) prefix += "Alt + ";
-    if (mods & GLFW_MOD_SHIFT) prefix += "Shift + ";
-    if (mods & GLFW_MOD_SUPER) prefix += "Super + ";
-
-    bool canBeCasted = key >= GLFW_KEY_A && key <= GLFW_KEY_Z;
-    canBeCasted = canBeCasted || (key >= GLFW_KEY_0 && key <= GLFW_KEY_9);
-    canBeCasted = canBeCasted || key == GLFW_KEY_APOSTROPHE;
-    canBeCasted = canBeCasted || key == GLFW_KEY_COMMA;
-    canBeCasted = canBeCasted || key == GLFW_KEY_MINUS;
-    canBeCasted = canBeCasted || key == GLFW_KEY_PERIOD;
-    canBeCasted = canBeCasted || key == GLFW_KEY_SLASH;
-    canBeCasted = canBeCasted || key == GLFW_KEY_SEMICOLON;
-    canBeCasted = canBeCasted || key == GLFW_KEY_EQUAL;
-    canBeCasted = canBeCasted || key == GLFW_KEY_LEFT_BRACKET;
-    canBeCasted = canBeCasted || key == GLFW_KEY_BACKSLASH;
-    canBeCasted = canBeCasted || key == GLFW_KEY_RIGHT_BRACKET;
-    canBeCasted = canBeCasted || key == GLFW_KEY_GRAVE_ACCENT;
-
-    if (canBeCasted)
-    {
-        return prefix + std::string(1, key);
-    }
-
-    if (key >= GLFW_KEY_F1 && key <= GLFW_KEY_F25)
-    {
-        return prefix + "F" + std::to_string(key - GLFW_KEY_F1 + 1);
-    }
-
-    if (key >= GLFW_KEY_KP_0 && key <= GLFW_KEY_KP_9)
-    {
-        return prefix + "Numpad " + std::to_string(key - GLFW_KEY_KP_0);
-    }
-
-    switch (key)
-    {
-    case GLFW_KEY_SPACE: return prefix + "Space";
-    case GLFW_KEY_ESCAPE             : return prefix + "Esc";
-    case GLFW_KEY_ENTER              : return prefix + "Enter";
-    case GLFW_KEY_TAB                : return prefix + "Tab";
-    case GLFW_KEY_BACKSPACE          : return prefix + "Backspace";
-    case GLFW_KEY_INSERT             : return prefix + "Insert";
-    case GLFW_KEY_DELETE             : return prefix + "Delete";
-    case GLFW_KEY_RIGHT              : return prefix + "Right";
-    case GLFW_KEY_LEFT               : return prefix + "Left";
-    case GLFW_KEY_DOWN               : return prefix + "Down";
-    case GLFW_KEY_UP                 : return prefix + "Up";
-    case GLFW_KEY_PAGE_UP            : return prefix + "PageUp";
-    case GLFW_KEY_PAGE_DOWN          : return prefix + "PageDown";
-    case GLFW_KEY_HOME               : return prefix + "Home";
-    case GLFW_KEY_END                : return prefix + "End";
-    case GLFW_KEY_CAPS_LOCK          : return prefix + "CapsLock";
-    case GLFW_KEY_SCROLL_LOCK        : return prefix + "ScrollLock";
-    case GLFW_KEY_NUM_LOCK           : return prefix + "NumLock";
-    case GLFW_KEY_PRINT_SCREEN       : return prefix + "PrintSc";
-    case GLFW_KEY_PAUSE              : return prefix + "Pause";
-    case GLFW_KEY_KP_DECIMAL         : return prefix + "Numpad .";
-    case GLFW_KEY_KP_DIVIDE          : return prefix + "Numpad /";
-    case GLFW_KEY_KP_MULTIPLY        : return prefix + "Numpad *";
-    case GLFW_KEY_KP_SUBTRACT        : return prefix + "Numpad -";
-    case GLFW_KEY_KP_ADD             : return prefix + "Numpad +";
-    case GLFW_KEY_KP_ENTER           : return prefix + "Numpad Enter";
-    case GLFW_KEY_KP_EQUAL           : return prefix + "Numpad =";
-    case GLFW_KEY_LEFT_SHIFT         : return prefix + "Left Shift";
-    case GLFW_KEY_LEFT_CONTROL       : return prefix + "Left Ctrl";
-    case GLFW_KEY_LEFT_ALT           : return prefix + "Left Alt";
-    case GLFW_KEY_LEFT_SUPER         : return prefix + "Left Super";
-    case GLFW_KEY_RIGHT_SHIFT        : return prefix + "Right Shift";
-    case GLFW_KEY_RIGHT_CONTROL      : return prefix + "Right Ctrl";
-    case GLFW_KEY_RIGHT_ALT          : return prefix + "Right Alt";
-    case GLFW_KEY_RIGHT_SUPER        : return prefix + "Right Super";
-    case GLFW_KEY_MENU               : return prefix + "Menu";
-    }
-    return "Unknown key";
-}
-
 void InputExecutionEditorNode::RenderContent()
 {
 	if (m_ListeningToInput)
@@ -533,17 +462,20 @@ void InputExecutionEditorNode::RenderContent()
     }
     else
     {
-        m_InputText = GetInputName(m_Key, m_Mods);
+        m_InputText = GLFWUtils::ToString(m_Key, m_Mods, GLFWUtils::StringRepresentation::UI);
     }
     ImGui::Text(m_InputText.c_str());
 }
 
-void InputExecutionEditorNode::OnKeyReleased(int key, int mods)
+void InputExecutionEditorNode::OnKeyInputEvent(const KeyInput& input)
 {
-	m_Key = key;
-    m_Mods = mods;
-	m_ListeningToInput = false;
-	App::Get()->UnsubscribeToInput(this);
+    if (input.Action == KeyInputAction::Released)
+    {
+		m_Key = input.Key;
+		m_Mods = input.Mods;
+		m_ListeningToInput = false;
+		App::Get()->UnsubscribeToInput(this);
+    }
 }
 
 CustomEditorNode::CustomEditorNode(NodeGraph* parentGraph, const std::string& name, NodeGraph* nodeGraph, bool regneratePins) :

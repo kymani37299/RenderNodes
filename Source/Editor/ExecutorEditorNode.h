@@ -18,9 +18,13 @@ public:
 	const EditorNodePin& GetExecutionInput() const { return GetPins()[m_ExectuionPinInput]; }
 	const EditorNodePin& GetExecutionOutput() const { return GetPins()[m_ExectuionPinOutput]; }
 
+	bool IsEnabled() const { return m_Enabled; }
+	void SetEnabled(bool enabled) { m_Enabled = enabled; }
+
 private:
 	unsigned m_ExectuionPinInput;
 	unsigned m_ExectuionPinOutput;
+	bool m_Enabled = true;
 };
 
 class PinEditorNode : public ExecutionEditorNode
@@ -100,6 +104,18 @@ public:
 		return 0;
 	}
 
+	PinID GetExecutionOutputPin()
+	{
+		for (const auto customPin : GetCustomPins())
+		{
+			if (customPin.Type == PinType::Execution && !customPin.IsInput)
+			{
+				return customPin.ID;
+			}
+		}
+		return 0;
+	}
+
 	NodeGraph* GetNodeGraph() const { return m_NodeGraph.get(); }
 
 	void RegeneratePins();
@@ -160,7 +176,7 @@ public:
 	int GetKey() const { return m_Key; }
 	int GetMods() const { return m_Mods; }
 
-	void OnKeyReleased(int key, int mods) override;
+	void OnKeyInputEvent(const KeyInput& input) override;
 
 private:
 	bool m_ListeningToInput = false;

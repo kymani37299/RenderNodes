@@ -23,7 +23,7 @@ struct EditorNodePin;
 
 class NodeGraphSerializer
 {
-	static constexpr unsigned VERSION = 9;
+	static constexpr unsigned VERSION = 10;
 
 public:
 	void Serialize(const std::string& path, const NodeGraph& nodeGraph, const VariablePool& variablePool);

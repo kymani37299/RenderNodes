@@ -290,6 +290,7 @@ void NewNodeContextMenu::RebuildMenus()
 
 	EditorWidgets::Menu constantsMenu{ "Constants" };
 	AddIfCompatible<BoolEditorNode>(constantsMenu, "Bool", &m_NewNode, nodePin);
+	AddIfCompatible<IntEditorNode>(constantsMenu, "Int", &m_NewNode, nodePin);
 	AddIfCompatible<StringEditorNode>(constantsMenu, "String", &m_NewNode, nodePin);
 	AddIfCompatible<FloatEditorNode>(constantsMenu, "Float", &m_NewNode, nodePin);
 	AddIfCompatible<Float2EditorNode>(constantsMenu, "Float2", &m_NewNode, nodePin);
@@ -409,6 +410,29 @@ void NodeContextMenu::DrawContent()
 	ImNode::SelectNode(m_NodeID, true);
 
 	EditorNode* node = m_CommandExecutor->GetNodeGraph()->GetNodeByID(m_NodeID);
+	
+	// Enable/Disable command
+	const auto selectedNodes = GetSelectedNodes(*m_CommandExecutor->GetNodeGraph());
+	if (selectedNodes.size() > 1) // Multi enable/disable
+	{
+		if (ImGui::MenuItem("Enable all"))
+		{
+			m_CommandExecutor->ExecuteCommand(new SetSelectedNodesEnabledNodeGraphCommand{ true });
+		}
+		if (ImGui::MenuItem("Disable all"))
+		{
+			m_CommandExecutor->ExecuteCommand(new SetSelectedNodesEnabledNodeGraphCommand{ false });
+		}
+	}
+	else // Single enable/disable
+	{
+		ExecutionEditorNode* exNode = dynamic_cast<ExecutionEditorNode*>(node);
+		if (exNode != nullptr && ImGui::MenuItem(exNode->IsEnabled() ? "Disable" : "Enable"))
+		{
+			m_CommandExecutor->ExecuteCommand(new SetSelectedNodesEnabledNodeGraphCommand{ !exNode->IsEnabled() });
+		}
+	}
+	
 	if (node->GetType() == EditorNodeType::Custom)
 	{
 		if (ImGui::MenuItem("Open"))

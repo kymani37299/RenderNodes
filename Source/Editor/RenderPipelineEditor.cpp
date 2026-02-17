@@ -49,11 +49,14 @@ void RenderPipelineEditor::Render()
     RenderVariableWindow();
 }
 
-void RenderPipelineEditor::HandleKeyPressed(int key, int mods)
+void RenderPipelineEditor::OnKeyInputEvent(const KeyInput& input)
 {
-	if (mods == 0)
+    if (input.Action != KeyInputAction::Pressed)
+        return;
+
+	if (input.Mods == 0)
 	{
-		switch (key)
+		switch (input.Key)
 		{
 		case GLFW_KEY_DELETE:
 			m_CommandExecutor->ExecuteCommand(new RemoveSelectedNodesNodeGraphCommand{});
@@ -61,9 +64,9 @@ void RenderPipelineEditor::HandleKeyPressed(int key, int mods)
 		}
 	}
 
-	if (mods & GLFW_MOD_CONTROL)
+	if (input.Key & GLFW_MOD_CONTROL)
 	{
-		switch (key)
+		switch (input.Key)
 		{
 		case GLFW_KEY_C:
 			m_CommandExecutor->ExecuteCommand(new CopySelectedNodesNodeGraphCommand{});
@@ -294,11 +297,7 @@ void RenderPipelineEditor::RenderVariableWindow()
     ImGui::Begin("Variables");
     ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
-    if (ImGui::Button("Add..."))
-    {
-        m_CurrentDialog = Ptr<NewVariableDialog>(new NewVariableDialog{});
-        m_CurrentDialog->Open();
-    }
+    if (ImGui::Button("Add...")) m_CurrentDialog = Ptr<NewVariableDialog>(new NewVariableDialog{});
 
     ImGui::Separator();
 

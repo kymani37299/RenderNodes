@@ -1,5 +1,8 @@
 #include "PinEvaluator.h"
 
+#include "NodeGraphCompiler.h"
+#include "../Execution/ValueNodeImpl.h"
+
 template<typename VariableTypeT>
 ValueNode<VariableTypeT>* EvaluateVariable(VariableEditorNode* node)
 {
@@ -12,17 +15,40 @@ ValueNode<RenderResourceTypeT>* EvaluateRenderResourceVariable(VariableEditorNod
 	return new RenderResourceVariableValueNodeT<RenderResourceTypeT>(node->GetVariableID());
 }
 
+template<typename T, PinType PinTypeT>
+ValueNode<T>* ValidateAndGetOutputPin(EditorNodePin& pin, const NodeGraph& nodeGraph, std::vector<NodeCompilerError>& compileErrors)
+{
+	EditorNodePin outPin = GetOutputPinIfInput(nodeGraph, pin);
+	if (outPin.Type == PinType::Invalid)
+	{
+		compileErrors.push_back({ "Node missing input, connect all required inputs !", nodeGraph.GetPinOwner(pin.ID)->GetID() });
+		return new ConstantValueNode<T>(T{});
+	}
+	ASSERT(pin.Type == PinTypeT);
+	pin = outPin;
+	return nullptr;
+}
+
+template<PinType PinTypeT>
+ValueNode<RenderState>* ValidateAndGetOutputPin(EditorNodePin& pin, const NodeGraph& nodeGraph, std::vector<NodeCompilerError>& compileErrors)
+{
+	EditorNodePin outPin = GetOutputPinIfInput(nodeGraph, pin);
+	if (outPin.Type == PinType::Invalid)
+	{
+		compileErrors.push_back({ "Node missing input, connect all required inputs !", nodeGraph.GetPinOwner(pin.ID)->GetID() });
+		return new RenderStateConstantValueNode({});
+	}
+	ASSERT(pin.Type == PinTypeT);
+	pin = outPin;
+	return nullptr;
+}
+
 BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<bool>{ pin.ConstantValue.B };
 
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);	
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Bool pin input missing link!");
-		return new ConstantValueNode<bool>(false);
-	}
-	ASSERT(pin.Type == PinType::Bool);
+	auto* errorNode = ValidateAndGetOutputPin<bool, PinType::Bool>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -36,7 +62,6 @@ BoolValueNode* PinEvaluator::EvaluateBool(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<BoolValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBoolPin] internal error!");
 	}
 	return new ConstantValueNode<bool>(false);
 }
@@ -45,13 +70,8 @@ IntValueNode* PinEvaluator::EvaluateInt(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<int>{ pin.ConstantValue.I };
 
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Int pin input missing link!");
-		return new ConstantValueNode<int>(0);
-	}
-	ASSERT(pin.Type == PinType::Int);
+	auto* errorNode = ValidateAndGetOutputPin<int, PinType::Int>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -63,7 +83,6 @@ IntValueNode* PinEvaluator::EvaluateInt(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<IntValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateIntPin] internal error!");
 	}
 	return new ConstantValueNode<int>(0);
 }
@@ -72,13 +91,8 @@ StringValueNode* PinEvaluator::EvaluateString(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<std::string>{ pin.ConstantValue.STR };
 	
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);	
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("String pin input missing link!");
-		return new ConstantValueNode<std::string>("");
-	}
-	ASSERT(pin.Type == PinType::String);
+	auto* errorNode = ValidateAndGetOutputPin<std::string, PinType::String>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -88,7 +102,6 @@ StringValueNode* PinEvaluator::EvaluateString(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<StringValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBoolPin] internal error!");
 	}
 	return new ConstantValueNode<std::string>("");
 }
@@ -97,13 +110,8 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<float>{ pin.ConstantValue.F };
 	
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Float pin input missing link!");
-		return new ConstantValueNode<float>(0.0f);
-	}
-	ASSERT(pin.Type == PinType::Float);
+	auto* errorNode = ValidateAndGetOutputPin<float, PinType::Float>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -119,7 +127,6 @@ FloatValueNode* PinEvaluator::EvaluateFloat(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<FloatValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
 	return new ConstantValueNode<float>(0.0f);
 }
@@ -128,13 +135,8 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<Float2>{ pin.ConstantValue.F2 };
 	
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Float2 pin input missing link!");
-		return new ConstantValueNode<Float2>({});
-	}
-	ASSERT(pin.Type == PinType::Float2);
+	auto* errorNode = ValidateAndGetOutputPin<Float2, PinType::Float2>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -148,7 +150,6 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float2ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
 	return new ConstantValueNode<Float2>({});
 }
@@ -157,13 +158,8 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<Float3>{ pin.ConstantValue.F3 };
 	
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Float3 pin input missing link!");
-		return new ConstantValueNode<Float3>({});
-	}
-	ASSERT(pin.Type == PinType::Float3);
+	auto* errorNode = ValidateAndGetOutputPin<Float3, PinType::Float3>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -178,7 +174,6 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float3ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
 	return new ConstantValueNode<Float3>({});
 }
@@ -187,13 +182,8 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 {
 	if (pin.HasConstantValue) return new ConstantValueNode<Float4>{ pin.ConstantValue.F4 };
 	
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Float4 pin input missing link!");
-		return new ConstantValueNode<Float4>({});
-	}
-	ASSERT(pin.Type == PinType::Float4);
+	auto* errorNode = ValidateAndGetOutputPin<Float4, PinType::Float4>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -207,7 +197,6 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float4ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
 	return new ConstantValueNode<Float4>({});
 }
@@ -216,13 +205,8 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(EditorNodePin pin)
 {
 	// if (pin.HasConstantValue) return new ConstantValueNode<Float4x4>{ pin.ConstantValue.F4X4 };
 
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Float4x4 pin input missing link!");
-		return new ConstantValueNode<Float4x4>(glm::identity<Float4x4>());
-	}
-	ASSERT(pin.Type == PinType::Float4x4);
+	auto* errorNode = ValidateAndGetOutputPin<Float4x4, PinType::Float4x4>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -239,20 +223,14 @@ Float4x4ValueNode* PinEvaluator::EvaluateFloat4x4(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<Float4x4ValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloat4x4Pin] internal error!");
 	}
 	return new ConstantValueNode<Float4x4>(glm::identity<Float4x4>());
 }
 
 TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Texture pin input not linked!");
-		return new ConstantValueNode<Texture*>(nullptr);
-	}
-	ASSERT(pin.Type == PinType::Texture);
+	auto* errorNode = ValidateAndGetOutputPin<Texture*, PinType::Texture>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -262,20 +240,14 @@ TextureValueNode* PinEvaluator::EvaluateTexture(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<TextureValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
-	return new ConstantValueNode<Texture*>(nullptr);
+	return new NullPtrValueNode<Texture>();
 }
 
 BufferValueNode* PinEvaluator::EvaluateBuffer(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Buffer pin input not linked!");
-		return new ConstantValueNode<Buffer*>(nullptr);
-	}
-	ASSERT(pin.Type == PinType::Buffer);
+	auto* errorNode = ValidateAndGetOutputPin<Buffer*, PinType::Buffer>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -284,20 +256,14 @@ BufferValueNode* PinEvaluator::EvaluateBuffer(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<BufferValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
-	return new ConstantValueNode<Buffer*>(nullptr);
+	return new NullPtrValueNode<Buffer>();
 }
 
 MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Mesh pin input not linked!");
-		return new ConstantValueNode<Mesh*>(nullptr);
-	}
-	ASSERT(pin.Type == PinType::Mesh);
+	auto* errorNode = ValidateAndGetOutputPin<Mesh*, PinType::Mesh>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -309,20 +275,14 @@ MeshValueNode* PinEvaluator::EvaluateMesh(EditorNodePin pin)
 
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateFloatPin] internal error!");
 	}
-	return new ConstantValueNode<Mesh*>(nullptr);
+	return new NullPtrValueNode<Mesh>();
 }
 
 ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Shader pin input not linked!");
-		return new ConstantValueNode<Shader*>(nullptr);
-	}
-	ASSERT(pin.Type == PinType::Shader);
+	auto* errorNode = ValidateAndGetOutputPin<Shader*, PinType::Shader>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -332,20 +292,14 @@ ShaderValueNode* PinEvaluator::EvaluateShader(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<ShaderValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateShader] internal error!");
 	}
-	return new ConstantValueNode<Shader*>(nullptr);
+	return new NullPtrValueNode<Shader>();
 }
 
 BindTableValueNode* PinEvaluator::EvaluateBindTable(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("BindTable pin input not linked!");
-		return new ConstantValueNode<BindTable*>(nullptr);
-	}
-	ASSERT(pin.Type == PinType::BindTable);
+	auto* errorNode = ValidateAndGetOutputPin<BindTable*, PinType::BindTable>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -355,20 +309,14 @@ BindTableValueNode* PinEvaluator::EvaluateBindTable(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<BindTableValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBindTable] internal error!");
 	}
-	return new ConstantValueNode<BindTable*>(nullptr);
+	return new NullPtrValueNode<BindTable>();
 }
 
 RenderStateValueNode* PinEvaluator::EvaluateRenderState(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("RenderState pin input not linked!");
-		return new ConstantValueNode<RenderState>({});
-	}
-	ASSERT(pin.Type == PinType::RenderState);
+	auto* errorNode = ValidateAndGetOutputPin<PinType::RenderState>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -378,21 +326,14 @@ RenderStateValueNode* PinEvaluator::EvaluateRenderState(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<RenderStateValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateRenderState] internal error!");
 	}
-	return new ConstantValueNode<RenderState>({});
+	return new RenderStateConstantValueNode({});
 }
 
 SceneObjectValueNode* PinEvaluator::EvaluateSceneObject(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	ASSERT(pin.Type == PinType::SceneObject);
-
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("SceneObject pin input not linked!");
-		return new ConstantValueNode<SceneObject*>({});
-	}
+	auto* errorNode = ValidateAndGetOutputPin<SceneObject*, PinType::SceneObject>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -402,20 +343,14 @@ SceneObjectValueNode* PinEvaluator::EvaluateSceneObject(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<SceneObjectValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateRenderState] internal error!");
 	}
-	return new ConstantValueNode<SceneObject*>({});
+	return new NullPtrValueNode<SceneObject>();
 }
 
 SceneValueNode* PinEvaluator::EvaluateScene(EditorNodePin pin)
 {
-	pin = GetOutputPinIfInput(*GetNodeGraph(), pin);
-	if (pin.Type == PinType::Invalid)
-	{
-		m_ErrorMessages.push_back("Scene pin input not linked!");
-		return new ConstantValueNode<Scene*>({});
-	}
-	ASSERT(pin.Type == PinType::Scene);
+	auto* errorNode = ValidateAndGetOutputPin<Scene*, PinType::Scene>(pin, *GetNodeGraph(), m_CompilerErrors);
+	if (errorNode != nullptr) return errorNode;
 
 	EditorNode* node = GetNodeGraph()->GetPinOwner(pin.ID);
 	switch (node->GetType())
@@ -425,9 +360,8 @@ SceneValueNode* PinEvaluator::EvaluateScene(EditorNodePin pin)
 	case EditorNodeType::Custom: return EvaluateCustomNode<SceneValueNode>(static_cast<CustomEditorNode*>(node), pin);
 	default:
 		NOT_IMPLEMENTED;
-		m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateRenderState] internal error!");
 	}
-	return new ConstantValueNode<Scene*>({});
+	return new NullPtrValueNode<Scene>();
 }
 
 IntValueNode* PinEvaluator::EvaluateInt(IntEditorNode* node)
@@ -707,10 +641,9 @@ BindTableValueNode* PinEvaluator::EvaluateBindTable(BindTableEditorNode* node)
 			break;
 		default:
 			NOT_IMPLEMENTED;
-			m_ErrorMessages.push_back("[NodeGraphCompiler::EvaluateBindTable] internal error!");
 		}
 	}
-	return new ConstantPtrValueNode<BindTable>{ bindTable };
+	return new BindTableConstantValueNode{ bindTable };
 }
 
 RenderStateValueNode* PinEvaluator::EvaluateRenderState(RenderStateEditorNode* node)
@@ -729,7 +662,7 @@ RenderStateValueNode* PinEvaluator::EvaluateRenderState(RenderStateEditorNode* n
 	else if (dt == "NotEqual") state.DepthTest = GL_NOTEQUAL;
 	else NOT_IMPLEMENTED;
 
-	return new ConstantValueNode<RenderState>{ state };
+	return new RenderStateConstantValueNode{ state };
 }
 
 SceneObjectValueNode* PinEvaluator::EvaluateForEachSceneObject(ForEachSceneObjectEditorNode* node)

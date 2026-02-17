@@ -4,23 +4,7 @@
 #include <nfd.h>
 #include <filesystem>
 
-static std::string GetWorkingDirectory() 
-{
-	CHAR buffer[MAX_PATH] = { 0 };
-	GetModuleFileNameA(NULL, buffer, MAX_PATH);
-	std::string::size_type pos = std::string(buffer).find_last_of("\\/");
-	return std::string(buffer).substr(0, pos);
-}
-
-static std::string GetRelativePath(const std::string& absolutePath)
-{
-	namespace fs = std::filesystem;
-
-	const fs::path base{ absolutePath };
-	const fs::path ref{ GetWorkingDirectory() };
-	const fs::path relative = fs::relative(base, ref);
-	return relative.string();
-}
+#include "FileUtils.h"
 
 namespace FileDialog
 {
@@ -45,7 +29,7 @@ namespace FileDialog
 		if (result == NFD_OKAY)
 		{
 			path = std::string{ outPath };
-			path = GetRelativePath(path);
+			path = FileUtils::GetRelativePath(path);
 			NFD_FreePath(outPath);
 			return true;
 		}
@@ -61,7 +45,7 @@ namespace FileDialog
 		if (result == NFD_OKAY)
 		{
 			path = std::string{ outPath };
-			path = GetRelativePath(path);
+			path = FileUtils::GetRelativePath(path);
 			NFD_FreePath(outPath);
 			return true;
 		}
@@ -76,6 +60,11 @@ namespace FileDialog
 	bool SaveRenderNodeFile(std::string& path)
 	{
 		return SaveFile(path, { { "Render node file", "rn" } });
+	}
+
+	bool SaveJavascriptFile(std::string& path)
+	{
+		return SaveFile(path, { { "Javascript file", "js" } });
 	}
 
 	bool OpenTextureFile(std::string& path)

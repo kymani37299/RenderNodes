@@ -13,4 +13,5 @@ namespace FileDialog
 	bool OpenSceneFile(std::string& path);
 
 	bool SaveRenderNodeFile(std::string& path);
+	bool SaveJavascriptFile(std::string& path);
 }

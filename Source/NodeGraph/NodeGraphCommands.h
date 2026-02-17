@@ -5,6 +5,9 @@
 
 #include "NodeGraph.h"
 
+// TODO: Move this to somewhere more logical
+std::unordered_set<EditorNode*> GetSelectedNodes(const NodeGraph& nodeGraph);
+
 struct NodeGraphCommandExecutorContext
 {
 	Float2 RootCopyLocation{};
@@ -176,4 +179,19 @@ public:
 private:
 	PinID m_PinID;
 	EditorNodePinConstant m_Value;
+};
+
+class SetSelectedNodesEnabledNodeGraphCommand : public NodeGraphCommand
+{
+public:
+	SetSelectedNodesEnabledNodeGraphCommand(bool enabled):
+		m_Enabled(enabled) {
+	}
+
+	void Execute(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
+	void Undo(NodeGraphCommandExecutorContext& context, NodeGraph& nodeGraph) override;
+
+private:
+	bool m_Enabled;
+	std::vector<NodeID> m_EditedNodes{};
 };

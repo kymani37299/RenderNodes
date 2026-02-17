@@ -10,7 +10,7 @@
 
 class NodeGraphCommandExecutor;
 
-class RenderPipelineEditor
+class RenderPipelineEditor : public IInputListener
 {
 public:
     RenderPipelineEditor(NodeGraphCommandExecutor* commandExecutor);
@@ -19,7 +19,7 @@ public:
 	void InitializeDefaultNodePositions();
 
     void Render();
-    void HandleKeyPressed(int key, int mods);
+    void OnKeyInputEvent(const KeyInput& input) override;
 
     void Unload();
     void Load(NodeGraph* nodeGraph, VariablePool* variablePool);
@@ -27,7 +27,11 @@ public:
     void LoadNodePositions();
     void SaveNodePositions();
 
+    void PushDialog(EditorDialog* dialog) { m_CurrentDialog = Ptr<EditorDialog>(dialog); }
+
     NodeGraphCommandExecutor* GetCommandExecutor() const { return m_CommandExecutor.get(); }
+
+    
 
 private:
     void UpdateEditor();

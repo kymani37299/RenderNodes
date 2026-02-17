@@ -13,14 +13,14 @@ class NodeGraph;
 class ExecutorNode;
 struct CompiledPipeline;
 
+struct NodeCompilerError
+{
+	std::string Message;
+	NodeID Node;
+};
+
 class NodeGraphCompiler
 {
-	struct CompilerError
-	{
-		std::string Message;
-		NodeID Node;
-	};
-
 	struct Context
 	{
 		std::unordered_map<ExecutorNode*, NodeID> EditorLinks;
@@ -28,7 +28,7 @@ class NodeGraphCompiler
 
 public:
 	CompiledPipeline Compile(const NodeGraph& graph, const VariablePool& variablePool);
-	const std::vector<CompilerError>& GetCompileErrors() const { return m_CompilationErrors; }
+	const std::vector<NodeCompilerError>& GetCompileErrors() const { return m_CompilationErrors; }
 
 private:
 	ExecutionEditorNode* GetNextExecutorNode(ExecutionEditorNode* executorNode);
@@ -52,5 +52,5 @@ private:
 
 private:
 	NodeGraphCompilerContextStack m_ContextStack;
-	std::vector<CompilerError> m_CompilationErrors;
+	std::vector<NodeCompilerError> m_CompilationErrors;
 };

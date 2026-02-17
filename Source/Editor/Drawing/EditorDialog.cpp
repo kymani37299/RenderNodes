@@ -3,6 +3,7 @@
 #include "../../App/App.h"
 #include "../../Common.h"
 #include "EditorWidgets.h"
+#include "../../Util/FileUtils.h"
 
 bool EditorDialog::Draw()
 {
@@ -58,6 +59,29 @@ void NewVariableDialog::DrawContent()
 	}
 
 	if (!validVariable) ImGui::PopStyleVar();
+
+	ImGui::SameLine();
+	if (ImGui::Button("Cancel"))
+	{
+		Close();
+	}
+}
+
+void GenerateCodeDialog::DrawContent()
+{
+	ImGui::InputText("Project name", m_ProjectName);
+
+	const bool validName = !m_ProjectName.empty() && !FileUtils::HasForbiddenSymbols(m_ProjectName);
+
+	if (!validName) ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
+
+	if (ImGui::Button("Generate") && validName)
+	{
+		App::Get()->AddRequest(AppRequest::CreateGenerateCodeRequest(m_ProjectName));
+		Close();
+	}
+
+	if (!validName) ImGui::PopStyleVar();
 
 	ImGui::SameLine();
 	if (ImGui::Button("Cancel"))

@@ -34,6 +34,7 @@ using CustomNodeList = std::vector<Ptr<CustomEditorNode>>;
 enum class AppRequestType
 {
 	ChangeMode,
+	GenerateCode,
 };
 
 struct ChangeModeAppRequest
@@ -42,17 +43,31 @@ struct ChangeModeAppRequest
 	std::string CustomNodeName;
 };
 
+struct GenerateCodeRequest
+{
+	std::string ProjectName;
+};
+
 struct AppRequest
 {
 	AppRequestType Type;
 	ChangeModeAppRequest ChangeMode;
+	GenerateCodeRequest GenerateCode;
 
-	static AppRequest ChangeModeRequest(AppMode mode, std::string customNodeName = "")
+	static AppRequest ChangeModeRequest(AppMode mode, const std::string& customNodeName = "")
 	{
 		AppRequest req;
 		req.Type = AppRequestType::ChangeMode;
 		req.ChangeMode.Mode = mode;
 		req.ChangeMode.CustomNodeName = customNodeName;
+		return req;
+	}
+
+	static AppRequest CreateGenerateCodeRequest(const std::string& projectName)
+	{
+		AppRequest req;
+		req.Type = AppRequestType::GenerateCode;
+		req.GenerateCode.ProjectName = projectName;
 		return req;
 	}
 };
@@ -83,7 +98,7 @@ public:
 
 	void AddRequest(const AppRequest& request) { m_Requests.push(request); }
 
-	void HandleInputAction(int key, int mods, int action);
+	void HandleInputAction(const KeyInput& input);
 
 	void AddCustomNode(CustomEditorNode* node);
 	void OpenCustomNode(const std::string& name);
@@ -104,6 +119,7 @@ private:
 	void SaveAsDocument();
 
 	void CompileAndRun();
+	void GenerateCode(const std::string& projectName);
 
 private:
 	void RenderMenuBar();

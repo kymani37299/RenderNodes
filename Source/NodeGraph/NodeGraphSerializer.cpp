@@ -532,6 +532,11 @@ void NodeGraphSerializer::WriteNode(EditorNode* node)
 	WritePinList(node->m_Pins, false);
 	WritePinList(node->m_CustomPins, true);
 
+	if (ExecutionEditorNode* exNode = dynamic_cast<ExecutionEditorNode*>(node))
+	{
+		WriteAttribute("Enabled", exNode->m_Enabled);
+	}
+	
 	WriteToken(END_NODE_TOKEN);
 }
 
@@ -967,6 +972,14 @@ EditorNode* NodeGraphSerializer::ReadNode(NodeGraph& nodeGraph, const std::vecto
 		}
 
 		EatToken(END_PIN_LIST_TOKEN);
+	}
+
+	if (m_Version >= 10)
+	{
+		if (ExecutionEditorNode* exNode = dynamic_cast<ExecutionEditorNode*>(node))
+		{
+			exNode->m_Enabled = ReadBoolAttr("Enabled");
+		}
 	}
 
 	EatToken(END_NODE_TOKEN);

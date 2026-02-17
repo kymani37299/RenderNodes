@@ -138,11 +138,23 @@ void InitRenderResources(ExecuteContext& context)
 	}
 }
 
-uint32_t ExecutorInputState::GetInputHash(int key, int mods)
+void ExecutorNodeVisitor::ExecuteNodes(ExecutorNode* startNode)
 {
-	uint32_t hash = Hash::Crc32(key);
-	hash = Hash::Crc32(hash, mods);
-	return hash;
+	if (m_Context.Failure)
+		return;
+
+	ExecutorNode* currentNode = startNode;
+	while (currentNode)
+	{
+		currentNode->Accept(*this);
+
+		if (m_Context.Failure)
+		{
+			m_Context.FailedNode = m_Context.EditorLinks.count(currentNode) > 0 ? m_Context.EditorLinks[currentNode] : 0;
+			break;
+		}
+		currentNode = currentNode->GetNextNode();
+	}
 }
 
 void RenderPipelineExecutor::OnStart()
@@ -158,8 +170,9 @@ void RenderPipelineExecutor::OnStart()
 	App::Get()->GetConsole().Clear();
 
 	// Execute
-	m_Pipeline.OnStartNode->ExecuteNodePath(m_Context);
-
+	InEditorExecutorNodeVisitor executor{ m_Context };
+	executor.ExecuteNodes(m_Pipeline.OnStartNode);
+	
 	HandleErrors();
 }
 
@@ -169,13 +182,14 @@ void RenderPipelineExecutor::OnUpdate(float dt)
 	m_Context.VariablePool.GetRefOrCreate(VariablePool::ID_DT, VariableType::Float, dtVar).Get<float>() = dt;
 	
 	// Update input
-	const auto processInputNodes = [this](std::unordered_set<uint32_t>& keys, std::unordered_map<uint32_t, ExecutorNode*>& map)
+	const auto processInputNodes = [this](std::unordered_set<KeyInput>& keys, std::unordered_map<KeyInput, ExecutorNode*>& map)
 	{
 		for (const auto& key : keys)
 		{
 			if (map.find(key) != map.end())
 			{
-				map[key]->ExecuteNodePath(m_Context);
+				InEditorExecutorNodeVisitor executor{ m_Context };
+				executor.ExecuteNodes(map[key]);
 			}
 		}
 	};
@@ -183,7 +197,8 @@ void RenderPipelineExecutor::OnUpdate(float dt)
 	processInputNodes(m_Context.InputState.ReleasedKeys, m_Pipeline.OnKeyReleasedNodes);
 	processInputNodes(m_Context.InputState.PressedKeys, m_Pipeline.OnKeyPressedNodes);
 
-	m_Pipeline.OnUpdateNode->ExecuteNodePath(m_Context);
+	InEditorExecutorNodeVisitor executor{ m_Context };
+	executor.ExecuteNodes(m_Pipeline.OnUpdateNode);
 
 	m_Context.InputState.PressedKeys.clear();
 	m_Context.InputState.ReleasedKeys.clear();
@@ -199,20 +214,6 @@ void RenderPipelineExecutor::Render()
 	}
 }
 
-void RenderPipelineExecutor::HandleKeyPressed(int key, int mods)
-{
-	const uint32_t inputHash = ExecutorInputState::GetInputHash(key, mods);
-	m_Context.InputState.DownKeys.insert(inputHash);
-	m_Context.InputState.PressedKeys.insert(inputHash);
-}
-
-void RenderPipelineExecutor::HandleKeyReleased(int key, int mods)
-{
-	const uint32_t inputHash = ExecutorInputState::GetInputHash(key, mods);
-	m_Context.InputState.DownKeys.erase(inputHash);
-	m_Context.InputState.ReleasedKeys.insert(inputHash);
-}
-
 void RenderPipelineExecutor::SetCompiledPipeline(CompiledPipeline pipeline)
 {
 	delete m_Pipeline.OnStartNode;
@@ -222,6 +223,26 @@ void RenderPipelineExecutor::SetCompiledPipeline(CompiledPipeline pipeline)
 	for (auto& it : m_Pipeline.OnKeyDownNodes) delete it.second;
 
 	m_Pipeline = pipeline;
+}
+
+void RenderPipelineExecutor::OnKeyInputEvent(const KeyInput& input)
+{
+	if (input.Action == KeyInputAction::Pressed)
+	{
+		KeyInput strippedInput = input;
+		strippedInput.Action = KeyInputAction::Undefined;
+
+		m_Context.InputState.DownKeys.insert(strippedInput);
+		m_Context.InputState.PressedKeys.insert(strippedInput);
+	}
+	else if (input.Action == KeyInputAction::Released)
+	{
+		KeyInput strippedInput = input;
+		strippedInput.Action = KeyInputAction::Undefined;
+
+		m_Context.InputState.DownKeys.erase(strippedInput);
+		m_Context.InputState.ReleasedKeys.insert(strippedInput);
+	}
 }
 
 void RenderPipelineExecutor::HandleErrors()

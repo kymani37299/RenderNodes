@@ -5,22 +5,17 @@
 
 #include "../Common.h"
 #include "../IDGen.h"
+#include "../App/IInputListener.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
 #include "../Render/Buffer.h"
-#include "ExecutorScene.h"
 #include "../NodeGraph/VariablePool.h"
+#include "ExecutorScene.h"
 
 namespace ExecutionPrivate
 {
 	void Failure(const std::string& nodeName, const std::string& msg);
 	void Warning(bool condition, const std::string& nodeName, const std::string& msg);
-
-	inline std::string GetIteratorName(PinID pinID)
-	{
-		return "Internal_Iterator_" + std::to_string(pinID);
-	}
-
 }
 
 enum class ExecutorStaticResource
@@ -38,6 +33,9 @@ struct ExecutorRenderResources
 
 	template<typename T, ExecutorStaticResource staticResource>  T GetStaticResource();
 	template<> Mesh* GetStaticResource<Mesh*, ExecutorStaticResource::CubeMesh>() { return Meshes[VariablePool::ID_CubeMesh].get(); }
+
+	template<ExecutorStaticResource staticResource>  std::string GetStaticResourceVariableName();
+	template<> std::string GetStaticResourceVariableName<ExecutorStaticResource::CubeMesh>() { return "CubeMesh"; }
 
 	template<typename T> T GetResource(VariableID id);
 	template<> Texture* GetResource(VariableID id) { return Textures[id].get(); }
@@ -64,11 +62,9 @@ struct ExecutorIterators
 
 struct ExecutorInputState
 {
-	std::unordered_set<uint32_t> ReleasedKeys;
-	std::unordered_set<uint32_t> PressedKeys;
-	std::unordered_set<uint32_t> DownKeys;
-
-	static uint32_t GetInputHash(int key, int mods);
+	std::unordered_set<KeyInput> ReleasedKeys;
+	std::unordered_set<KeyInput> PressedKeys;
+	std::unordered_set<KeyInput> DownKeys;
 };
 
 class ExecutorNode;
@@ -92,9 +88,9 @@ struct CompiledPipeline
 	ExecutorNode* OnStartNode = nullptr;
 	ExecutorNode* OnUpdateNode = nullptr;
 
-	std::unordered_map<uint32_t, ExecutorNode*> OnKeyPressedNodes;
-	std::unordered_map<uint32_t, ExecutorNode*> OnKeyDownNodes;
-	std::unordered_map<uint32_t, ExecutorNode*> OnKeyReleasedNodes;
+	std::unordered_map<KeyInput, ExecutorNode*> OnKeyPressedNodes;
+	std::unordered_map<KeyInput, ExecutorNode*> OnKeyDownNodes;
+	std::unordered_map<KeyInput, ExecutorNode*> OnKeyReleasedNodes;
 
 	VariablePool VariablePool;
 

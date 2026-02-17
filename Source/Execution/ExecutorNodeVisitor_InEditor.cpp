@@ -1,4 +1,4 @@
-#include "ExecutorNode.h"
+#include "ExecutorNodeVisitor.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -6,6 +6,9 @@
 #include "../Common.h"
 #include "../Render/Texture.h"
 #include "../Render/Shader.h"
+
+#include "ExecutorNode.h"
+#include "RenderStructs.h"
 
 namespace ExecutionPrivate
 {
@@ -85,7 +88,7 @@ namespace
 			return;
 		}
 
-		for(const auto& binding : bindTable->Textures)
+		for (const auto& binding : bindTable->Textures)
 		{
 			Texture* texture = binding.Value.get() ? binding.Value->GetValue(context) : (Texture*) nullptr;
 			if (!texture) continue;
@@ -201,7 +204,7 @@ namespace
 		if (depthTestEnabled) glEnable(GL_DEPTH_TEST);
 		else glDisable(GL_DEPTH_TEST);
 
-		if(depthTestEnabled)
+		if (depthTestEnabled)
 		{
 			glDepthMask(renderState.DepthWrite ? GL_TRUE : GL_FALSE);
 			glDepthFunc(renderState.DepthTest);
@@ -209,41 +212,54 @@ namespace
 	}
 }
 
-void IfExecutorNode::Execute(ExecuteContext& context)
+namespace
 {
-	m_PassedCondition = m_Condition->GetValue(context);
+	std::string ToString(const Float2& value)
+	{
+		return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ")";
+	}
+
+	std::string ToString(const Float3& value)
+	{
+		return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ",  " + std::to_string(value.z) + ")";
+	}
+
+	std::string ToString(const Float4& value)
+	{
+		return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ",  " + std::to_string(value.z) + ",  " + std::to_string(value.w) + ")";
+	}
 }
 
-std::string ToString(const Float2& value)
+DrawMeshExecutorNode::~DrawMeshExecutorNode()
 {
-	return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ")";
+	if (m_VAO) GL_CALL(glDeleteVertexArrays(1, &m_VAO));
 }
 
-std::string ToString(const Float3& value)
+void InEditorExecutorNodeVisitor::Visit(EmptyExecutorNode& node)
 {
-	return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ",  " + std::to_string(value.z) + ")";
+	// Do nothing...
 }
 
-std::string ToString(const Float4& value)
+void InEditorExecutorNodeVisitor::Visit(IfExecutorNode& node)
 {
-	return "(" + std::to_string(value.x) + ",  " + std::to_string(value.y) + ",  " + std::to_string(value.z) + ",  " + std::to_string(value.w) + ")";
+	node.SetCondition(node.GetConditionNode()->GetValue(m_Context));
 }
 
-void PrintExecutorNode::Execute(ExecuteContext& context)
+void InEditorExecutorNodeVisitor::Visit(PrintExecutorNode& node)
 {
-	if (m_FloatNode)  App::Get()->GetConsole().Log(std::to_string(m_FloatNode->GetValue(context)));
-	if (m_Float2Node) App::Get()->GetConsole().Log(ToString(m_Float2Node->GetValue(context)));
-	if (m_Float3Node) App::Get()->GetConsole().Log(ToString(m_Float3Node->GetValue(context)));
-	if (m_Float4Node) App::Get()->GetConsole().Log(ToString(m_Float4Node->GetValue(context)));
-	if (m_IntNode) App::Get()->GetConsole().Log(std::to_string(m_IntNode->GetValue(context)));
-	if (m_BoolNode) App::Get()->GetConsole().Log(m_BoolNode->GetValue(context) ? "true" : "false");
-	if (m_StringNode) App::Get()->GetConsole().Log(m_StringNode->GetValue(context));
+	if (node.GetFloatValueNode())  App::Get()->GetConsole().Log(std::to_string(node.GetFloatValueNode()->GetValue(m_Context)));
+	if (node.GetFloat2ValueNode()) App::Get()->GetConsole().Log(ToString(node.GetFloat2ValueNode()->GetValue(m_Context)));
+	if (node.GetFloat3ValueNode()) App::Get()->GetConsole().Log(ToString(node.GetFloat3ValueNode()->GetValue(m_Context)));
+	if (node.GetFloat4ValueNode()) App::Get()->GetConsole().Log(ToString(node.GetFloat4ValueNode()->GetValue(m_Context)));
+	if (node.GetIntValueNode()) App::Get()->GetConsole().Log(std::to_string(node.GetIntValueNode()->GetValue(m_Context)));
+	if (node.GetBoolValueNode()) App::Get()->GetConsole().Log(node.GetBoolValueNode()->GetValue(m_Context) ? "true" : "false");
+	if (node.GetStringValueNode()) App::Get()->GetConsole().Log(node.GetStringValueNode()->GetValue(m_Context));
 }
 
-void ClearRenderTargetExecutorNode::Execute(ExecuteContext& context)
+void InEditorExecutorNodeVisitor::Visit(ClearRenderTargetExecutorNode& node)
 {
-	const Float4 clearColor = m_ClearColorNode->GetValue(context);
-	const Texture* texture = m_TextureNode->GetValue(context);
+	const Float4 clearColor = node.GetClearColorNode()->GetValue(m_Context);
+	const Texture* texture = node.GetTextureNode()->GetValue(m_Context);
 	Warning(texture, "ClearRenderTargetExecutorNode", "Input texture is null");
 
 	if (texture)
@@ -257,53 +273,92 @@ void ClearRenderTargetExecutorNode::Execute(ExecuteContext& context)
 	}
 }
 
-void PresentTextureExecutorNode::Execute(ExecuteContext& context)
-{
-	Texture* texture = m_Texture->GetValue(context);
-	Warning(texture, "PresentTextureExecutorNode", "Input texture is null");
-	context.RenderTarget = texture;
-}
-
 template<typename T>
-static T* AddToPtrVector(std::vector<Ptr<T>>& ptrVector, Ptr<T>&& ptrValue)
+void AsignVariable(Variable& variable, AsignVariableExecutorNode& node, ExecuteContext& context)
 {
-	ptrVector.push_back(std::move(ptrValue));
-	return ptrVector[ptrVector.size() - 1].get();
+	variable.Get<T>() = node.GetValueNode<T>()->GetValue(context);
 }
 
-DrawMeshExecutorNode::~DrawMeshExecutorNode()
+void InEditorExecutorNodeVisitor::Visit(AsignVariableExecutorNode& node)
 {
-	if (m_VAO) GL_CALL(glDeleteVertexArrays(1, &m_VAO));
-}
-
-void DrawMeshExecutorNode::Execute(ExecuteContext& context)
-{
-	if (!m_FramebufferNode || !m_ShaderNode || !m_MeshNode)
+	if (!node.GetVariableID())
 	{
-		Failure("DrawMeshExecutorNode", "Missing inputs");
-		context.Failure = true;
+		ExecutionPrivate::Failure("AsignVariableExecutorNode", "Variable name not defined");
+		m_Context.Failure = true;
 		return;
 	}
 
-	Texture* framebuffer = m_FramebufferNode->GetValue(context);
-	Shader* shader = m_ShaderNode->GetValue(context);
-	Mesh* mesh = m_MeshNode->GetValue(context);
+	Variable& var = m_Context.VariablePool.GetRef(node.GetVariableID());
+	switch (var.Type)
+	{
+	case VariableType::Invalid:
+		ExecutionPrivate::Failure("AsignVariableExecutorNode", "Variable name not defined");
+		m_Context.Failure = true;
+		break;
+	case VariableType::Bool:
+		AsignVariable<bool>(var, node, m_Context);
+		break;
+	case VariableType::Int:
+		AsignVariable<int>(var, node, m_Context);
+		break;
+	case VariableType::Float:
+		AsignVariable<float>(var, node, m_Context);
+		break;
+	case VariableType::Float2:
+		AsignVariable<Float2>(var, node, m_Context);
+		break;
+	case VariableType::Float3:
+		AsignVariable<Float3>(var, node, m_Context);
+		break;
+	case VariableType::Float4:
+		AsignVariable<Float4>(var, node, m_Context);
+		break;
+	case VariableType::Float4x4:
+		AsignVariable<Float4x4>(var, node, m_Context);
+		break;
+	case VariableType::Shader:
+	case VariableType::Texture:
+	case VariableType::Scene:
+	default:
+		NOT_IMPLEMENTED;
+	}
+}
+
+void InEditorExecutorNodeVisitor::Visit(PresentTextureExecutorNode& node)
+{
+	Texture* texture = node.GetTextureNode()->GetValue(m_Context);
+	Warning(texture, "PresentTextureExecutorNode", "Input texture is null");
+	m_Context.RenderTarget = texture;
+}
+
+void InEditorExecutorNodeVisitor::Visit(DrawMeshExecutorNode& node)
+{
+	if (!node.GetFramebufferNode() || !node.GetShaderNode() || !node.GetMeshNode())
+	{
+		Failure("DrawMeshExecutorNode", "Missing inputs");
+		m_Context.Failure = true;
+		return;
+	}
+
+	Texture* framebuffer = node.GetFramebufferNode()->GetValue(m_Context);
+	Shader* shader = node.GetShaderNode()->GetValue(m_Context);
+	Mesh* mesh = node.GetMeshNode()->GetValue(m_Context);
 
 	if (!framebuffer || !shader || !mesh)
 	{
 		Failure("DrawMeshExecutorNode", "Invalid inputs");
-		context.Failure = true;
+		m_Context.Failure = true;
 		return;
 	}
 
 	if ((framebuffer->Flags & TF_Framebuffer) == 0)
 	{
 		Failure("DrawMeshExecutorNode", "Input framebuffer texture isn't created with framebuffer flag");
-		context.Failure = true;
+		m_Context.Failure = true;
 		return;
 	}
 
-	if (!m_VAO) m_VAO = CreateVAO(mesh, m_MeshNode->GetExtraInfo());
+	if (!node.GetVAO()) node.SetVAO(CreateVAO(mesh, node.GetMeshNode()->GetExtraInfo()));
 
 	// Framebuffer
 	GL_CALL(glViewport(0, 0, framebuffer->Width, framebuffer->Height));
@@ -311,20 +366,20 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 
 	// Render state
 	RenderState renderState;
-	if (m_RenderState) renderState = m_RenderState->GetValue(context);
+	if (node.GetRenderStateNode()) renderState = node.GetRenderStateNode()->GetValue(m_Context);
 	RenderStateBind(renderState);
 
 	// Shader
 	GL_CALL(glUseProgram(shader->Handle));
 
 	// Mesh
-	GL_CALL(glBindVertexArray(m_VAO));
+	GL_CALL(glBindVertexArray(node.GetVAO()));
 	GL_CALL(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh->Indices->Handle));
 
 	// Bindings
 	BindTable* bindTable = nullptr;
-	if (m_BindTable) bindTable = m_BindTable->GetValue(context);
-	TableBind(context, shader, bindTable);
+	if (node.GetBindTableNode()) bindTable = node.GetBindTableNode()->GetValue(m_Context);
+	TableBind(m_Context, shader, bindTable);
 
 	GL_CALL(glDrawElements(GL_TRIANGLES, mesh->NumPrimitives, GL_UNSIGNED_INT, 0));
 
@@ -337,17 +392,19 @@ void DrawMeshExecutorNode::Execute(ExecuteContext& context)
 
 	// ~Shader
 	GL_CALL(glUseProgram(0));
-	
+
 	// ~Framebuffer
 	GL_CALL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
-void ForEachSceneObjectExecutorNode::Execute(ExecuteContext& context)
+void InEditorExecutorNodeVisitor::Visit(ForEachSceneObjectExecutorNode& node)
 {
-	Scene* scene = m_SceneNode->GetValue(context);
+	Scene* scene = node.GetSceneNode()->GetValue(m_Context);
 	for (SceneObject& sceneObject : scene->SceneObjects)
 	{
-		context.Iterators.Data[m_IteratorPin] = &sceneObject;
-		m_LoopExecutorNode->ExecuteNodePath(context);
+		m_Context.Iterators.Data[node.GetIteratorPin()] = &sceneObject;
+
+		InEditorExecutorNodeVisitor visitor{ m_Context };
+		visitor.ExecuteNodes(node.GetLoopExecutorNode());
 	}
 }

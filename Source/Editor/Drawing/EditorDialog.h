@@ -7,8 +7,9 @@
 class EditorDialog
 {
 public:
-	EditorDialog(const std::string id):
-		m_ID(id) {}
+	EditorDialog(const std::string id, bool openImmidiately = true):
+		m_ID(id),
+		m_ShouldOpen(openImmidiately) {}
 
 	void Open()
 	{
@@ -24,7 +25,7 @@ protected:
 private:
 	bool m_IsOpen = false;
 
-	bool m_ShouldOpen = false;
+	bool m_ShouldOpen;
 	std::string m_ID;
 };
 
@@ -43,4 +44,17 @@ protected:
 
 private:
 	Variable m_Variable{};
+};
+
+class GenerateCodeDialog : public EditorDialog
+{
+public:
+	GenerateCodeDialog() :
+		EditorDialog("Generate Code") { }
+
+protected:
+	void DrawContent() override;
+
+private:
+	std::string m_ProjectName;
 };

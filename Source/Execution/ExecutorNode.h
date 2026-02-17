@@ -1,37 +1,19 @@
 #pragma once
 
+#include <variant>
+
 #include "../Common.h"
 #include "../Util/Hash.h"
 
+#include "ExecutorNodeVisitor.h"
 #include "ValueNode.h"
-#include "ExecuteContext.h"
 
 class ExecutorNode
 {
 public:
 	virtual ~ExecutorNode() {}
 
-	virtual void Execute(ExecuteContext& context) = 0;
-
-	// Executes whole node path to the end
-	void ExecuteNodePath(ExecuteContext& context)
-	{
-		if (context.Failure)
-			return;
-
-		ExecutorNode* currentNode = this;
-		while (currentNode)
-		{
-			currentNode->Execute(context);
-
-			if (context.Failure)
-			{
-				context.FailedNode = context.EditorLinks.count(currentNode) > 0 ? context.EditorLinks[currentNode] : 0;
-				break;
-			}
-			currentNode = currentNode->GetNextNode();
-		}
-	}
+	virtual void Accept(ExecutorNodeVisitor& visitor) = 0;
 
 	void SetNextNode(ExecutorNode* node)
 	{
@@ -42,7 +24,6 @@ public:
 	{
 		return m_NextNode.get();
 	}
-
 private:
 	Ptr<ExecutorNode> m_NextNode;
 };
@@ -50,7 +31,7 @@ private:
 class EmptyExecutorNode : public ExecutorNode
 {
 public:
-	void Execute(ExecuteContext& context) override {  }
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
 };
 
 class IfExecutorNode : public ExecutorNode
@@ -60,7 +41,7 @@ public:
 		m_Condition(conditionNode),
 		m_Else(elseBranch) {}
 
-	void Execute(ExecuteContext& context) override;
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
 
 	ExecutorNode* GetNextNode() const override
 	{
@@ -69,6 +50,11 @@ public:
 		else
 			return m_Else.get();
 	}
+
+	void SetCondition(bool condition) { m_PassedCondition = condition; }
+
+	BoolValueNode* GetConditionNode() { return m_Condition.get(); }
+	ExecutorNode* GetElseExecutorNode() { return m_Else.get(); }
 
 private:
 	bool m_PassedCondition = false;
@@ -101,7 +87,15 @@ public:
 	PrintExecutorNode(StringValueNode* stringNode) :
 		m_StringNode(stringNode) {}
 
-	void Execute(ExecuteContext& context) override;
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
+
+	FloatValueNode* GetFloatValueNode() { return m_FloatNode.get(); }
+	Float2ValueNode* GetFloat2ValueNode() { return m_Float2Node.get(); }
+	Float3ValueNode* GetFloat3ValueNode() { return m_Float3Node.get(); }
+	Float4ValueNode* GetFloat4ValueNode() { return m_Float4Node.get(); }
+	IntValueNode* GetIntValueNode() { return m_IntNode.get(); }
+	BoolValueNode* GetBoolValueNode() { return m_BoolNode.get(); }
+	StringValueNode* GetStringValueNode() { return m_StringNode.get(); }
 
 private:
 	Ptr<FloatValueNode> m_FloatNode;
@@ -120,43 +114,60 @@ public:
 		m_TextureNode(textureNode),
 		m_ClearColorNode(clearColorNode) {}
 
-	void Execute(ExecuteContext& context) override;
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
+
+	Float4ValueNode* GetClearColorNode() { return m_ClearColorNode.get(); }
+	TextureValueNode* GetTextureNode() { return m_TextureNode.get(); }
 
 private:
 	Ptr<Float4ValueNode> m_ClearColorNode;
 	Ptr<TextureValueNode> m_TextureNode;
 };
 
-template<typename T>
 class AsignVariableExecutorNode : public ExecutorNode
 {
 public:
+	using ValueNodeVariant = std::variant<
+		Ptr<ValueNode<int>>,
+		Ptr<ValueNode<float>>,
+		Ptr<ValueNode<std::string>>,
+		Ptr<ValueNode<bool>>,
+		Ptr<ValueNode<Float2>>,
+		Ptr<ValueNode<Float3>>,
+		Ptr<ValueNode<Float4>>,
+		Ptr<ValueNode<Float4x4>> 
+	>;
+
+	template<typename T>
 	AsignVariableExecutorNode(VariableID variableID, ValueNode<T>* value):
 		m_VariableID(variableID),
-		m_InitialValueNode(value) {}
-
-	void Execute(ExecuteContext& context) override
+		m_InitialValueNode(Ptr<ValueNode<T>>(value)) 
 	{
-		if (!m_VariableID)
-		{
-			ExecutionPrivate::Failure("AsignVariableExecutorNode", "Variable name not defined");
-			context.Failure = true;
-			return;
-		}
-
-		Variable& var = context.VariablePool.GetRef(m_VariableID);
-		if (var.Type == VariableType::Invalid)
-		{
-			ExecutionPrivate::Failure("AsignVariableExecutorNode", "Variable name not defined");
-			context.Failure = true;
-			return;
-		}
-		var.Get<T>() = m_InitialValueNode->GetValue(context);
+		static_assert(
+			std::disjunction_v<
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<int>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<float>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<std::string>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<bool>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<Float2>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<Float3>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<Float4>>>,
+			std::is_same<Ptr<ValueNode<T>>, Ptr<ValueNode<Float4x4>>>
+			> ,
+			"Type T is not supported in AssignVariableExecutorNode variant! Add it to ValueNodeVariant."
+			);
 	}
+
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
+
+	VariableID GetVariableID() { return m_VariableID; }
+
+	template<typename T>
+	ValueNode<T>* GetValueNode() { return std::get<Ptr<ValueNode<T>>>(m_InitialValueNode).get(); }
 
 private:
 	VariableID m_VariableID = 0;
-	Ptr<ValueNode<T>> m_InitialValueNode;
+	ValueNodeVariant m_InitialValueNode;
 };
 
 class PresentTextureExecutorNode : public ExecutorNode
@@ -166,7 +177,9 @@ public:
 		m_Texture(texture)
 	{ }
 
-	void Execute(ExecuteContext& context) override;
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
+
+	TextureValueNode* GetTextureNode() { return m_Texture.get(); }
 
 private:
 	Ptr<TextureValueNode> m_Texture;
@@ -184,9 +197,19 @@ public:
 
 	~DrawMeshExecutorNode();
 
-	void Execute(ExecuteContext& context) override;
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
+
+	TextureValueNode* GetFramebufferNode() { return m_FramebufferNode.get(); }
+	ShaderValueNode* GetShaderNode() { return m_ShaderNode.get(); }
+	MeshValueNode* GetMeshNode() { return m_MeshNode.get(); }
+	BindTableValueNode* GetBindTableNode() { return m_BindTable.get(); }
+	RenderStateValueNode* GetRenderStateNode() { return m_RenderState.get(); }
+
+	unsigned GetVAO() { return m_VAO; }
+	void SetVAO(unsigned vao) { m_VAO = vao; }
+
 private:
-	unsigned m_VAO = 0;
+	unsigned m_VAO = 0; // TODO: Visitor or executor should own resourrces
 
 	Ptr<TextureValueNode> m_FramebufferNode;
 	Ptr<ShaderValueNode> m_ShaderNode;
@@ -204,7 +227,11 @@ public:
 		m_LoopExecutorNode(loopExecutorNode)
 	{ }
 
-	void Execute(ExecuteContext& context) override;
+	void Accept(ExecutorNodeVisitor& visitor) override { visitor.Visit(*this); }
+
+	PinID GetIteratorPin() { return m_IteratorPin; }
+	SceneValueNode* GetSceneNode() { return m_SceneNode.get(); }
+	ExecutorNode* GetLoopExecutorNode() { return m_LoopExecutorNode.get(); }
 
 private:
 	PinID m_IteratorPin;
