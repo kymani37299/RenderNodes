@@ -1,10 +1,12 @@
 #pragma once
 
 #include <fstream>
+#include <vector>
 
 #include "../Common.h"
 
 struct CompiledPipeline;
+struct ShaderData;
 class CodeGenerator;
 class WebGLExecutorNodeVisitor;
 
@@ -20,7 +22,9 @@ private:
 
 	void WriteInputCallbacks(CodeGenerator& generator, const CompiledPipeline& pipeline, WebGLExecutorNodeVisitor& visitor);
 	void RegisterInputCallbacks(CodeGenerator& generator, const CompiledPipeline& pipeline);
-
 private:
 	std::ofstream m_Out;
+
+	bool m_CompilationSuccess = true;
+	std::vector<std::string> m_ErrorMessages;
 };

@@ -1,5 +1,5 @@
-import { WebGPURenderer } from './webgpu-renderer.js';
 import { InputManager } from "./input-manager.js"
+import { RenderContext } from "./render-context.js";
 
 export class RenderNodesEngine {
     static instance = null;
@@ -24,8 +24,8 @@ export class RenderNodesEngine {
 
     async initialize() {
         try {
-            this.renderer = new WebGPURenderer(this.canvas);
-            await this.renderer.initialize();
+            this.renderer = new RenderContext();
+            await this.renderer.initialize(this.canvas);
             
             window.addEventListener('resize', () => this._handleResize());
             this._handleResize();
@@ -53,6 +53,7 @@ export class RenderNodesEngine {
             this.codeGenClass.RegisterInputs();
             await this.codeGenClass.InitializeVariables();
             await this.codeGenClass.OnStart();
+            this.renderer.endFrame();
         } catch (error) {
             console.error('CodeGen initialization failed:', error);
             throw error;
@@ -65,6 +66,7 @@ export class RenderNodesEngine {
         try {
             this.inputManager.processInputs();
             this.codeGenClass.OnUpdate();
+            this.renderer.endFrame();
         } catch (error) {
             console.error('CodeGen OnUpdate error:', error);
         }

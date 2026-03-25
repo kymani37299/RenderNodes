@@ -155,7 +155,9 @@ public:
 	virtual T GetValue(ExecuteContext& context) const override { return context.RenderResources.GetStaticResource<T, staticResource>(); }
 	virtual void GenerateExpression(CodeGenerator& generator, ExecuteContext& context) const override 
 	{ 
-		generator.WriteVariable("staticResources");
+		generator.FunctionCall("RenderNodeAPI.GetStaticResources");
+		generator.FunctionArgumentsBegin();
+		generator.FunctionArgumentsEnd();
 		generator.ClassMemeberAccess(context.RenderResources.GetStaticResourceVariableName<staticResource>());
 	}
 };
@@ -219,6 +221,80 @@ public:
 		}
 		m_B->GenerateExpression(generator, context);
 		generator.EndExpression();
+	}
+
+private:
+	Ptr<ValueNode<T>> m_A;
+	Ptr<ValueNode<T>> m_B;
+	char m_Op;
+};
+
+template<typename T>
+class VectorBinaryArithmeticOperatorValueNode : public ValueNode<T>
+{
+	static_assert(
+		std::is_same_v<T, Float2> || std::is_same_v<T, Float3> || std::is_same_v<T, Float4>,
+		"BinaryArithmeticOperatorValueNode only supports Float2, Float3, and Float4 types"
+		);
+
+public:
+	VectorBinaryArithmeticOperatorValueNode(ValueNode<T>* a, ValueNode<T>* b, char op) :
+		m_A(Ptr<ValueNode<T>>(a)),
+		m_B(Ptr<ValueNode<T>>(b)),
+		m_Op(op) {}
+
+	virtual T GetValue(ExecuteContext& context) const override
+	{
+		if (!m_A || !m_B)
+		{
+			ExecutionPrivate::Failure("VectorBinaryArithmeticOperatorValueNode", "Binary operator have missing values!");
+			context.Failure = true;
+			return T{};
+		}
+
+		const T a = m_A->GetValue(context);
+		const T b = m_B->GetValue(context);
+
+		switch (m_Op)
+		{
+		case '+':
+			return a + b;
+		case '-':
+			return a - b;
+		case '/':
+			return a / b;
+		case '*':
+			return a * b;
+		}
+		NOT_IMPLEMENTED;
+		return a;
+	}
+
+	virtual void GenerateExpression(CodeGenerator& generator, ExecuteContext& context) const override
+	{
+		generator.BeginExpression();
+		generator.FunctionCall("RenderNodeAPI." + GetVectorOperation());
+		generator.FunctionArgumentsBegin();
+		m_A->GenerateExpression(generator, context);
+		generator.ArgumentsSeparator();
+		m_B->GenerateExpression(generator, context);
+		generator.FunctionArgumentsEnd();
+		generator.EndExpression();
+	}
+
+private:
+	std::string GetVectorOperation() const
+	{
+		switch (m_Op)
+		{
+		case '+': return "VectorAdd";
+		case '-': return "VectorSubtract";
+		case '/': return "VectorDivide";
+		case '*': return "VectorMultiply";
+		default:
+			NOT_IMPLEMENTED;
+		}
+		return "VectorAdd";
 	}
 
 private:
@@ -377,7 +453,7 @@ public:
 
 	virtual void GenerateExpression(CodeGenerator& generator, ExecuteContext& context) const override
 	{
-		generator.FunctionCall("VectorNormalize");
+		generator.FunctionCall("RenderNodeAPI.VectorNormalize");
 		generator.FunctionArgumentsBegin();
 		m_Input->GenerateExpression(generator, context);
 		generator.FunctionArgumentsEnd();
@@ -412,7 +488,7 @@ public:
 
 	virtual void GenerateExpression(CodeGenerator& generator, ExecuteContext& context) const override
 	{
-		generator.FunctionCall("VectorCross");
+		generator.FunctionCall("RenderNodeAPI.VectorCross");
 		generator.FunctionArgumentsBegin();
 		m_A->GenerateExpression(generator, context);
 		generator.ArgumentsSeparator();
@@ -506,7 +582,7 @@ public:
 	virtual void GenerateExpression(CodeGenerator& generator, ExecuteContext& context) const override
 	{
 		generator.WriteKeyword("new");
-		generator.WriteVariable(ValueNodeHelpers::VectorClassName[vecSize]);
+		generator.WriteVariable(ValueNodeHelpers::VectorClassName[vecSize - 1]);
 		generator.FunctionArgumentsBegin();
 
 		for (uint32_t i = 0; i < vecSize; i++)

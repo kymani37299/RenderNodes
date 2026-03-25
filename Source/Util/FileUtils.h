@@ -14,6 +14,7 @@ namespace FileUtils {
     {
         try 
         {
+            fs::create_directories(fs::path(dst).parent_path());
             fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
             return true;
         }
@@ -27,6 +28,7 @@ namespace FileUtils {
     {
         try
         {
+            fs::create_directories(dst);
             fs::copy(src, dst, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             return true;
         }
@@ -36,20 +38,7 @@ namespace FileUtils {
         }
     }
 
-    inline bool MakeDirectory(const std::string& path) 
-    {
-        try 
-        {
-            fs::create_directories(path);
-            return true;
-        }
-        catch (const std::exception&) 
-        {
-            return false;
-        }
-    }
-
-    inline bool DeleteDirectoryIfExists(const std::string& path) 
+    inline bool DeleteDirectory(const std::string& path) 
     {
         try 
         {
@@ -66,7 +55,7 @@ namespace FileUtils {
         }
     }
 
-    inline bool DeleteFileIfExists(const std::string& path) {
+    inline bool DeleteFile(const std::string& path) {
         try 
         {
             if (fs::exists(path) && fs::is_regular_file(path)) 
@@ -82,13 +71,26 @@ namespace FileUtils {
         }
     }
 
+	inline bool MakeDirectory(const std::string& path)
+	{
+		try
+		{
+			fs::create_directories(path);
+			return true;
+		}
+		catch (const std::exception&)
+		{
+			return false;
+		}
+	}
+
     inline std::string MakeRelativePath(const std::string& from, const std::string& to) 
     {
         try 
         {
             fs::path fromPath(from);
             fs::path toPath(to);
-            return fs::relative(toPath, fromPath).string();
+            return fs::relative(toPath, fromPath).generic_string();
         }
         catch (const std::exception&) 
         {
@@ -148,4 +150,21 @@ namespace FileUtils {
 		return relative.generic_string();
 	}
 
+	inline bool ReadFile(const std::string& path, std::vector<std::string>& content)
+	{
+		std::ifstream fileStream(path, std::ios::in);
+
+		if (!fileStream.is_open()) {
+			return false;
+		}
+
+		std::string line = "";
+		while (!fileStream.eof()) {
+			std::getline(fileStream, line);
+			content.push_back(line);
+		}
+
+		fileStream.close();
+		return true;
+	}
 }

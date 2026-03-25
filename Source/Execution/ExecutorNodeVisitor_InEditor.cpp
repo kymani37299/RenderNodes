@@ -14,14 +14,14 @@ namespace ExecutionPrivate
 {
 	void Failure(const std::string& nodeName, const std::string& msg)
 	{
-		App::Get()->GetConsole().Log("[FAILURE] [" + nodeName + "] " + msg);
+		App::Get()->GetConsole().Log("<red>[FAILURE] </red>[" + nodeName + "] " + msg);
 	}
 
 	void Warning(bool condition, const std::string& nodeName, const std::string& msg)
 	{
 		if (!condition)
 		{
-			App::Get()->GetConsole().Log("[WARN] [" + nodeName + "] " + msg);
+			App::Get()->GetConsole().Log("<yellow>[WARN] </yellow>[" + nodeName + "] " + msg);
 		}
 	}
 

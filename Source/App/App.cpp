@@ -453,6 +453,7 @@ void App::SaveAsDocument()
 
 void App::CompileAndRun()
 {
+	m_Console.Clear();
 	m_ErrorHandler->Clear();
 
 	CompiledPipeline pipeline = m_Compiler->Compile(*m_NodeGraph, m_VariablePool);
@@ -467,17 +468,21 @@ void App::CompileAndRun()
 	{
 		AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
 		
-		// Mark error nodes
+		m_Console.Log("<red>--------[Pipeline compilation errors]--------</red> ");
 		for (const auto& err : m_Compiler->GetCompileErrors())
 		{
-			m_Console.Log("[Compilation error] " + err.Message);
+			m_Console.Log(err.Message);
 			m_ErrorHandler->MarkErrorNode(err.Node);
 		}
+		m_Console.Log("<red>----------------------------------------------</red> ");
 	}
 }
 
 void App::GenerateCode(const std::string& projectName)
 {	
+	m_Console.Clear();
+	m_ErrorHandler->Clear();
+
 	CompiledPipeline pipeline = m_Compiler->Compile(*m_NodeGraph, m_VariablePool);
 	bool compilationSuccessful = m_Compiler->GetCompileErrors().empty();
 	if (compilationSuccessful)
@@ -486,21 +491,22 @@ void App::GenerateCode(const std::string& projectName)
 		const bool compilationSuccess = codeGenerator.GenerateCode(projectName, pipeline);
 		if (compilationSuccess)
 		{
-			m_Console.Log("Compilation successful!");
+			m_Console.Log("<green>Code generation successful!</green>");
 		}
 		else
 		{
-			m_Console.Log("[Compilation error] Failed to generate compiler pipeline!");
+			m_Console.Log("<red>Failed to generate code!</red>");
 		}
 	}
 	else
 	{
-		// Mark error nodes
+		m_Console.Log("<red>--------[Pipeline compilation errors]--------</red> ");
 		for (const auto& err : m_Compiler->GetCompileErrors())
 		{
-			m_Console.Log("[Compilation error] " + err.Message);
+			m_Console.Log("<red>[Compile error]</red> " + err.Message);
 			m_ErrorHandler->MarkErrorNode(err.Node);
 		}
+		m_Console.Log("<red>---------------------------------------------</red> ");
 	}
 }
 

@@ -1,23 +1,39 @@
 #include "RenderPipelineCodeGenerator.h"
 
+#include <regex>
+
 #include "CodeGenerator.h"
+#include "../App/App.h"
+#include "../Editor/EditorErrorHandler.h"
 #include "../Execution/ExecuteContext.h"
 #include "../Execution/ExecutorNodeVisitor.h"
+#include "../Misc/WGSLConverter.h"
 #include "../Util/FileUtils.h"
 #include "../Util/GLFWUtils.h"
+#include "../Render/Shader.h"
 
 static std::string CodegenFileName = "nodegraph-codegen.js";
 static std::string TemplateLocation = "./Data/WebGPU_Template";
 static std::string GeneratedProjectsLocation = "./Generated";
-static std::string ResourcesDirectoryName = "Resources";
+static std::string ResourcesDirectoryName = "res";
+static std::string TmpDirectoryName = ".temp";
+static std::string JsSourceDirectoryName = "js";
+
+inline std::string CreateResPath(const std::string& resouceType, const std::string& fileName)
+{
+	return ResourcesDirectoryName + "/" + resouceType + "/" + fileName;
+}
 
 bool RenderPipelineCodeGenerator::GenerateCode(const std::string& projectName, const CompiledPipeline& pipeline)
 {
 	const std::string projectDirectoryLocation = GeneratedProjectsLocation + "/" + projectName;
-	const std::string codegenFileLocation = projectDirectoryLocation + "/" + CodegenFileName;
+	const std::string jsSourceDir = projectDirectoryLocation + "/" + JsSourceDirectoryName;
+	const std::string codegenFileLocation = jsSourceDir + "/" + CodegenFileName;
 
-	FileUtils::DeleteDirectoryIfExists(projectDirectoryLocation);
-	FileUtils::MakeDirectory(projectDirectoryLocation);
+	m_ErrorMessages.clear();
+
+	FileUtils::DeleteDirectory(projectDirectoryLocation);
+	FileUtils::MakeDirectory(jsSourceDir);
 
 	LinkResources(projectDirectoryLocation, const_cast<CompiledPipeline&>(pipeline)); // TODO: TMP: Find a better way than const_cast
 
@@ -56,22 +72,33 @@ bool RenderPipelineCodeGenerator::GenerateCode(const std::string& projectName, c
 	RegisterInputCallbacks(codeGenerator, pipeline);
 	WriteInputCallbacks(codeGenerator, pipeline, visitor);
 
-	// TODO: Mark error execution nodes
-
 	codeGenerator.EndBlock();
 
 	m_Out.close();
 
-	if (executeContext.Failure)
+	m_CompilationSuccess = !executeContext.Failure && m_CompilationSuccess;
+
+	if (!m_CompilationSuccess)
 	{
-		FileUtils::DeleteDirectoryIfExists(projectDirectoryLocation);
+		if (executeContext.Failure && executeContext.FailedNode != 0)
+		{
+			App::Get()->GetErrorHandler().MarkErrorNode(executeContext.FailedNode);
+		}
+
+		App::Get()->GetConsole().Log("<red>----------------[CodeGen Errors]----------------</red>");
+		for (const std::string& errorMsg : m_ErrorMessages)
+		{
+			App::Get()->GetConsole().Log(errorMsg);
+		}
+		App::Get()->GetConsole().Log("<red>------------------------------------------------</red>");
+		FileUtils::DeleteDirectory(projectDirectoryLocation);
 	}
 	else
 	{
 		FileUtils::CopyDirectory(TemplateLocation, projectDirectoryLocation);
 	}
 
-	return !executeContext.Failure;
+	return m_CompilationSuccess;
 }
 
 void RenderPipelineCodeGenerator::WriteImports(CodeGenerator& generator)
@@ -125,6 +152,19 @@ void RenderPipelineCodeGenerator::GenerateVariableInitialization(CodeGenerator& 
 				generator.FunctionCall("RenderNodeAPI.LoadShader");
 				generator.FunctionArgumentsBegin();
 				generator.WriteConstant(data.Path);
+				generator.ArgumentsSeparator();
+
+				generator.BeginInlineObject();
+				for (const auto& bindMap : data.BindingMap)
+				{
+					generator.WriteConstant(bindMap.first);
+					generator.WriteKeyword(": ");
+					generator.WriteConstant(bindMap.second);
+					generator.ArgumentsSeparator();
+				}
+				generator.EndInlineObject();
+
+
 				generator.FunctionArgumentsEnd();
 			} break;
 			case VariableType::Texture:
@@ -132,7 +172,6 @@ void RenderPipelineCodeGenerator::GenerateVariableInitialization(CodeGenerator& 
 				const auto& data = variable.Get<TextureData>();
 				if (data.Path.empty())
 				{
-					generator.WriteKeyword("await");
 					generator.FunctionCall("RenderNodeAPI.CreateFramebuffer");
 					generator.FunctionArgumentsBegin();
 					generator.WriteConstant(data.Width);
@@ -146,7 +185,17 @@ void RenderPipelineCodeGenerator::GenerateVariableInitialization(CodeGenerator& 
 				}
 				else
 				{
-					NOT_IMPLEMENTED;
+					generator.WriteKeyword("await");
+					generator.FunctionCall("RenderNodeAPI.LoadTexture");
+					generator.FunctionArgumentsBegin();
+					generator.WriteConstant(data.Path);
+					generator.ArgumentsSeparator();
+					generator.WriteConstant(data.Width);
+					generator.ArgumentsSeparator();
+					generator.WriteConstant(data.Height);
+					generator.ArgumentsSeparator();
+					generator.WriteConstant(data.Framebuffer);
+					generator.FunctionArgumentsEnd();
 				}
 
 			} break;
@@ -174,6 +223,12 @@ void RenderPipelineCodeGenerator::GenerateVariableInitialization(CodeGenerator& 
 	generator.FunctionArgumentsBegin();
 	generator.FunctionArgumentsEnd();
 	generator.BeginBlock();
+
+	generator.FunctionCall("RenderNodeAPI.InitStaticResources");
+	generator.FunctionArgumentsBegin();
+	generator.FunctionArgumentsEnd();
+	generator.EndInstruction();
+
 	pipeline.VariablePool.ForEachVariable(fn);
 	generator.EndBlock();
 }
@@ -181,26 +236,34 @@ void RenderPipelineCodeGenerator::GenerateVariableInitialization(CodeGenerator& 
 void RenderPipelineCodeGenerator::LinkResources(const std::string& projectPath, CompiledPipeline& pipeline)
 {
 	const std::string resourceDir = projectPath + "/" + ResourcesDirectoryName;
+	const std::string tmpDir = projectPath + "/" + TmpDirectoryName;
 
-	FileUtils::DeleteDirectoryIfExists(resourceDir);
-	FileUtils::MakeDirectory(resourceDir);
-	FileUtils::MakeDirectory(resourceDir + "/Textures");
-	FileUtils::MakeDirectory(resourceDir + "/Shaders");
-	FileUtils::MakeDirectory(resourceDir + "/Scenes");
-
-	const auto fn = [&resourceDir](VariableID id, Variable& variable) {
+	FileUtils::DeleteDirectory(resourceDir);
+	FileUtils::MakeDirectory(tmpDir);
+	
+	const auto fn = [&resourceDir, &tmpDir, &projectPath, this](VariableID id, Variable& variable) {
 		switch (variable.Type)
 		{
 		case VariableType::Shader:
 		{
 			auto& data = variable.Get<ShaderData>();
+
 			std::string fileName, fileExt;
-			if (FileUtils::GetFileNameAndExtension(data.Path, fileName, fileExt))
+			if (!FileUtils::GetFileNameAndExtension(data.Path, fileName, fileExt))
 			{
-				const std::string newPath = resourceDir + "/Shaders/" + fileName + ".wgsl";
-				FileUtils::CopyFile(data.Path, newPath);
-				data.Path = newPath;
+				m_CompilationSuccess = false;
+				m_ErrorMessages.push_back("Error while processing shader at: " + data.Path);
+				break;
 			}
+
+			const std::string shadersResPath = resourceDir + "/Shaders/";
+			FileUtils::MakeDirectory(shadersResPath);
+
+			if (!WGSLConverter::Convert(data.Path, tmpDir + "/" + fileName, resourceDir + "/Shaders/" + fileName, data.BindingMap, m_ErrorMessages))
+			{
+				m_CompilationSuccess = false;
+			}
+			data.Path = CreateResPath("Shaders", fileName);
 		} break;
 		case VariableType::Scene:
 		{
@@ -210,7 +273,7 @@ void RenderPipelineCodeGenerator::LinkResources(const std::string& projectPath, 
 			{
 				const std::string newPath = resourceDir + "/Scenes/" + fileName + fileExt;
 				FileUtils::CopyFile(data.Path, newPath);
-				data.Path = newPath;
+				data.Path = CreateResPath("Scenes", fileName + fileExt);
 			}
 		} break;
 		case VariableType::Texture:
@@ -223,13 +286,15 @@ void RenderPipelineCodeGenerator::LinkResources(const std::string& projectPath, 
 				{
 					const std::string newPath = resourceDir + "/Textures/" + fileName + fileExt;
 					FileUtils::CopyFile(data.Path, newPath);
-					data.Path = newPath;
+					data.Path = CreateResPath("Textures", fileName + fileExt);
 				}
 			}
 		} break;
 		}
 		};
 	pipeline.VariablePool.ForEachVariable(fn);
+
+	FileUtils::DeleteDirectory(tmpDir);
 }
 
 void RenderPipelineCodeGenerator::WriteInputCallbacks(CodeGenerator& generator, const CompiledPipeline& pipeline, WebGLExecutorNodeVisitor& visitor)

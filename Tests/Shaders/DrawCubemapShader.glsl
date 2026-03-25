@@ -4,7 +4,7 @@
 
 layout (location = 0) in vec3 in_Pos;
 
-out vec3 out_SkyboxRay;
+layout (location = 0) out vec3 out_SkyboxRay;
 
 uniform mat4 View;
 uniform mat4 Projection;
@@ -19,9 +19,9 @@ void main()
 
 #ifdef FRAGMENT
 
-out vec4 FragColor;
+layout (location = 0) out vec4 FragColor;
 
-out vec3 out_SkyboxRay;
+layout (location = 0) in vec3 out_SkyboxRay;
 
 layout(binding=0) uniform sampler2D Skybox;
 

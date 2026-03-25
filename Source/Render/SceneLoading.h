@@ -69,10 +69,12 @@ namespace SceneLoading
 		bool HasErrors() const { return !m_ErrorMessages.empty(); }
 		void PrintErrors()
 		{
+			App::Get()->GetConsole().Log("<red>-------------[Loader errors]-----------</red> ");
 			for (const std::string& e : m_ErrorMessages)
 			{
-				App::Get()->GetConsole().Log("[Loader error] " + e);
+				App::Get()->GetConsole().Log(e);
 			}
+			App::Get()->GetConsole().Log("<red>---------------------------------------</red> ");
 		}
 
 	private:

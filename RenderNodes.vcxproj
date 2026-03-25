@@ -110,6 +110,7 @@
     <ClCompile Include="Source\Editor\Drawing\EditorWidgets.cpp" />
     <ClCompile Include="Source\Editor\EditorNode.cpp" />
     <ClCompile Include="Source\Execution\ExecutorNodeVisitor_InEditor.cpp" />
+    <ClCompile Include="Source\Misc\WGSLConverter.cpp" />
     <ClCompile Include="Source\NodeGraph\NodeGraph.cpp" />
     <ClCompile Include="Source\Editor\RenderPipelineEditor.cpp" />
     <ClCompile Include="Source\Execution\RenderPipelineExecutor.cpp" />
@@ -164,6 +165,7 @@
     <ClInclude Include="Source\Execution\ValueNode.h" />
     <ClInclude Include="Source\Execution\ValueNodeImpl.h" />
     <ClInclude Include="Source\imgui_rendernodes.h" />
+    <ClInclude Include="Source\Misc\WGSLConverter.h" />
     <ClInclude Include="Source\NodeGraph\NodeGraph.h" />
     <ClInclude Include="Source\Editor\RenderPipelineEditor.h" />
     <ClInclude Include="Source\Execution\ExecutorNode.h" />
@@ -194,12 +196,18 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-  <Target Name="CopyFilesAfterBuild" AfterTargets="Build">
+  <Target Name="CopyTemplate" AfterTargets="Build">
     <RemoveDir Directories="$(TargetDir)Data" />
     <MakeDir Directories="$(TargetDir)Data" />
     <ItemGroup>
       <TemplateFiles Include="$(ProjectDir)Source\CodeGenerator\WebGPU\Template\**\*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(TemplateFiles)" DestinationFiles="@(TemplateFiles->'$(TargetDir)Data\WebGPU_Template\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+  <Target Name="CopyTools" AfterTargets="Build">
+    <ItemGroup>
+      <NagaCliFiles Include="$(ProjectDir)External\naga-cli\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NagaCliFiles)" DestinationFolder="$(TargetDir)Tools\naga-cli" SkipUnchangedFiles="true" />
   </Target>
 </Project>

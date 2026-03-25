@@ -116,7 +116,7 @@ void InitRenderResources(ExecuteContext& context)
 				errorMessages.push_back("Failed to load shader under variable " + variable.Name + " (empty path)");
 				return;
 			}
-			context.RenderResources.Shaders[id] = Shader::Compile(shaderData.Path);
+			context.RenderResources.Shaders[id] = Shader::Compile(shaderData.Path, { ShaderStage::Vertex, ShaderStage::Fragment });
 		} break;
 		}
 	};
@@ -165,9 +165,6 @@ void RenderPipelineExecutor::OnStart()
 	m_Context.VariablePool = m_Pipeline.VariablePool;
 	InitStaticResources(m_Context);
 	InitRenderResources(m_Context);
-
-	// Clear console
-	App::Get()->GetConsole().Clear();
 
 	// Execute
 	InEditorExecutorNodeVisitor executor{ m_Context };

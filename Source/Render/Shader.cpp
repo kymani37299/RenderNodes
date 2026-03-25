@@ -6,58 +6,61 @@
 #include <set>
 
 #include "../App/App.h"
+#include "../Util/FileUtils.h"
 
-static bool ReadFile(const std::string& path, std::vector<std::string>& content)
+std::string GetShaderDefine(ShaderStage stage)
 {
-	std::ifstream fileStream(path, std::ios::in);
-
-	if (!fileStream.is_open()) {
-		return false;
+	switch(stage)
+	{
+	case ShaderStage::Vertex: return "VERTEX";
+	case ShaderStage::Fragment: return "FRAGMENT";
+	default:
+		NOT_IMPLEMENTED;
 	}
-
-	std::string line = "";
-	while (!fileStream.eof()) {
-		std::getline(fileStream, line);
-		content.push_back(line);
-	}
-
-	fileStream.close();
-	return true;
+	return "UNKOWN";
 }
 
-static GLenum MacroToShaderType(const std::string macro)
+unsigned GetShaderGLEnum(ShaderStage stage)
 {
-	if (macro.find("#start VERTEX") != std::string::npos) return GL_VERTEX_SHADER;
-	if (macro.find("#start FRAGMENT") != std::string::npos) return GL_FRAGMENT_SHADER;
-	if (macro.find("#start COMPUTE") != std::string::npos) return GL_COMPUTE_SHADER;
-	if (macro.find("#start GEOMETRY") != std::string::npos) return GL_GEOMETRY_SHADER;
+	switch (stage)
+	{
+	case ShaderStage::Vertex: return GL_VERTEX_SHADER;
+	case ShaderStage::Fragment: return GL_FRAGMENT_SHADER;
+	default:
+		NOT_IMPLEMENTED;
+	}
 	return 0;
 }
 
-std::string GetTag(GLenum type)
+std::string GetTag(ShaderStage stage)
 {
-	switch (type)
+	switch (stage)
 	{
-	case GL_VERTEX_SHADER:
-		return "[VS]";
-	case GL_FRAGMENT_SHADER:
-		return "[FS]";
-	case GL_COMPUTE_SHADER:
-	 	return "[CS]";
-	case GL_GEOMETRY_SHADER:
-		return "[GS]";
+	case ShaderStage::Vertex: return "[VS]";
+	case ShaderStage::Fragment: return "[FS]";
 	default:
-		return "[Unknown shader type]";
+		NOT_IMPLEMENTED;
 	}
+	return "[Unknown shader type]";
 }
 
-static void LogError(const std::string& err)
+// TODO: Make it threadsafe
+static std::vector<std::string> s_Errors;
+
+static void LogErrors(const std::string& path)
 {
-	App::Get()->GetConsole().Log("[Shader compiler error] " + err);
+	App::Get()->GetConsole().Log("<red>----------------[Shader compiler errors]------------------</red> ");
+	App::Get()->GetConsole().Log("File: " + path);
+	for (const auto& err : s_Errors)
+	{
+		App::Get()->GetConsole().Log(err);
+	}
+	App::Get()->GetConsole().Log("<red>----------------------------------------------------------</red> ");
 }
 
-static unsigned CompileShader(unsigned type, const char* source)
+static unsigned CompileShader(ShaderStage stage, const char* source)
 {
+	unsigned type = GetShaderGLEnum(stage);
 	GL_CALL(unsigned id = glCreateShader(type));
 	GL_CALL(glShaderSource(id, 1, &source, nullptr));
 	GL_CALL(glCompileShader(id));
@@ -70,7 +73,7 @@ static unsigned CompileShader(unsigned type, const char* source)
 		GL_CALL(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length));
 		char* message = (char*)alloca(length * sizeof(char));
 		GL_CALL(glGetShaderInfoLog(id, length, &length, message));
-		LogError(GetTag(type) + " " + message);
+		s_Errors.push_back(GetTag(stage) + " " + message);
 		GL_CALL(glDeleteShader(id));
 		return 0;
 	}
@@ -96,12 +99,12 @@ static void DecomposePath(const std::string& path, std::string& pathRoot, std::s
 	fileName = path.substr(path.find_last_of("/\\") + 1);
 }
 
-static bool ReadShaderFile(std::string& outputCode, const std::string& includeRoot, const std::string includePath)
+bool ReadShaderFile(std::string& outputCode, std::string& shaderVersion, const std::string& includeRoot, const std::string includePath)
 {
 	std::vector<std::string> shaderContent;
-	if (!ReadFile(includeRoot + includePath, shaderContent))
+	if (!FileUtils::ReadFile(includeRoot + includePath, shaderContent))
 	{
-		LogError("Failed to load shader file: " + includeRoot + includePath);
+		s_Errors.push_back("Failed to load shader file: " + includeRoot + includePath);
 		return false;
 	}
 
@@ -116,12 +119,14 @@ static bool ReadShaderFile(std::string& outputCode, const std::string& includeRo
 			ReplaceAll(fileName, " ", "");
 			ReplaceAll(fileName, "\"", "");
 
-			if (!ReadShaderFile(outputCode, includeRoot, fileName))
+			if (ReadShaderFile(outputCode, shaderVersion, includeRoot, fileName))
 				return false;
 		}
-		else if (line.find("#version") != std::string::npos) // TODO: Read version from here
+		else if (line.find("#version") != std::string::npos)
 		{
-			continue;
+			shaderVersion = line;
+			ReplaceAll(shaderVersion, "#version", "");
+			ReplaceAll(shaderVersion, " ", "");
 		}
 		else
 		{
@@ -131,42 +136,71 @@ static bool ReadShaderFile(std::string& outputCode, const std::string& includeRo
 	return true;
 }
 
-Ptr<Shader> Shader::Compile(const std::string& path)
+std::string Shader::GetShaderStageExtension(ShaderStage stage)
+{
+	switch (stage)
+	{
+	case ShaderStage::Vertex: return ".vert";
+	case ShaderStage::Fragment: return ".frag";
+	default:
+		NOT_IMPLEMENTED;
+	}
+	return "";
+}
+
+std::string Shader::FinalizeShaderCode(ShaderStage stage, const std::string& shaderVersion, const std::string& shaderCode)
+{
+	return "#version " + shaderVersion + "\n#define " + GetShaderDefine(stage) + "\n" + shaderCode;
+}
+
+bool Shader::ReadShaderFile(const std::string& path, std::string& outputCode, std::string& shaderVersion)
 {
 	std::string includeRoot, shaderFile;
 	DecomposePath(path, includeRoot, shaderFile);
+	return ::ReadShaderFile(outputCode, shaderVersion, includeRoot, shaderFile);
+}
 
-	std::string shaderCode;
-	if (!ReadShaderFile(shaderCode, includeRoot, shaderFile))
+Ptr<Shader> Shader::Compile(const std::string& path, const std::vector<ShaderStage>& stages)
+{
+	std::vector<std::string> errors;
+
+	std::string shaderCode, shaderVersion;
+	if (!Shader::ReadShaderFile(path, shaderCode, shaderVersion))
 	{
-		LogError("Failed to compile shader!");
+		errors.push_back("Failed to compile shader!");
+		s_Errors.push_back("Failed to compile shader!");
+		LogErrors(path);
 		return nullptr;
 	}
 
-	const std::string vertexCode = "#version 430\n#define VERTEX\n" + shaderCode;
-	unsigned vsModule = CompileShader(GL_VERTEX_SHADER, vertexCode.c_str());
-
-	const std::string fragmentCode = "#version 430\n#define FRAGMENT\n" + shaderCode;
-	unsigned fsModule = CompileShader(GL_FRAGMENT_SHADER, fragmentCode.c_str());
-
-	if (!vsModule || !fsModule)
+	std::vector<unsigned> shaderModules{};
+	for (ShaderStage stage : stages)
 	{
-		LogError("Failed to compile shader!");
-		return nullptr;
+		const std::string moduleCode = FinalizeShaderCode(stage, shaderVersion, shaderCode);
+		unsigned module = CompileShader(stage, moduleCode.c_str());
+		if (!module)
+		{
+			s_Errors.push_back("Failed to compile shader!");
+			LogErrors(path);
+			return nullptr;
+		}
+		shaderModules.push_back(module);
 	}
 
 	Shader* shader = new Shader{};
 	GL_CALL(shader->Handle = glCreateProgram());
-	GL_CALL(glAttachShader(shader->Handle, vsModule));
-	GL_CALL(glAttachShader(shader->Handle, fsModule));
+	for (unsigned module : shaderModules)
+	{
+		GL_CALL(glAttachShader(shader->Handle, module));
+	}
 	GL_CALL(glLinkProgram(shader->Handle));
 
 	GLint validLinking;
 	GL_CALL(glGetProgramiv(shader->Handle, GL_LINK_STATUS, (int*)&validLinking));
 	if (!validLinking)
 	{
-		LogError("Failed to link shader!");
-		std::cout << "[Shader compiler error] failed to link shader" << std::endl;
+		s_Errors.push_back("Failed to link shader!");
+		LogErrors(path);
 		return nullptr;
 	}
 
@@ -175,17 +209,19 @@ Ptr<Shader> Shader::Compile(const std::string& path)
 	GL_CALL(glGetProgramiv(shader->Handle, GL_VALIDATE_STATUS, (int*)&validShader));
 	if (!validShader)
 	{
-		LogError("Shader is not valid!");
+		s_Errors.push_back("Shader is not valid!");
+		LogErrors(path);
 		return nullptr;
 	}
 
+	for (unsigned module : shaderModules)
+	{
 #ifdef _DEBUG
-	GL_CALL(glDetachShader(shader->Handle, vsModule));
-	GL_CALL(glDetachShader(shader->Handle, fsModule));
+		GL_CALL(glDetachShader(shader->Handle, module));
 #else
-	GL_CALL(glDeleteShader(vsModule));
-	GL_CALL(glDeleteShader(fsModule));
+		GL_CALL(glDeleteShader(module));
 #endif
+	}
 
 	return Ptr<Shader>{shader};
 }

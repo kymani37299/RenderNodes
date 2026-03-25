@@ -470,7 +470,7 @@ Float2ValueNode* PinEvaluator::EvaluateFloat2BinaryOperator(Float2BinaryOperator
 {
 	Float2ValueNode* a = EvaluateFloat2(node->GetAPin());
 	Float2ValueNode* b = EvaluateFloat2(node->GetBPin());
-	return new BinaryArithmeticOperatorValueNode<Float2>{ a, b, node->GetOp()[0]};
+	return new VectorBinaryArithmeticOperatorValueNode<Float2>{ a, b, node->GetOp()[0]};
 }
 
 Float2ValueNode* PinEvaluator::EvaluateNormalizeFloat2(NormalizeFloat2EditorNode* node)
@@ -496,7 +496,7 @@ Float3ValueNode* PinEvaluator::EvaluateFloat3BinaryOperator(Float3BinaryOperator
 {
 	Float3ValueNode* a = EvaluateFloat3(node->GetAPin());
 	Float3ValueNode* b = EvaluateFloat3(node->GetBPin());
-	return new BinaryArithmeticOperatorValueNode<Float3>{ a, b, node->GetOp()[0]};
+	return new VectorBinaryArithmeticOperatorValueNode<Float3>{ a, b, node->GetOp()[0]};
 }
 
 Float3ValueNode* PinEvaluator::EvaluateNormalizeFloat3(NormalizeFloat3EditorNode* node)
@@ -521,7 +521,7 @@ Float4ValueNode* PinEvaluator::EvaluateFloat4BinaryOperator(Float4BinaryOperator
 {
 	Float4ValueNode* a = EvaluateFloat4(node->GetAPin());
 	Float4ValueNode* b = EvaluateFloat4(node->GetBPin());
-	return new BinaryArithmeticOperatorValueNode<Float4>{ a, b, node->GetOp()[0] };
+	return new VectorBinaryArithmeticOperatorValueNode<Float4>{ a, b, node->GetOp()[0] };
 }
 
 Float4ValueNode* PinEvaluator::EvaluateNormalizeFloat4(NormalizeFloat4EditorNode* node)

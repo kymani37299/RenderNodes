@@ -6,8 +6,8 @@ layout (location = 0) in vec3 in_Pos;
 layout (location = 1) in vec2 in_UV;
 layout (location = 2) in vec3 in_Normal;
 
-out vec2 out_UV;
-out vec3 out_Normal;
+layout(location = 0) out vec2 out_UV;
+layout(location = 1) out vec3 out_Normal;
 
 uniform mat4 Model;
 uniform mat4 View;
@@ -24,10 +24,10 @@ void main()
 
 #ifdef FRAGMENT
 
-out vec4 FragColor;
+layout(location = 0) out vec4 FragColor;
 
-in vec2 out_UV;
-in vec3 out_Normal;
+layout(location = 0) in vec2 out_UV;
+layout(location = 1) in vec3 out_Normal;
 
 layout(binding=0) uniform sampler2D Albedo;
 

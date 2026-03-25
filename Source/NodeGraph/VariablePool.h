@@ -18,6 +18,7 @@ struct TextureData
 struct ShaderData
 {
 	std::string Path = "";
+	std::unordered_map<std::string, int> BindingMap; // TODO: Remove this from data since its only used in WebGPU
 };
 
 struct SceneData
