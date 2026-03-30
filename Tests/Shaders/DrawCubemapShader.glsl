@@ -11,7 +11,10 @@ uniform mat4 Projection;
 
 void main()
 {
-    gl_Position = vec4(in_Pos, 0.0f) * View * Projection;
+    vec4 viewPos = vec4(in_Pos, 0.0f) * View;
+    viewPos.w = 1.0;
+    gl_Position = viewPos * Projection;
+
     out_SkyboxRay = in_Pos;
 }
 
@@ -23,20 +26,12 @@ layout (location = 0) out vec4 FragColor;
 
 layout (location = 0) in vec3 out_SkyboxRay;
 
-layout(binding=0) uniform sampler2D Skybox;
-
-vec2 SprericalToUV(vec3 coords)
-{
-    const vec2 invAtan = vec2(0.1591, 0.3183);
-    vec2 uv = vec2(atan(coords.x, coords.z), asin(coords.y));
-    uv *= invAtan;
-    uv += 0.5;
-    return uv;
-}
-
 void main()
 {
-    FragColor = texture(Skybox, SprericalToUV(out_SkyboxRay));
+    vec3 ray = normalize(out_SkyboxRay);
+    float t = 0.5 * (ray.y + 1.0);
+    vec3 skyColor = mix(vec3(0.5, 0.7, 1.0), vec3(1.0, 1.0, 1.0), t);
+    FragColor = vec4(skyColor, 1.0);
 } 
 
 #endif // FRAGMENT

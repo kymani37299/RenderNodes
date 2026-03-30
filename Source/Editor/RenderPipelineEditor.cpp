@@ -37,6 +37,13 @@ void RenderPipelineEditor::Render()
 
     ImNode::Begin("Render pipeline editor", ImVec2(0.0, 0.0f));
 
+    // Make sure node graph window is never over other windows
+    ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
+    if (ImGuiWindow* window = ImGui::GetCurrentWindow())
+    {
+        window->Flags |= ImGuiWindowFlags_NoBringToFrontOnFocus;
+    }
+
     UpdateEditor();
     RenderEditor();
 
@@ -295,7 +302,6 @@ void RenderPipelineEditor::RenderVariableWindow()
     ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
 
     ImGui::Begin("Variables");
-    ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
     if (ImGui::Button("Add...")) m_CurrentDialog = Ptr<NewVariableDialog>(new NewVariableDialog{});
 

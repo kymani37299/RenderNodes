@@ -1,6 +1,7 @@
 #include "NodeGraphSerializer.h"
 
 #include <sstream>
+#include <regex>
 
 #include "../App/App.h"
 #include "../Common.h"
@@ -1121,25 +1122,8 @@ static bool ValidateIntStr(const std::string& intStr)
 
 static bool ValidateFloatStr(const std::string& floatStr)
 {
-	if (floatStr.empty()) return false;
-
-	unsigned numDots = 0;
-	for (unsigned i = (floatStr[0] == '-') ? 1 : 0; i < floatStr.size(); i++)
-	{
-		if (floatStr[i] == '.')
-		{
-			numDots++;
-			if (numDots > 1)
-				return false;
-
-			continue;
-		}
-		if (!std::isdigit(floatStr[i]))
-		{
-			return false;
-		}
-	}
-	return true;
+	static const std::regex pattern(R"(^-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$)");
+	return std::regex_match(floatStr, pattern);
 }
 
 int NodeGraphSerializer::ReadIntAttr(const std::string& name)

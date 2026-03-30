@@ -146,6 +146,8 @@ inline std::string GetPathWithoutExtension(const std::string path)
 
 void App::Run()
 {
+	SubscribeToInput(this);
+
     // Render loop
     while (!glfwWindowShouldClose(m_Window))
     {
@@ -180,6 +182,8 @@ void App::Run()
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }
+
+	UnsubscribeToInput(this);
 }
 
 void App::RenderMenuBar()
@@ -280,9 +284,12 @@ void App::RenderFrame()
 			ImGui::PopStyleVar();
 		}
 
-		if (ImGui::Button("   Abort    "))
-			AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
-
+		if (!editNode)
+		{
+			if (ImGui::Button("   Abort    "))
+				AddRequest(AppRequest::ChangeModeRequest(AppMode::Editor));
+		}
+		
 		ImGui::EndHorizontal();
 
 		ImGui::Separator();
@@ -299,23 +306,6 @@ void App::RenderFrame()
 
 void App::HandleInputAction(const KeyInput& input)
 {
-	// TODO: Manage subscriptions of IInputListeners , current problem is state of App needs to be in sync with subscriptions
-	if (m_Mode == AppMode::Editor)
-	{
-		m_Editor->OnKeyInputEvent(input);
-
-		if ((input.Mods & GLFW_MOD_CONTROL) && input.Key == GLFW_KEY_S)
-			SaveDocument();
-	}
-	else if (m_Mode == AppMode::CustomNode)
-	{
-		m_CustomNodeEditor->OnKeyInputEvent(input);
-	}
-	else if (m_Mode == AppMode::Run)
-	{
-		m_Executor->OnKeyInputEvent(input);
-	}
-
 	for (IInputListener* listener : m_InputListeners)
 		listener->OnKeyInputEvent(input);
 }
@@ -346,11 +336,19 @@ void App::UnsubscribeToInput(IInputListener* lisnener)
 			break;
 		}
 	}
-
-	ASSERT(listenerIndex != -1);
+	
 	if (listenerIndex != -1)
 	{
 		m_InputListeners.erase(m_InputListeners.begin() + listenerIndex);
+	}
+}
+
+void App::OnKeyInputEvent(const KeyInput& input)
+{
+	if (m_Mode != AppMode::Run)
+	{
+		if (input.Action == KeyInputAction::Pressed && (input.Mods & GLFW_MOD_CONTROL) && input.Key == GLFW_KEY_S)
+			SaveDocument();
 	}
 }
 
@@ -488,10 +486,13 @@ void App::GenerateCode(const std::string& projectName)
 	if (compilationSuccessful)
 	{
 		RenderPipelineCodeGenerator codeGenerator{};
-		const bool compilationSuccess = codeGenerator.GenerateCode(projectName, pipeline);
+
+		std::string absoluteProjectPath;
+		const bool compilationSuccess = codeGenerator.GenerateCode(projectName, pipeline, absoluteProjectPath);
 		if (compilationSuccess)
 		{
 			m_Console.Log("<green>Code generation successful!</green>");
+			FileUtils::OpenPathInFileManager(absoluteProjectPath);
 		}
 		else
 		{
@@ -542,6 +543,10 @@ void App::ProcessRequests()
 
 void App::ProcessChangeModeRequest(const AppRequest& request)
 {
+	UnsubscribeToInput(m_Editor.get());
+	UnsubscribeToInput(m_CustomNodeEditor.get());
+	UnsubscribeToInput(m_Executor.get());
+
 	m_Mode = request.ChangeMode.Mode;
 	if (m_Mode == AppMode::CustomNode)
 	{
@@ -573,15 +578,19 @@ void App::ProcessChangeModeRequest(const AppRequest& request)
 		{
 			m_Console.Log("[Internal error][App::ProcessChangeModeRequest] Cannot find custom node by name " + request.ChangeMode.CustomNodeName);
 		}
+
+		SubscribeToInput(m_CustomNodeEditor.get());
 	}
 	else if(m_Mode == AppMode::Editor)
 	{
 		m_CustomNodeEditor = nullptr;
 		m_NodeGraph->RefreshNodes(m_VariablePool);
+		SubscribeToInput(m_Editor.get());
 	}
 	else if (m_Mode == AppMode::Run)
 	{
 		m_CustomNodeEditor = nullptr;
+		SubscribeToInput(m_Executor.get());
 	}
 }
 

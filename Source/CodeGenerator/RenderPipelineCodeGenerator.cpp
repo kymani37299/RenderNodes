@@ -24,11 +24,13 @@ inline std::string CreateResPath(const std::string& resouceType, const std::stri
 	return ResourcesDirectoryName + "/" + resouceType + "/" + fileName;
 }
 
-bool RenderPipelineCodeGenerator::GenerateCode(const std::string& projectName, const CompiledPipeline& pipeline)
+bool RenderPipelineCodeGenerator::GenerateCode(const std::string& projectName, const CompiledPipeline& pipeline, std::string& absoluteOutputPath)
 {
 	const std::string projectDirectoryLocation = GeneratedProjectsLocation + "/" + projectName;
 	const std::string jsSourceDir = projectDirectoryLocation + "/" + JsSourceDirectoryName;
 	const std::string codegenFileLocation = jsSourceDir + "/" + CodegenFileName;
+
+	absoluteOutputPath = FileUtils::GetAbsolutePath(projectDirectoryLocation);
 
 	m_ErrorMessages.clear();
 
@@ -268,12 +270,23 @@ void RenderPipelineCodeGenerator::LinkResources(const std::string& projectPath, 
 		case VariableType::Scene:
 		{
 			auto& data = variable.Get<SceneData>();
-			std::string fileName, fileExt;
-			if (FileUtils::GetFileNameAndExtension(data.Path, fileName, fileExt))
+			std::string fileName, fileExt, fileRootPath;
+			if (FileUtils::DecomposePath(data.Path, fileRootPath, fileName, fileExt))
 			{
 				const std::string newPath = resourceDir + "/Scenes/" + fileName + fileExt;
 				FileUtils::CopyFile(data.Path, newPath);
+				
+				// TODO: We need to read json file to find all dependencies
+				// For now, we will look for .bin file with same name
+				const std::string binFilePath = fileRootPath + "/" + fileName + ".bin";
+				if (FileUtils::FileExists(binFilePath))
+				{
+					const std::string newBinFilePath = resourceDir + "/Scenes/" + fileName + ".bin";
+					FileUtils::CopyFile(binFilePath, newBinFilePath);
+				}
+
 				data.Path = CreateResPath("Scenes", fileName + fileExt);
+
 			}
 		} break;
 		case VariableType::Texture:

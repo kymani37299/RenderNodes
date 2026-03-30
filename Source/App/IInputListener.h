@@ -41,5 +41,5 @@ inline bool operator==(const KeyInput& lhs, const KeyInput& rhs)
 class IInputListener
 {
 public:
-	virtual void OnKeyInputEvent(const KeyInput& input) {}
+	virtual void OnKeyInputEvent(const KeyInput& input) = 0;
 };

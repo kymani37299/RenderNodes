@@ -13,7 +13,7 @@ class WebGLExecutorNodeVisitor;
 class RenderPipelineCodeGenerator
 {
 public:
-	bool GenerateCode(const std::string& projectName, const CompiledPipeline& pipeline);
+	bool GenerateCode(const std::string& projectName, const CompiledPipeline& pipeline, std::string& absoluteOutputPath);
 
 private:
 	void WriteImports(CodeGenerator& generator);

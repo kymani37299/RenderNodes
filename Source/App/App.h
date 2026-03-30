@@ -72,7 +72,7 @@ struct AppRequest
 	}
 };
 
-class App
+class App : public IInputListener
 {
 	static App* s_Instance;
 
@@ -111,6 +111,8 @@ public:
 	AppConsole& GetConsole() { return m_Console; }
 	EditorErrorHandler& GetErrorHandler() { return *m_ErrorHandler; }
 	VariablePool& GetVariablePool() { return m_VariablePool; }
+
+	virtual void OnKeyInputEvent(const KeyInput& input) override;
 
 private:
 	void NewDocument();

@@ -4,11 +4,23 @@
 #include <fstream>
 #include <filesystem>
 #include <stdexcept>
+
+#if defined(_WIN32)
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <cstdlib>
+#else // Linux / Unix
+#include <cstdlib>
+#endif
 
 namespace FileUtils {
 
     namespace fs = std::filesystem;
+
+	inline bool FileExists(const std::string& path)
+	{
+		return fs::exists(path);
+	}
 
     inline bool CopyFile(const std::string& src, const std::string& dst) 
     {
@@ -134,12 +146,28 @@ namespace FileUtils {
 		}
 	}
 
+	inline bool DecomposePath(const std::string& path, std::string& outRootPath, std::string& outFileName, std::string& outExtension)
+	{
+		try
+		{
+			fs::path p(path);
+			if (!p.has_filename())
+				return false;
+
+			outRootPath = p.parent_path().string();
+			outFileName = p.stem().string();
+			outExtension = p.extension().string(); // includes the dot: ".txt"
+			return true;
+		}
+		catch (const std::exception&)
+		{
+			return false;
+		}
+	}
+
 	inline std::string GetWorkingDirectory()
 	{
-		CHAR buffer[MAX_PATH] = { 0 };
-		GetModuleFileNameA(NULL, buffer, MAX_PATH);
-		std::string::size_type pos = std::string(buffer).find_last_of("\\/");
-		return std::string(buffer).substr(0, pos);
+		return fs::current_path().generic_string();
 	}
 
 	inline std::string GetRelativePath(const std::string& absolutePath)
@@ -148,6 +176,15 @@ namespace FileUtils {
 		const fs::path ref{ GetWorkingDirectory() };
 		const fs::path relative = fs::relative(base, ref);
 		return relative.generic_string();
+	}
+
+	inline std::string GetAbsolutePath(const std::string& relativePath)
+	{
+		const fs::path base{ relativePath };
+		const fs::path ref{ GetWorkingDirectory() };
+
+		const fs::path absolute = fs::weakly_canonical(ref / base);
+		return absolute.generic_string();
 	}
 
 	inline bool ReadFile(const std::string& path, std::vector<std::string>& content)
@@ -166,5 +203,24 @@ namespace FileUtils {
 
 		fileStream.close();
 		return true;
+	}
+
+	inline void OpenPathInFileManager(const std::string& path)
+	{
+		fs::path p(path);
+
+		if (!fs::exists(p))
+			return;
+
+#if defined(_WIN32)
+		std::wstring wPath(path.begin(), path.end());
+		ShellExecuteW(nullptr, L"open", wPath.c_str(), nullptr, nullptr, SW_SHOWDEFAULT);
+#elif defined(__APPLE__)
+		std::string command = "open \"" + path + "\"";
+		system(command.c_str());
+#else
+		std::string command = "xdg-open \"" + path + "\"";
+		system(command.c_str());
+#endif
 	}
 }

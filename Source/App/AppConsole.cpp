@@ -115,7 +115,6 @@ static std::vector<ConsoleSegment> ParseAnsiString(const std::string& input)
 void AppConsole::Draw()
 {
 	ImGui::Begin("Console");
-	ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 	if (ImGui::Button("Clear")) Clear();
 	ImGui::SameLine();
 	if (ImGui::Button("Copy"))
